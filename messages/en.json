@@ -1,0 +1,64 @@
+{
+  "home": {
+    "title": "BBU LMS",
+    "intro": "This is the first step of the new login module, compatible with your existing database. Azerbaijani is the primary language.",
+    "loginLink": "Sign in"
+  },
+  "login": {
+    "title": "Sign in",
+    "subtitle": "Use the same username and password as in the legacy system. After the first successful sign-in, your password will be stored securely.",
+    "username": "Username",
+    "password": "Password",
+    "submit": "Sign in",
+    "submitting": "Please wait…",
+    "error": "Invalid username or password.",
+    "networkError": "Could not reach the server. Is the backend running?",
+    "backHome": "Back to home"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "welcome": "Hello, {displayName}.",
+    "loginId": "Username: {username}",
+    "role": "Role: {role}",
+    "logout": "Log out",
+    "nonTeacher": "This section is for registered teachers and students only.",
+    "unnamedCourse": "Course title not available",
+    "coursesLoadError": "Could not load courses. Check backend and database.",
+    "yearHint": "Current academic year (from DB): {year}. Teachers: current year and open assignment (MS).",
+    "sections": {
+      "current": "Currently teaching",
+      "currentSub": "Current academic year, active assignments (main teaching, MS).",
+      "past": "Previously taught",
+      "pastSub": "Earlier years or closed assignments (main teaching, MS).",
+      "attestation": "Attestation",
+      "attestationSub": "Courses with evaluation type XDS.",
+      "practice": "Internship / practice",
+      "practiceSub": "Courses with evaluation type MSL."
+    },
+    "empty": {
+      "current": "No courses in this category.",
+      "past": "No courses in this category.",
+      "future": "No courses scheduled for future academic years.",
+      "attestation": "No attestation courses assigned.",
+      "practice": "No practice courses assigned."
+    },
+    "student": {
+      "yearHint": "Current academic year (from DB): {year}. Current / past / future are split mainly by academic year and course status (main teaching, MS).",
+      "current": "Current courses",
+      "currentSub": "Current academic year with active enrollment.",
+      "past": "Completed courses",
+      "pastSub": "Earlier years or closed courses in the current year.",
+      "future": "Upcoming courses",
+      "futureSub": "Main teaching (MS) planned for upcoming academic years.",
+      "attestation": "Attestation",
+      "attestationSub": "Courses with evaluation type XDS.",
+      "practice": "Internship / practice",
+      "practiceSub": "Courses with evaluation type MSL."
+    }
+  }
+  ,
+  "journal": {
+    "title": "E-journal",
+    "loadError": "Could not load the e-journal. Check backend and database."
+  }
+}

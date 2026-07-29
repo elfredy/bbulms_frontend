@@ -1,0 +1,169 @@
+.yearBanner {
+  margin: 1.25rem 0 0;
+  padding: 0.65rem 1rem;
+  background: linear-gradient(135deg, #e8f1fb 0%, #f0f4f8 100%);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+.tabsWrap {
+  margin-top: 1.25rem;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tabsList {
+  display: flex;
+  gap: 0.25rem;
+  min-width: min-content;
+  padding-bottom: 0;
+}
+
+.tab {
+  position: relative;
+  padding: 0.75rem 1rem;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  border-radius: 8px 8px 0 0;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.tab:hover {
+  background: rgba(11, 92, 171, 0.06);
+  color: var(--text);
+}
+
+.tabActive {
+  color: var(--accent);
+  background: var(--card);
+  box-shadow: 0 -1px 0 0 var(--card), 0 1px 0 0 var(--card);
+  border: 1px solid var(--border);
+  border-bottom-color: var(--card);
+  margin-bottom: -1px;
+  z-index: 1;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  margin-left: 0.4rem;
+  padding: 0 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent);
+  border-radius: 999px;
+}
+
+.panel {
+  padding: 1.25rem 0 2rem;
+}
+
+.panelSubtitle {
+  margin: 0 0 1.25rem;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--muted);
+  max-width: 42rem;
+}
+
+.courseList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.courseCard {
+  padding: 1rem 1.15rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow:               0 1px 2px rgba(26, 29, 38, 0.04);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.courseCard:hover {
+  border-color: rgba(11, 92, 171, 0.25);
+  box-shadow: 0 4px 14px rgba(26, 29, 38, 0.06);
+}
+
+.courseName {
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.courseCodePill {
+  display: inline-block;
+  margin-top: 0.35rem;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+  background: rgba(11, 92, 171, 0.09);
+  border-radius: 6px;
+}
+
+.courseMeta {
+  margin: 0.55rem 0 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.courseActions {
+  margin-top: 0.75rem;
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.linkButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.4rem 0.65rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid rgba(11, 92, 171, 0.22);
+  color: var(--accent);
+  background: rgba(11, 92, 171, 0.06);
+  text-decoration: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.linkButton:hover {
+  background: rgba(11, 92, 171, 0.1);
+  border-color: rgba(11, 92, 171, 0.35);
+}
+
+.empty {
+  margin: 0;
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.92rem;
+  background: var(--card);
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+}
