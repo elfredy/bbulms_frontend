@@ -95,6 +95,19 @@ function fmtTimeRange(start: string | null | undefined, end: string | null | und
   return [start, end].filter(Boolean).join(" - ");
 }
 
+/** Mühazirə → M, Seminar → S, Laboratoriya → L */
+function lessonTypeShort(m: CourseMeetingItem): string | null {
+  const id = String(m.lesson_type_id ?? "").trim();
+  if (id === "110000111") return "M";
+  if (id === "110000112") return "S";
+  if (id === "110000113") return "L";
+  const name = String(m.lesson_type_az ?? "").trim().toLowerCase();
+  if (name.startsWith("müha") || name.startsWith("muha") || name.includes("lecture")) return "M";
+  if (name.startsWith("sem")) return "S";
+  if (name.startsWith("lab")) return "L";
+  return null;
+}
+
 function dateOnly(v: string | null | undefined): string {
   return String(v ?? "").slice(0, 10);
 }
@@ -692,14 +705,22 @@ export function JournalClient({
               <thead>
                 <tr>
                   <th className={`${styles.th} ${styles.nameCol}`}>Tələbə</th>
-                  {meetingWindow.map((m) => (
-                    <th key={m.course_meeting_id} className={`${styles.th} ${styles.thCell}`}>
-                      <div>{fmtDateLabel(m.meeting_date)}</div>
-                      <div className={styles.muted} style={{ fontSize: 12 }}>
-                        {fmtTimeRange(m.start_time, m.end_time)}
-                      </div>
-                    </th>
-                  ))}
+                  {meetingWindow.map((m) => {
+                    const lt = lessonTypeShort(m);
+                    return (
+                      <th key={m.course_meeting_id} className={`${styles.th} ${styles.thCell}`}>
+                        <div>{fmtDateLabel(m.meeting_date)}</div>
+                        <div className={styles.muted} style={{ fontSize: 12 }}>
+                          {fmtTimeRange(m.start_time, m.end_time)}
+                        </div>
+                        {lt ? (
+                          <div className={styles.muted} style={{ fontSize: 12, fontWeight: 600 }} title={m.lesson_type_az ?? undefined}>
+                            {lt}
+                          </div>
+                        ) : null}
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>

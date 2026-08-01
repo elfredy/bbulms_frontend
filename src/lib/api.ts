@@ -237,6 +237,8 @@ export type CourseMeetingItem = {
   start_time: string | null;
   end_time: string | null;
   point_status: string | null;
+  lesson_type_id?: string | null;
+  lesson_type_az?: string | null;
 };
 
 export type CourseMeetingListResponse = {
