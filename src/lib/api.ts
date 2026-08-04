@@ -276,12 +276,15 @@ export type JournalCell = {
   student_id: string;
   course_eva_id: string;
   value: string | null;
+  confirmed?: boolean;
 };
 
 export type JournalGridResponse = {
   course_id: string;
   course_meeting_id: string;
   cells: JournalCell[];
+  meeting_confirmed?: boolean;
+  editable?: boolean;
 };
 
 export type JournalUpsertRequest = {
@@ -289,6 +292,10 @@ export type JournalUpsertRequest = {
   course_eva_id: string;
   course_meeting_id: string;
   value: string | null;
+};
+
+export type JournalConfirmRequest = {
+  course_meeting_id: string;
 };
 
 export type JournalPointsGridResponse = {
@@ -325,6 +332,7 @@ export type CourseExerciseItem = {
   start_date: string | null;
   end_date: string | null;
   editable: boolean;
+  confirmed?: boolean;
 };
 
 export type CourseExerciseListResponse = {
@@ -351,6 +359,7 @@ export type CourseExercisePointsResponse = {
   start_date: string | null;
   end_date: string | null;
   editable: boolean;
+  confirmed?: boolean;
   cells: CourseExercisePointCell[];
 };
 

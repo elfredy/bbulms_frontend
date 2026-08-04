@@ -4,6 +4,7 @@ import type {
   CourseExerciseListResponse,
   CourseExercisePointsResponse,
   CourseExercisePointUpsertRequest,
+  JournalConfirmRequest,
   JournalGridResponse,
   JournalPointsGridResponse,
   JournalResultResponse,
@@ -26,6 +27,16 @@ export async function getTeacherJournalGrid(courseId: string, meetingId: string)
 
 export async function upsertTeacherJournalCell(courseId: string, body: JournalUpsertRequest): Promise<JournalGridResponse | null> {
   const res = await fetch(`/api/teacher/courses/${courseId}/journal`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return jsonOrNull(res);
+}
+
+export async function confirmTeacherJournalMeeting(courseId: string, body: JournalConfirmRequest): Promise<JournalGridResponse | null> {
+  const res = await fetch(`/api/teacher/courses/${courseId}/journal/confirm`, {
     method: "POST",
     credentials: "include",
     headers: { "content-type": "application/json" },
@@ -116,3 +127,17 @@ export async function upsertTeacherCourseExercisePoint(
   return jsonOrNull(res);
 }
 
+export async function confirmTeacherCourseExercise(
+  courseId: string,
+  type: string,
+  courseExecisesId: string
+): Promise<CourseExercisePointsResponse | null> {
+  const res = await fetch(
+    `/api/teacher/courses/${courseId}/course-exercises/${courseExecisesId}/confirm?type=${encodeURIComponent(type)}`,
+    {
+      method: "POST",
+      credentials: "include",
+    }
+  );
+  return jsonOrNull(res);
+}

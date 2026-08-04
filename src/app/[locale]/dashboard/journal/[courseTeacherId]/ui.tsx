@@ -6,6 +6,8 @@ import styles from "./journal.module.css";
 
 import type { CourseEvaluationItem, CourseMeetingItem, JournalCell, StudentRosterItem } from "@/lib/api";
 import {
+  confirmTeacherCourseExercise,
+  confirmTeacherJournalMeeting,
   createTeacherCourseExercise,
   getTeacherCourseExercisePoints,
   getTeacherCourseExercises,
@@ -18,6 +20,12 @@ import {
 } from "@/lib/api-client";
 
 type TabId = "summary" | "attendance" | "exam" | "referat" | "colloquium";
+
+const STATUS_CONFIRMED = "110000058";
+
+function isConfirmedStatus(v: string | null | undefined): boolean {
+  return String(v ?? "").trim() === STATUS_CONFIRMED;
+}
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "summary", label: "Ümumi" },
@@ -35,14 +43,32 @@ const ATTENDANCE_OPTIONS: { value: string; label: string }[] = [
   { value: "ü.z", label: "ü.z" },
 ];
 
+const ATTENDANCE_CODE_SET = new Set(
+  ATTENDANCE_OPTIONS.map((o) => o.value.trim().toLowerCase()).filter(Boolean),
+);
+
 const DISPLAY_START_DATE = "2026-02-16";
 const MEETING_WINDOW_SIZE = 11; // 5 days before + today + 5 days after
+
+function isAttendanceValue(rawValue: string | null | undefined): boolean {
+  return ATTENDANCE_CODE_SET.has(String(rawValue ?? "").trim().toLowerCase());
+}
+
+/** Qiymət (0–max) + davamiyyət kodları (10-dan sonra). */
+function combinedMeetingOptions(maxPoint = 10): { value: string; label: string }[] {
+  const opts: { value: string; label: string }[] = [{ value: "", label: "—" }];
+  for (let i = 0; i <= maxPoint; i++) opts.push({ value: String(i), label: String(i) });
+  for (const o of ATTENDANCE_OPTIONS) {
+    if (o.value) opts.push(o);
+  }
+  return opts;
+}
 
 function cellToneClass(stylesObj: typeof styles, rawValue: string, isAttendanceCell: boolean): string {
   const v = (rawValue ?? "").trim();
   if (!v) return stylesObj.cellEmpty;
 
-  if (isAttendanceCell) {
+  if (isAttendanceCell || isAttendanceValue(v)) {
     const s = v.toLowerCase();
     if (s === "q.b") return stylesObj.cellNeutral;
     if (s === "i.e" || s === "q.iş" || s === "ü.z") return stylesObj.cellGood;
@@ -151,6 +177,8 @@ export function JournalClient({
   const [meetingPendingByKey, setMeetingPendingByKey] = useState<Record<string, string>>({});
   const [meetingWindowStart, setMeetingWindowStart] = useState<number>(0);
   const [meetingWindowCellsByMeetingId, setMeetingWindowCellsByMeetingId] = useState<Record<string, Record<string, JournalCell>>>({});
+  const [meetingLockedById, setMeetingLockedById] = useState<Record<string, boolean>>({});
+  const [bulkValueByMeetingId, setBulkValueByMeetingId] = useState<Record<string, string>>({});
   const [resultByStudentId, setResultByStudentId] = useState<
     Record<
       string,
@@ -204,6 +232,121 @@ export function JournalClient({
     return `${mid}:${studentId}:${courseEvaId}`;
   }
 
+  const seminarMaxPoint = evalSeminar[0]?.max_point ?? 10;
+  const meetingCombinedOpts = useMemo(() => combinedMeetingOptions(seminarMaxPoint), [seminarMaxPoint]);
+
+  /** Qiymət varsa onu, yoxsa davamiyyət kodunu göstər. */
+  function meetingCombinedDisplay(
+    cellMap: Record<string, JournalCell>,
+    studentId: string,
+  ): string {
+    const evaA = evalAttendance[0];
+    const evaS = evalSeminar[0];
+    const vS = evaS ? (cellMap[key(studentId, evaS.course_eva_id)]?.value ?? "") : "";
+    const vA = evaA ? (cellMap[key(studentId, evaA.course_eva_id)]?.value ?? "") : "";
+    if (vS.trim() && parseNum(vS) != null) return String(vS).trim();
+    if (vA.trim()) return String(vA).trim();
+    if (vS.trim()) return String(vS).trim();
+    return "";
+  }
+
+  /** Bir select: rəqəm → EVA_02 (+ i.e), davamiyyət kodu → EVA_01 (aktivlik silinir). */
+  function setMeetingCombined(mid: string, studentId: string, rawNext: string) {
+    if (meetingLockedById[mid]) return;
+    const evaA = evalAttendance[0];
+    const evaS = evalSeminar[0];
+    if (!evaA && !evaS) return;
+
+    const next = String(rawNext ?? "").trim();
+    const n = parseNum(next);
+    const isAtt = isAttendanceValue(next);
+
+    setMeetingWindowCellsByMeetingId((prev) => {
+      const cellMap = { ...(prev[mid] ?? {}) };
+      const write = (evaId: string, value: string | null) => {
+        cellMap[key(studentId, evaId)] = { student_id: studentId, course_eva_id: evaId, value };
+      };
+
+      if (!next) {
+        if (evaA) write(evaA.course_eva_id, null);
+        if (evaS) write(evaS.course_eva_id, null);
+      } else if (n != null) {
+        if (evaS) write(evaS.course_eva_id, next);
+        if (evaA) write(evaA.course_eva_id, "i.e");
+      } else if (isAtt) {
+        if (evaA) write(evaA.course_eva_id, next);
+        if (evaS) write(evaS.course_eva_id, null);
+      } else {
+        return prev;
+      }
+      return { ...prev, [mid]: cellMap };
+    });
+
+    setMeetingPendingByKey((prev) => {
+      const p = { ...prev };
+      if (!next) {
+        if (evaA) p[meetingCellKey(mid, studentId, evaA.course_eva_id)] = "";
+        if (evaS) p[meetingCellKey(mid, studentId, evaS.course_eva_id)] = "";
+      } else if (n != null) {
+        if (evaS) p[meetingCellKey(mid, studentId, evaS.course_eva_id)] = next;
+        if (evaA) p[meetingCellKey(mid, studentId, evaA.course_eva_id)] = "i.e";
+      } else if (isAtt) {
+        if (evaA) p[meetingCellKey(mid, studentId, evaA.course_eva_id)] = next;
+        if (evaS) p[meetingCellKey(mid, studentId, evaS.course_eva_id)] = "";
+      }
+      return p;
+    });
+  }
+
+  function bulkApplyMeeting(mid: string) {
+    if (meetingLockedById[mid]) return;
+    const raw = (bulkValueByMeetingId[mid] ?? "").trim();
+    const evaA = evalAttendance[0];
+    const evaS = evalSeminar[0];
+    if (!evaA && !evaS) return;
+
+    const n = parseNum(raw);
+    const isAtt = isAttendanceValue(raw);
+    setErr(null);
+
+    setMeetingWindowCellsByMeetingId((prev) => {
+      const cellMap = { ...(prev[mid] ?? {}) };
+      for (const s of roster) {
+        const write = (evaId: string, value: string | null) => {
+          cellMap[key(s.student_id, evaId)] = { student_id: s.student_id, course_eva_id: evaId, value };
+        };
+        if (!raw) {
+          if (evaA) write(evaA.course_eva_id, null);
+          if (evaS) write(evaS.course_eva_id, null);
+        } else if (n != null) {
+          if (evaS) write(evaS.course_eva_id, raw);
+          if (evaA) write(evaA.course_eva_id, "i.e");
+        } else if (isAtt) {
+          if (evaA) write(evaA.course_eva_id, raw);
+          if (evaS) write(evaS.course_eva_id, null);
+        }
+      }
+      return { ...prev, [mid]: cellMap };
+    });
+
+    setMeetingPendingByKey((prev) => {
+      const p = { ...prev };
+      for (const s of roster) {
+        if (!raw) {
+          if (evaA) p[meetingCellKey(mid, s.student_id, evaA.course_eva_id)] = "";
+          if (evaS) p[meetingCellKey(mid, s.student_id, evaS.course_eva_id)] = "";
+        } else if (n != null) {
+          if (evaS) p[meetingCellKey(mid, s.student_id, evaS.course_eva_id)] = raw;
+          if (evaA) p[meetingCellKey(mid, s.student_id, evaA.course_eva_id)] = "i.e";
+        } else if (isAtt) {
+          if (evaA) p[meetingCellKey(mid, s.student_id, evaA.course_eva_id)] = raw;
+          if (evaS) p[meetingCellKey(mid, s.student_id, evaS.course_eva_id)] = "";
+        }
+      }
+      return p;
+    });
+  }
+
   function loadMeetingWindowGrids(mids: string[]) {
     const uniq = Array.from(new Set(mids.filter(Boolean)));
     if (uniq.length === 0) return;
@@ -211,6 +354,7 @@ export function JournalClient({
     startTransition(async () => {
       const results = await Promise.all(uniq.map((mid) => getTeacherJournalGrid(courseId, mid)));
       const next: Record<string, Record<string, JournalCell>> = {};
+      const locked: Record<string, boolean> = {};
       for (let i = 0; i < uniq.length; i++) {
         const mid = uniq[i];
         const res = results[i];
@@ -218,8 +362,12 @@ export function JournalClient({
         const map: Record<string, JournalCell> = {};
         for (const c of res.cells) map[key(c.student_id, c.course_eva_id)] = c;
         next[mid] = map;
+        locked[mid] = Boolean(res.meeting_confirmed) || res.editable === false || isConfirmedStatus(
+          meetings.find((m) => String(m.course_meeting_id) === mid)?.point_status
+        );
       }
       setMeetingWindowCellsByMeetingId((prev) => ({ ...prev, ...next }));
+      setMeetingLockedById((prev) => ({ ...prev, ...locked }));
     });
   }
 
@@ -348,6 +496,13 @@ export function JournalClient({
 
   // initial load
   useEffect(() => {
+    const initialLocked: Record<string, boolean> = {};
+    for (const m of meetings) {
+      const mid = String(m.course_meeting_id);
+      if (isConfirmedStatus(m.point_status)) initialLocked[mid] = true;
+    }
+    if (Object.keys(initialLocked).length) setMeetingLockedById(initialLocked);
+
     const today = new Date().toISOString().slice(0, 10);
     const idxToday = visibleMeetings.findIndex((m) => dateOnly(m.meeting_date) === today);
     const maxStart = Math.max(0, visibleMeetings.length - MEETING_WINDOW_SIZE);
@@ -508,16 +663,19 @@ export function JournalClient({
 
   function confirmSaveAttendance() {
     if (meetingPendingCount === 0) return;
-    if (!window.confirm("Daxil etdiyiniz göstəriciləri yadda saxlamaq istəyirsiniz?")) return;
+    if (!window.confirm("Daxil etdiyiniz göstəriciləri yadda saxlayıb təsdiqləmək istəyirsiniz? Təsdiqdən sonra dəyişiklik mümkün olmayacaq.")) return;
 
     setErr(null);
     startTransition(async () => {
+      const touchedMids = new Set<string>();
       for (const [k, v] of Object.entries(meetingPendingByKey)) {
         const parts = k.split(":");
         const mid = parts[0];
         const studentId = parts[1];
         const courseEvaId = parts[2];
         if (!mid || !studentId || !courseEvaId) continue;
+        if (meetingLockedById[mid]) continue;
+        touchedMids.add(mid);
         // eslint-disable-next-line no-await-in-loop
         const res = await upsertTeacherJournalCell(courseId, {
           student_id: studentId,
@@ -533,6 +691,20 @@ export function JournalClient({
         for (const c of res.cells) map[key(c.student_id, c.course_eva_id)] = c;
         setMeetingWindowCellsByMeetingId((prev) => ({ ...prev, [mid]: map }));
       }
+
+      for (const mid of touchedMids) {
+        // eslint-disable-next-line no-await-in-loop
+        const confirmed = await confirmTeacherJournalMeeting(courseId, { course_meeting_id: mid });
+        if (!confirmed) {
+          setErr("Təsdiq alınmadı");
+          return;
+        }
+        const map: Record<string, JournalCell> = {};
+        for (const c of confirmed.cells) map[key(c.student_id, c.course_eva_id)] = c;
+        setMeetingWindowCellsByMeetingId((prev) => ({ ...prev, [mid]: map }));
+        setMeetingLockedById((prev) => ({ ...prev, [mid]: true }));
+      }
+
       setMeetingPendingByKey({});
       loadResult();
     });
@@ -542,26 +714,41 @@ export function JournalClient({
     const prefix = `${exType}:`;
     const entries = Object.entries(exercisePendingByKey).filter(([k]) => k.startsWith(prefix));
     if (entries.length === 0) return;
-    if (!window.confirm("Daxil etdiyiniz göstəriciləri yadda saxlamaq istəyirsiniz?")) return;
+    if (!window.confirm("Daxil etdiyiniz göstəriciləri yadda saxlayıb təsdiqləmək istəyirsiniz? Təsdiqdən sonra dəyişiklik mümkün olmayacaq.")) return;
 
     setErr(null);
     startTransition(async () => {
+      const touchedExerciseIds = new Set<string>();
       for (const [k, v] of entries) {
         const parts = k.split(":");
         const type = parts[0] as "colloquium" | "referat";
         const exerciseId = parts[1];
         const studentId = parts[2];
         if (!type || !exerciseId || !studentId) continue;
+        touchedExerciseIds.add(exerciseId);
         // eslint-disable-next-line no-await-in-loop
         const res = await upsertTeacherCourseExercisePoint(courseId, type, exerciseId, { student_id: studentId, value: v || null });
         if (!res) {
-          setErr("Yadda saxlanmadı (1 həftə limiti bitmiş ola bilər)");
+          setErr("Yadda saxlanmadı (1 həftə limiti bitmiş və ya təsdiqlənmiş ola bilər)");
           return;
         }
         const m: Record<string, string> = {};
         for (const c of res.cells) m[String(c.student_id)] = c.value ?? "";
         setExercisePointsByExerciseId((prev) => ({ ...prev, [exerciseId]: m }));
       }
+
+      for (const exerciseId of touchedExerciseIds) {
+        // eslint-disable-next-line no-await-in-loop
+        const confirmed = await confirmTeacherCourseExercise(courseId, exType, exerciseId);
+        if (!confirmed) {
+          setErr("Təsdiq alınmadı");
+          return;
+        }
+        const m: Record<string, string> = {};
+        for (const c of confirmed.cells) m[String(c.student_id)] = c.value ?? "";
+        setExercisePointsByExerciseId((prev) => ({ ...prev, [exerciseId]: m }));
+      }
+
       setExercisePendingByKey((prev) => {
         const next: Record<string, string> = {};
         for (const [k, v] of Object.entries(prev)) {
@@ -669,129 +856,134 @@ export function JournalClient({
 
         {tab === "attendance" ? (
           <div className={styles.tableWrap}>
-            <div className={styles.controls} style={{ marginBottom: 12 }}>
-              <div className={styles.field}>
-                <div className={styles.label}>&nbsp;</div>
-                <button
-                  type="button"
-                  className={`${styles.btn} ${styles.btnNav}`}
-                  onClick={() => setMeetingWindowStart((s) => Math.max(0, s - 5))}
-                  disabled={isPending || meetingWindowStart <= 0}
-                >
-                  Prev
-                </button>
-              </div>
-              <div className={styles.field}>
-                <div className={styles.label}>&nbsp;</div>
-                <button
-                  type="button"
-                  className={`${styles.btn} ${styles.btnNav}`}
-                  onClick={() =>
-                    setMeetingWindowStart((s) => Math.min(Math.max(0, visibleMeetings.length - MEETING_WINDOW_SIZE), s + 5))
-                  }
-                  disabled={isPending || meetingWindowStart + MEETING_WINDOW_SIZE >= visibleMeetings.length}
-                >
-                  Next
-                </button>
-              </div>
-              <div className={styles.muted} style={{ alignSelf: "end" }}>
-                {meetingWindow.length
-                  ? `${meetingWindowStart + 1}-${Math.min(visibleMeetings.length, meetingWindowStart + meetingWindow.length)} / ${visibleMeetings.length}`
-                  : "Dərs tarixi yoxdur"}
-              </div>
-            </div>
-
             <table className={styles.table}>
               <thead>
                 <tr>
                   <th className={`${styles.th} ${styles.nameCol}`}>Tələbə</th>
                   {meetingWindow.map((m) => {
+                    const mid = String(m.course_meeting_id);
                     const lt = lessonTypeShort(m);
+                    const locked = Boolean(meetingLockedById[mid]);
                     return (
                       <th key={m.course_meeting_id} className={`${styles.th} ${styles.thCell}`}>
                         <div>{fmtDateLabel(m.meeting_date)}</div>
-                        <div className={styles.muted} style={{ fontSize: 12 }}>
+                        <div className={styles.muted} style={{ fontSize: 12, padding: 0 }}>
                           {fmtTimeRange(m.start_time, m.end_time)}
                         </div>
                         {lt ? (
-                          <div className={styles.muted} style={{ fontSize: 12, fontWeight: 600 }} title={m.lesson_type_az ?? undefined}>
+                          <div className={styles.muted} style={{ fontSize: 12, fontWeight: 600, padding: 0 }} title={m.lesson_type_az ?? undefined}>
                             {lt}
                           </div>
                         ) : null}
+                        {locked ? (
+                          <div className={styles.muted} style={{ fontSize: 12, fontWeight: 700, padding: "0.35rem 0 0", color: "rgba(20, 83, 45, 1)" }}>
+                            Təsdiqlənib
+                          </div>
+                        ) : (
+                          <div className={styles.bulkRowStack}>
+                            <select
+                              className={styles.cellSelect}
+                              value={bulkValueByMeetingId[mid] ?? ""}
+                              onChange={(ev) =>
+                                setBulkValueByMeetingId((prev) => ({ ...prev, [mid]: String(ev.target.value) }))
+                              }
+                              disabled={isPending}
+                            >
+                              {meetingCombinedOpts.map((o) => (
+                                <option key={`${o.value}-${o.label}`} value={o.value}>
+                                  {o.label}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              className={styles.bulkButton}
+                              onClick={() => bulkApplyMeeting(mid)}
+                              disabled={isPending}
+                            >
+                              Hamıya eyni
+                            </button>
+                          </div>
+                        )}
                       </th>
                     );
                   })}
                 </tr>
               </thead>
               <tbody>
-                {roster.map((s) => (
+                {roster.map((s, idx) => (
                   <tr key={s.student_id} className={styles.row}>
-                    <td className={`${styles.td} ${styles.nameCol}`}>{s.person_fullname}</td>
+                    <td className={`${styles.td} ${styles.nameCol}`}>
+                      {idx + 1}. {s.person_fullname}
+                    </td>
                     {meetingWindow.map((m) => {
                       const mid = String(m.course_meeting_id);
+                      const locked = Boolean(meetingLockedById[mid]);
                       const cellMap = meetingWindowCellsByMeetingId[mid] ?? {};
-                      const evaA = evalAttendance[0];
-                      const evaS = evalSeminar[0];
-                      const vA = evaA ? (cellMap[key(s.student_id, evaA.course_eva_id)]?.value ?? "") : "";
-                      const vS = evaS ? (cellMap[key(s.student_id, evaS.course_eva_id)]?.value ?? "") : "";
-                      const toneA = cellToneClass(styles, vA, true);
-                      const toneS = cellToneClass(styles, vS, false);
+                      const display = meetingCombinedDisplay(cellMap, s.student_id);
+                      const tone = cellToneClass(styles, display, isAttendanceValue(display));
 
                       return (
                         <td key={mid} className={`${styles.td} ${styles.tdCell}`}>
-                          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                            {evaA ? (
-                              <select
-                                className={`${styles.cellSelect} ${toneA}`}
-                                value={vA}
-                                onChange={(ev) => {
-                                  const next = String(ev.target.value);
-                                  const kk = key(s.student_id, evaA.course_eva_id);
-                                  setMeetingWindowCellsByMeetingId((prev) => ({
-                                    ...prev,
-                                    [mid]: { ...(prev[mid] ?? {}), [kk]: { student_id: s.student_id, course_eva_id: evaA.course_eva_id, value: next || null } },
-                                  }));
-                                  setMeetingPendingByKey((prev) => ({ ...prev, [meetingCellKey(mid, s.student_id, evaA.course_eva_id)]: next }));
-                                }}
-                                disabled={isPending}
-                              >
-                                {ATTENDANCE_OPTIONS.map((o) => (
-                                  <option key={o.label} value={o.value}>
-                                    {o.label}
-                                  </option>
-                                ))}
-                              </select>
-                            ) : null}
-
-                            {evaS ? (
-                              <select
-                                className={`${styles.cellSelect} ${toneS}`}
-                                value={vS}
-                                onChange={(ev) => {
-                                  const next = String(ev.target.value);
-                                  const kk = key(s.student_id, evaS.course_eva_id);
-                                  setMeetingWindowCellsByMeetingId((prev) => ({
-                                    ...prev,
-                                    [mid]: { ...(prev[mid] ?? {}), [kk]: { student_id: s.student_id, course_eva_id: evaS.course_eva_id, value: next || null } },
-                                  }));
-                                  setMeetingPendingByKey((prev) => ({ ...prev, [meetingCellKey(mid, s.student_id, evaS.course_eva_id)]: next }));
-                                }}
-                                disabled={isPending}
-                              >
-                                {optionsForEval(evaS).map((o) => (
-                                  <option key={o.label} value={o.value}>
-                                    {o.label}
-                                  </option>
-                                ))}
-                              </select>
-                            ) : null}
-                          </div>
+                          <select
+                            className={`${styles.cellSelect} ${tone}`}
+                            value={display}
+                            onChange={(ev) => setMeetingCombined(mid, s.student_id, String(ev.target.value))}
+                            disabled={isPending || locked}
+                          >
+                            {meetingCombinedOpts.map((o) => (
+                              <option key={`${o.value}-${o.label}`} value={o.value}>
+                                {o.label}
+                              </option>
+                            ))}
+                          </select>
                         </td>
                       );
                     })}
                   </tr>
                 ))}
               </tbody>
+              <tfoot>
+                <tr className={styles.pagerRow}>
+                  <td className={`${styles.td} ${styles.nameCol} ${styles.pagerNavCell}`}>
+                    <div className={styles.pagerNav}>
+                      <button
+                        type="button"
+                        className={`${styles.btn} ${styles.btnNav}`}
+                        onClick={() => setMeetingWindowStart((s) => Math.max(0, s - 5))}
+                        disabled={isPending || meetingWindowStart <= 0}
+                      >
+                        Prev
+                      </button>
+                      <button
+                        type="button"
+                        className={`${styles.btn} ${styles.btnNav}`}
+                        onClick={() =>
+                          setMeetingWindowStart((s) =>
+                            Math.min(Math.max(0, visibleMeetings.length - MEETING_WINDOW_SIZE), s + 5),
+                          )
+                        }
+                        disabled={isPending || meetingWindowStart + MEETING_WINDOW_SIZE >= visibleMeetings.length}
+                      >
+                        Next
+                      </button>
+                    </div>
+                    {meetingWindow.length === 0 ? (
+                      <div className={styles.pagerMeta}>Dərs tarixi yoxdur</div>
+                    ) : null}
+                  </td>
+                  {meetingWindow.length > 0 ? (
+                    <td
+                      className={`${styles.td} ${styles.pagerMetaCell}`}
+                      colSpan={meetingWindow.length}
+                    >
+                      <div className={styles.pagerMeta}>
+                        {`${meetingWindowStart + 1}-${Math.min(visibleMeetings.length, meetingWindowStart + meetingWindow.length)} / ${visibleMeetings.length}`}
+                      </div>
+                    </td>
+                  ) : null}
+                </tr>
+              </tfoot>
             </table>
           </div>
         ) : null}
@@ -812,7 +1004,7 @@ export function JournalClient({
                 </tr>
               </thead>
               <tbody>
-                {roster.map((s) => {
+                {roster.map((s, idx) => {
                   const r = resultByStudentId[s.student_id] ?? {
                     davamiyyet: 0,
                     aktivlik: 0,
@@ -824,7 +1016,9 @@ export function JournalClient({
                   };
                   return (
                     <tr key={s.student_id} className={styles.row}>
-                      <td className={`${styles.td} ${styles.nameCol}`}>{s.person_fullname}</td>
+                      <td className={`${styles.td} ${styles.nameCol}`}>
+                        {idx + 1}. {s.person_fullname}
+                      </td>
                       <td className={`${styles.td} ${styles.tdCell}`}>{r.davamiyyet.toFixed(2).replace(/\.00$/, "")}</td>
                       <td className={`${styles.td} ${styles.tdCell}`}>{r.aktivlik.toFixed(2).replace(/\.00$/, "")}</td>
                       <td className={`${styles.td} ${styles.tdCell}`}>{r.collokvium.toFixed(2).replace(/\.00$/, "")}</td>
@@ -917,7 +1111,7 @@ export function JournalClient({
                             <th key={it.course_execises_id} className={`${styles.th} ${styles.thCell}`}>
                               <div>{fmtDateLabel(it.start_date)}</div>
                               <div className={styles.muted} style={{ fontSize: 12 }}>
-                                {it.editable ? "Aktiv" : "Bağlı"}
+                                {it.confirmed ? "Təsdiqlənib" : it.editable ? "Aktiv" : "Bağlı"}
                               </div>
                             </th>
                           ))}
@@ -925,12 +1119,14 @@ export function JournalClient({
                         </tr>
                       </thead>
                       <tbody>
-                        {roster.map((s) => {
+                        {roster.map((s, idx) => {
                           const vals = items.map((it) => parseNum(exercisePointsByExerciseId[it.course_execises_id]?.[s.student_id] ?? "") ?? 0);
                           const avg = exType === "colloquium" ? (items.length ? vals.reduce((a, b) => a + b, 0) / items.length : 0) : 0;
                           return (
                             <tr key={s.student_id} className={styles.row}>
-                              <td className={`${styles.td} ${styles.nameCol}`}>{s.person_fullname}</td>
+                              <td className={`${styles.td} ${styles.nameCol}`}>
+                                {idx + 1}. {s.person_fullname}
+                              </td>
                               {items.map((it) => {
                                 const current = exercisePointsByExerciseId[it.course_execises_id]?.[s.student_id] ?? "";
                                 const tone = cellToneClass(styles, current, false);
@@ -1007,9 +1203,11 @@ export function JournalClient({
                 </tr>
               </thead>
               <tbody>
-                {roster.map((s) => (
+                {roster.map((s, idx) => (
                   <tr key={s.student_id} className={styles.row}>
-                    <td className={`${styles.td} ${styles.nameCol}`}>{s.person_fullname}</td>
+                    <td className={`${styles.td} ${styles.nameCol}`}>
+                      {idx + 1}. {s.person_fullname}
+                    </td>
                     {visibleEvals.map((e) => {
                       const v = currentValue(s.student_id, e.course_eva_id);
                       const tone = cellToneClass(styles, v, isMeetingEval(e.course_eva_id));

@@ -197,12 +197,33 @@
 
 .tdCell {
   text-align: center;
-  min-width: 84px;
+  min-width: 110px;
 }
 
 .thCell {
   text-align: center;
-  min-width: 84px;
+  min-width: 128px;
+  vertical-align: top;
+}
+
+.bulkRow {
+  margin-top: 0.5rem;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.bulkRowStack {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.bulkRowStack .bulkButton {
+  width: 100%;
+  white-space: nowrap;
 }
 
 .cell {
@@ -269,14 +290,6 @@
 .cellSelect:focus {
   outline: 2px solid rgba(11, 92, 171, 0.25);
   outline-offset: 1px;
-}
-
-.bulkRow {
-  margin-top: 0.5rem;
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 0.4rem;
-  align-items: center;
 }
 
 .bulkButton {
@@ -350,6 +363,55 @@
 
 .btnNav:hover {
   background: rgba(59, 130, 246, 0.16);
+}
+
+.pagerRow .td {
+  border-bottom: none;
+  background: var(--card);
+}
+
+.pagerNavCell {
+  position: sticky;
+  left: 0;
+  bottom: 0;
+  z-index: 5;
+  background: var(--card);
+  box-shadow: 0 -6px 16px rgba(2, 6, 23, 0.06);
+  border-top: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.pagerNavCell .pagerMeta {
+  margin-top: 0.35rem;
+}
+
+.pagerNav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.pagerNav .btn {
+  min-width: 4.5rem;
+}
+
+.pagerMetaCell {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+  background: var(--card);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -6px 16px rgba(2, 6, 23, 0.06);
+  vertical-align: middle;
+  text-align: right;
+}
+
+.pagerMeta {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .bulkButton:disabled {
