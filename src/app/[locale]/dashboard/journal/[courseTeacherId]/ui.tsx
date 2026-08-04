@@ -232,7 +232,7 @@ export function JournalClient({
     return `${mid}:${studentId}:${courseEvaId}`;
   }
 
-  const seminarMaxPoint = evalSeminar[0]?.max_point ?? 10;
+  const seminarMaxPoint = Math.min(Number(evalSeminar[0]?.max_point ?? 10) || 10, 10);
   const meetingCombinedOpts = useMemo(() => combinedMeetingOptions(seminarMaxPoint), [seminarMaxPoint]);
 
   /** Qiymət varsa onu, yoxsa davamiyyət kodunu göstər. */
@@ -609,12 +609,12 @@ export function JournalClient({
         course_meeting_id: meetingId,
         value: next || null,
       });
-      if (!res) {
-        setErr("Yadda saxlanmadı");
+      if (!res.ok) {
+        setErr(res.error);
         return;
       }
       const map: Record<string, JournalCell> = {};
-      for (const c of res.cells) map[key(c.student_id, c.course_eva_id)] = c;
+      for (const c of res.data.cells) map[key(c.student_id, c.course_eva_id)] = c;
       setCells(map);
     } else {
       const res = await upsertTeacherJournalPoint(courseId, {
@@ -683,12 +683,12 @@ export function JournalClient({
           course_meeting_id: mid,
           value: v.trim() || null,
         });
-        if (!res) {
-          setErr("Yadda saxlanmadı");
+        if (!res.ok) {
+          setErr(res.error);
           return;
         }
         const map: Record<string, JournalCell> = {};
-        for (const c of res.cells) map[key(c.student_id, c.course_eva_id)] = c;
+        for (const c of res.data.cells) map[key(c.student_id, c.course_eva_id)] = c;
         setMeetingWindowCellsByMeetingId((prev) => ({ ...prev, [mid]: map }));
       }
 

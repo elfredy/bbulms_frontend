@@ -17,6 +17,17 @@ async function jsonOrNull<T>(res: Response): Promise<T | null> {
   return res.json();
 }
 
+async function readErrorDetail(res: Response): Promise<string | null> {
+  try {
+    const data = await res.json();
+    if (typeof data?.detail === "string") return data.detail;
+    if (Array.isArray(data?.detail)) return data.detail.map((d: any) => d?.msg ?? String(d)).join("; ");
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
 export async function getTeacherJournalGrid(courseId: string, meetingId: string): Promise<JournalGridResponse | null> {
   const res = await fetch(`/api/teacher/courses/${courseId}/journal?course_meeting_id=${encodeURIComponent(String(meetingId))}`, {
     credentials: "include",
@@ -25,14 +36,21 @@ export async function getTeacherJournalGrid(courseId: string, meetingId: string)
   return jsonOrNull(res);
 }
 
-export async function upsertTeacherJournalCell(courseId: string, body: JournalUpsertRequest): Promise<JournalGridResponse | null> {
+export async function upsertTeacherJournalCell(
+  courseId: string,
+  body: JournalUpsertRequest
+): Promise<{ ok: true; data: JournalGridResponse } | { ok: false; error: string }> {
   const res = await fetch(`/api/teacher/courses/${courseId}/journal`, {
     method: "POST",
     credentials: "include",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
-  return jsonOrNull(res);
+  if (!res.ok) {
+    return { ok: false, error: (await readErrorDetail(res)) || "Yadda saxlanmadı" };
+  }
+  const data = (await res.json()) as JournalGridResponse;
+  return { ok: true, data };
 }
 
 export async function confirmTeacherJournalMeeting(courseId: string, body: JournalConfirmRequest): Promise<JournalGridResponse | null> {
