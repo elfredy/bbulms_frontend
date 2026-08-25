@@ -31,6 +31,9 @@ export default async function AdminHomePage({ params }: Props) {
       <div className={styles.content}>
         <ul style={{ display: "grid", gap: 12, paddingLeft: 18 }}>
           <li>
+            <Link href={`/${locale}/dashboard/admin/education-plans`}>{t("educationPlans")}</Link>
+          </li>
+          <li>
             <Link href={`/${locale}/dashboard/admin/groups`}>{t("groups")}</Link>
           </li>
           <li>

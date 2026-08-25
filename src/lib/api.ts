@@ -137,6 +137,62 @@ export type DepartmentCourseFileItem = {
   create_date: string | null;
 };
 
+export type AdminEducationPlanItem = {
+  id: string;
+  name: string | null;
+  organization_id: string | null;
+  org_name_az: string | null;
+  education_type_name_az: string | null;
+  education_level_name_az: string | null;
+  status_name_az: string | null;
+  note: string | null;
+  create_date: string | null;
+  subject_count: number;
+  group_count: number;
+};
+
+export type AdminEducationPlanListResponse = {
+  items: AdminEducationPlanItem[];
+  limit: number;
+  offset: number;
+};
+
+export type AdminEducationPlanSubjectItem = {
+  id: string;
+  code: string | null;
+  subject_name_az: string | null;
+  semester_id: string | null;
+  semester_name_az: string | null;
+  subject_block_name_az: string | null;
+  m_hours: number | null;
+  s_hours: number | null;
+  l_hours: number | null;
+  credit: number | null;
+  week_charge: number | null;
+  type_name: string | null;
+};
+
+export type AdminEducationPlanDetailResponse = {
+  plan: AdminEducationPlanItem & {
+    education_type_id?: string | null;
+    education_level_id?: string | null;
+    status?: string | null;
+  };
+  subjects: AdminEducationPlanSubjectItem[];
+  groups: { id: string; name: string | null; education_year_name: string | null }[];
+};
+
+export type AdminDictOption = { id: string; name_az: string | null; code?: string | null };
+
+export type AdminEducationPlanLookups = {
+  organizations: { id: string; name_az: string | null; faculty_name_az: string | null; formula: string | null }[];
+  education_types: AdminDictOption[];
+  education_levels: AdminDictOption[];
+  statuses: AdminDictOption[];
+  semesters: AdminDictOption[];
+  subject_blocks: AdminDictOption[];
+};
+
 export type AdminCourseItem = {
   course_id: string;
   course_code: string | null;
@@ -602,6 +658,52 @@ export async function getDepartmentCourseFiles(courseId: string) {
   if (res.status === 403) return null;
   if (!res.ok) return null;
   return res.json() as Promise<{ course_id: string; items: DepartmentCourseFileItem[] }>;
+}
+
+export async function adminListEducationPlans(q?: string | null, limit = 80, offset = 0): Promise<AdminEducationPlanListResponse | null> {
+  const cookieStore = await cookies();
+  const header = cookieStore.toString();
+  if (!header) return null;
+  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const params = new URLSearchParams();
+  if (q != null && String(q).trim()) params.set("q", String(q).trim());
+  params.set("limit", String(limit));
+  params.set("offset", String(offset));
+  const res = await fetch(`${origin}/api/admin/education-plans?${params.toString()}`, {
+    headers: { cookie: header },
+    cache: "no-store",
+  });
+  if (res.status === 403) return null;
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function adminGetEducationPlan(planId: string): Promise<AdminEducationPlanDetailResponse | null> {
+  const cookieStore = await cookies();
+  const header = cookieStore.toString();
+  if (!header) return null;
+  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const res = await fetch(`${origin}/api/admin/education-plans/${encodeURIComponent(String(planId))}`, {
+    headers: { cookie: header },
+    cache: "no-store",
+  });
+  if (res.status === 403) return null;
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function adminEducationPlanLookups(): Promise<AdminEducationPlanLookups | null> {
+  const cookieStore = await cookies();
+  const header = cookieStore.toString();
+  if (!header) return null;
+  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const res = await fetch(`${origin}/api/admin/education-plans/lookups`, {
+    headers: { cookie: header },
+    cache: "no-store",
+  });
+  if (res.status === 403) return null;
+  if (!res.ok) return null;
+  return res.json();
 }
 
 export async function adminListCourses(

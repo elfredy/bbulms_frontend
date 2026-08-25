@@ -23,6 +23,7 @@ export default async function DashboardLayout({ children, params }: Props) {
     ...(me.is_superadmin
       ? [
           { href: `/${locale}/dashboard/admin`, label: "Admin panel", badge: "Admin", section: "Admin" },
+          { href: `/${locale}/dashboard/admin/education-plans`, label: "Tədris planları", section: "Admin" },
           { href: `/${locale}/dashboard/admin/groups`, label: "Qruplar", section: "Admin" },
           { href: `/${locale}/dashboard/admin/teachers`, label: "Müəllimlər", section: "Admin" },
           { href: `/${locale}/dashboard/admin/courses`, label: "Courselar", section: "Admin" },
