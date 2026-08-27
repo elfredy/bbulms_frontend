@@ -34,13 +34,16 @@ export default async function AdminHomePage({ params }: Props) {
             <Link href={`/${locale}/dashboard/admin/education-plans`}>{t("educationPlans")}</Link>
           </li>
           <li>
+            <Link href={`/${locale}/dashboard/admin/subject-groups`}>{t("subjectGroups")}</Link>
+          </li>
+          <li>
+            <Link href={`/${locale}/dashboard/admin/courses`}>{t("timetable")}</Link>
+          </li>
+          <li>
             <Link href={`/${locale}/dashboard/admin/groups`}>{t("groups")}</Link>
           </li>
           <li>
             <Link href={`/${locale}/dashboard/admin/teachers`}>{t("teachers")}</Link>
-          </li>
-          <li>
-            <Link href={`/${locale}/dashboard/admin/courses`}>{t("timetable")}</Link>
           </li>
           <li>
             <Link href={`/${locale}/dashboard/admin/departments`}>{t("departments")}</Link>

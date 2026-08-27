@@ -23,11 +23,12 @@ export default async function DashboardLayout({ children, params }: Props) {
     ...(me.is_superadmin
       ? [
           { href: `/${locale}/dashboard/admin`, label: "Admin panel", badge: "Admin", section: "Admin" },
-          { href: `/${locale}/dashboard/admin/education-plans`, label: "Tədris planları", section: "Admin" },
-          { href: `/${locale}/dashboard/admin/groups`, label: "Qruplar", section: "Admin" },
-          { href: `/${locale}/dashboard/admin/teachers`, label: "Müəllimlər", section: "Admin" },
-          { href: `/${locale}/dashboard/admin/courses`, label: "Courselar", section: "Admin" },
-          { href: `/${locale}/dashboard/admin/departments`, label: "Kafedralar", section: "Admin" },
+          { href: `/${locale}/dashboard/admin/education-plans`, label: "Tədris planları", section: "Təhsil proqramları" },
+          { href: `/${locale}/dashboard/admin/subject-groups`, label: "Fənn qrupları", section: "Təhsil proqramları" },
+          { href: `/${locale}/dashboard/admin/courses`, label: "Dərs cədvəli", section: "Təhsil proqramları" },
+          { href: `/${locale}/dashboard/admin/groups`, label: "Qruplar", section: "İdarəetmə" },
+          { href: `/${locale}/dashboard/admin/teachers`, label: "Müəllimlər", section: "İdarəetmə" },
+          { href: `/${locale}/dashboard/admin/departments`, label: "Kafedralar", section: "İdarəetmə" },
         ]
       : []),
     ...(me.is_department_user

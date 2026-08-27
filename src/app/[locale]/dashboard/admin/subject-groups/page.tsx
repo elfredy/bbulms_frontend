@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 
-import { adminEducationPlanLookups, adminListEducationPlans, getMe } from "@/lib/api";
+import { adminListSubjectGroups, getMe } from "@/lib/api";
 
 import styles from "../../dashboard.module.css";
 
@@ -10,9 +10,7 @@ type Props = {
   params: Promise<{ locale: string }>;
   searchParams?: Promise<{
     q?: string;
-    education_type_id?: string;
-    education_level_id?: string;
-    status_id?: string;
+    education_plan_id?: string;
     page?: string;
     pageSize?: string;
   }>;
@@ -25,9 +23,9 @@ function statusClass(name: string | null | undefined) {
   return styles.badge;
 }
 
-function specialtyLabel(p: { specialty_name_az?: string | null; faculty_name_az?: string | null; org_name_az: string | null }) {
+function specialtyLabel(p: { specialty_name_az: string | null; faculty_name_az: string | null }) {
   const parts = [p.specialty_name_az, p.faculty_name_az].filter(Boolean);
-  return parts.length ? parts.join(" / ") : p.org_name_az || "—";
+  return parts.length ? parts.join(" / ") : "—";
 }
 
 function pageList(current: number, last: number) {
@@ -35,7 +33,7 @@ function pageList(current: number, last: number) {
   return [...pages].filter((p) => p >= 1 && p <= last).sort((a, b) => a - b);
 }
 
-export default async function AdminEducationPlansPage({ params, searchParams }: Props) {
+export default async function AdminSubjectGroupsPage({ params, searchParams }: Props) {
   const { locale } = await params;
   const sp = (await searchParams) ?? {};
   const t = await getTranslations("admin");
@@ -45,36 +43,26 @@ export default async function AdminEducationPlansPage({ params, searchParams }: 
   if (!me.is_superadmin) redirect(`/${locale}/dashboard`);
 
   const q = (sp.q ?? "").trim();
-  const educationTypeId = (sp.education_type_id ?? "").trim();
-  const educationLevelId = (sp.education_level_id ?? "").trim();
-  const statusId = (sp.status_id ?? "").trim();
+  const educationPlanId = (sp.education_plan_id ?? "").trim();
   const pageSize = Math.min(500, Math.max(1, Number(sp.pageSize) || 20));
   const page = Math.max(1, Number(sp.page) || 1);
   const offset = (page - 1) * pageSize;
 
-  const [data, lookups] = await Promise.all([
-    adminListEducationPlans({
-      q: q || null,
-      education_type_id: educationTypeId || null,
-      education_level_id: educationLevelId || null,
-      status_id: statusId || null,
-      limit: pageSize,
-      offset,
-    }),
-    adminEducationPlanLookups(),
-  ]);
+  const data = await adminListSubjectGroups({
+    q: q || null,
+    education_plan_id: educationPlanId || null,
+    limit: pageSize,
+    offset,
+  });
 
   if (!data) {
     return (
       <div className={styles.page}>
         <header className={styles.headerCard}>
           <div>
-            <h1 className={styles.title}>{t("educationPlans")}</h1>
+            <h1 className={styles.title}>{t("subjectGroups")}</h1>
             <p className={styles.meta}>{t("loadError")}</p>
           </div>
-          <Link className={styles.meta} href={`/${locale}/dashboard/admin`}>
-            {t("back")}
-          </Link>
         </header>
       </div>
     );
@@ -84,9 +72,7 @@ export default async function AdminEducationPlansPage({ params, searchParams }: 
   const qs = (extra: Record<string, string | number | undefined>) => {
     const params = new URLSearchParams();
     if (q) params.set("q", q);
-    if (educationTypeId) params.set("education_type_id", educationTypeId);
-    if (educationLevelId) params.set("education_level_id", educationLevelId);
-    if (statusId) params.set("status_id", statusId);
+    if (educationPlanId) params.set("education_plan_id", educationPlanId);
     params.set("pageSize", String(pageSize));
     Object.entries(extra).forEach(([k, v]) => {
       if (v == null || v === "") params.delete(k);
@@ -95,64 +81,24 @@ export default async function AdminEducationPlansPage({ params, searchParams }: 
     return params.toString();
   };
 
-  const stats = data.stats ?? { bachelor_count: 0, master_count: 0, fulltime_count: 0, parttime_count: 0, total: 0 };
-
   return (
     <div className={styles.pageWide}>
       <header className={styles.headerCard}>
         <div>
-          <h1 className={styles.title}>{t("educationPlans")}</h1>
-          <p className={styles.meta}>{t("educationPlansHint")}</p>
+          <h1 className={styles.title}>{t("subjectGroups")}</h1>
+          <p className={styles.meta}>{t("subjectGroupsHint")}</p>
         </div>
         <div className={styles.headerActions}>
-          <Link href={`/${locale}/dashboard/admin/education-plans/new`} className={styles.actionLinkPrimary}>
-            {t("educationPlanCreate")}
+          <Link href={`/${locale}/dashboard/admin/subject-groups/new`} className={styles.actionLinkPrimary}>
+            {t("subjectGroupCreate")}
           </Link>
         </div>
       </header>
 
       <div className={styles.content}>
-        <div className={styles.statsGrid}>
-          <div className={styles.statCard}>
-            <p className={styles.statValue}>
-              {stats.bachelor_count} / {stats.master_count}
-            </p>
-            <p className={styles.statLabel}>{t("educationPlanLevelStats")}</p>
-          </div>
-          <div className={styles.statCard}>
-            <p className={styles.statValue}>
-              {stats.fulltime_count} / {stats.parttime_count}
-            </p>
-            <p className={styles.statLabel}>{t("educationPlanTypeStats")}</p>
-          </div>
-        </div>
-
         <form className={styles.toolbar}>
           <input name="q" defaultValue={q} placeholder={t("searchPlaceholder")} className={styles.input} />
-          <select name="education_level_id" defaultValue={educationLevelId} className={styles.select}>
-            <option value="">{t("educationLevel")}</option>
-            {(lookups?.education_levels ?? []).map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.name_az ?? o.id}
-              </option>
-            ))}
-          </select>
-          <select name="education_type_id" defaultValue={educationTypeId} className={styles.select}>
-            <option value="">{t("educationType")}</option>
-            {(lookups?.education_types ?? []).map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.name_az ?? o.id}
-              </option>
-            ))}
-          </select>
-          <select name="status_id" defaultValue={statusId} className={styles.select}>
-            <option value="">{t("status")}</option>
-            {(lookups?.statuses ?? []).map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.name_az ?? o.id}
-              </option>
-            ))}
-          </select>
+          {educationPlanId ? <input type="hidden" name="education_plan_id" value={educationPlanId} /> : null}
           <select name="pageSize" defaultValue={String(pageSize)} className={styles.select}>
             {[20, 50, 100, 200].map((n) => (
               <option key={n} value={n}>
@@ -174,40 +120,37 @@ export default async function AdminEducationPlansPage({ params, searchParams }: 
               <thead>
                 <tr>
                   <th className={styles.th}>#</th>
-                  <th className={styles.th}>{t("colName")}</th>
                   <th className={styles.th}>{t("colSpecialty")}</th>
+                  <th className={styles.th}>{t("colSubject")}</th>
+                  <th className={styles.th}>{t("colSubjectGroupCode")}</th>
+                  <th className={styles.th}>{t("colSemester")}</th>
+                  <th className={styles.th}>{t("colLang")}</th>
                   <th className={styles.th}>{t("educationType")}</th>
-                  <th className={styles.th}>{t("educationLevel")}</th>
+                  <th className={styles.th}>{t("colYear")}</th>
                   <th className={styles.th}>{t("status")}</th>
                   <th className={styles.th} />
                 </tr>
               </thead>
               <tbody>
-                {data.items.map((p, i) => (
-                  <tr key={p.id} className={styles.row}>
+                {data.items.map((g, i) => (
+                  <tr key={g.id} className={styles.row}>
                     <td className={`${styles.td} ${styles.tdNum}`}>{offset + i + 1}</td>
-                    <td className={`${styles.td} ${styles.tdName}`}>
-                      <Link href={`/${locale}/dashboard/admin/education-plans/${p.id}`} title={p.note ?? undefined}>
-                        {p.name ?? p.id}
-                      </Link>
-                      <div className={styles.tdMuted}>
-                        {[p.subject_count != null ? `${p.subject_count} fənn` : null, p.group_count != null ? `${p.group_count} qrup` : null]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </div>
-                    </td>
-                    <td className={styles.td}>{specialtyLabel(p)}</td>
-                    <td className={styles.td}>{p.education_type_name_az ?? "—"}</td>
-                    <td className={styles.td}>{p.education_level_name_az ?? "—"}</td>
+                    <td className={styles.td}>{specialtyLabel(g)}</td>
+                    <td className={`${styles.td} ${styles.tdName}`}>{g.subject_name_az ?? "—"}</td>
+                    <td className={styles.td}>{g.code ?? "—"}</td>
+                    <td className={styles.td}>{g.semester_name_az ?? "—"}</td>
+                    <td className={styles.td}>{g.education_lang_name_az ?? "—"}</td>
+                    <td className={styles.td}>{g.education_type_name_az ?? "—"}</td>
+                    <td className={styles.td}>{g.education_year_name ?? "—"}</td>
                     <td className={styles.td}>
-                      <span className={statusClass(p.status_name_az)}>{p.status_name_az ?? "—"}</span>
+                      <span className={statusClass(g.status_name_az)}>{g.status_name_az ?? "—"}</span>
                     </td>
                     <td className={styles.td}>
                       <Link
                         className={styles.rowAction}
-                        href={`/${locale}/dashboard/admin/education-plans/${p.id}`}
-                        aria-label={t("educationPlanDetail")}
-                        title={t("educationPlanDetail")}
+                        href={`/${locale}/dashboard/admin/courses/${g.id}`}
+                        aria-label={t("timetable")}
+                        title={t("timetable")}
                       >
                         ☰
                       </Link>

@@ -141,9 +141,14 @@ export type AdminEducationPlanItem = {
   id: string;
   name: string | null;
   organization_id: string | null;
+  specialty_name_az?: string | null;
+  faculty_name_az?: string | null;
   org_name_az: string | null;
+  education_type_id?: string | null;
   education_type_name_az: string | null;
+  education_level_id?: string | null;
   education_level_name_az: string | null;
+  status?: string | null;
   status_name_az: string | null;
   note: string | null;
   create_date: string | null;
@@ -151,10 +156,43 @@ export type AdminEducationPlanItem = {
   group_count: number;
 };
 
+export type AdminEducationPlanStats = {
+  bachelor_count: number;
+  master_count: number;
+  fulltime_count: number;
+  parttime_count: number;
+  total: number;
+};
+
 export type AdminEducationPlanListResponse = {
   items: AdminEducationPlanItem[];
   limit: number;
   offset: number;
+  total: number;
+  stats: AdminEducationPlanStats;
+};
+
+export type AdminSubjectGroupItem = {
+  id: string;
+  code: string | null;
+  specialty_name_az: string | null;
+  faculty_name_az: string | null;
+  subject_name_az: string | null;
+  semester_name_az: string | null;
+  education_lang_name_az: string | null;
+  education_type_name_az: string | null;
+  education_year_name: string | null;
+  status_name_az: string | null;
+  education_plan_id: string | null;
+  education_plan_name: string | null;
+  edu_group_ids: string | null;
+};
+
+export type AdminSubjectGroupListResponse = {
+  items: AdminSubjectGroupItem[];
+  limit: number;
+  offset: number;
+  total: number;
 };
 
 export type AdminEducationPlanSubjectItem = {
@@ -660,16 +698,55 @@ export async function getDepartmentCourseFiles(courseId: string) {
   return res.json() as Promise<{ course_id: string; items: DepartmentCourseFileItem[] }>;
 }
 
-export async function adminListEducationPlans(q?: string | null, limit = 80, offset = 0): Promise<AdminEducationPlanListResponse | null> {
+export async function adminListEducationPlans(opts?: {
+  q?: string | null;
+  education_type_id?: string | null;
+  education_level_id?: string | null;
+  status_id?: string | null;
+  limit?: number;
+  offset?: number;
+}): Promise<AdminEducationPlanListResponse | null> {
   const cookieStore = await cookies();
   const header = cookieStore.toString();
   if (!header) return null;
   const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
   const params = new URLSearchParams();
+  const q = opts?.q;
   if (q != null && String(q).trim()) params.set("q", String(q).trim());
-  params.set("limit", String(limit));
-  params.set("offset", String(offset));
+  if (opts?.education_type_id) params.set("education_type_id", String(opts.education_type_id));
+  if (opts?.education_level_id) params.set("education_level_id", String(opts.education_level_id));
+  if (opts?.status_id) params.set("status_id", String(opts.status_id));
+  params.set("limit", String(opts?.limit ?? 20));
+  params.set("offset", String(opts?.offset ?? 0));
   const res = await fetch(`${origin}/api/admin/education-plans?${params.toString()}`, {
+    headers: { cookie: header },
+    cache: "no-store",
+  });
+  if (res.status === 403) return null;
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function adminListSubjectGroups(opts?: {
+  q?: string | null;
+  education_plan_id?: string | null;
+  education_year_id?: string | null;
+  semester_id?: string | null;
+  limit?: number;
+  offset?: number;
+}): Promise<AdminSubjectGroupListResponse | null> {
+  const cookieStore = await cookies();
+  const header = cookieStore.toString();
+  if (!header) return null;
+  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const params = new URLSearchParams();
+  if (opts?.q != null && String(opts.q).trim()) params.set("q", String(opts.q).trim());
+  if (opts?.education_plan_id) params.set("education_plan_id", String(opts.education_plan_id));
+  if (opts?.education_year_id) params.set("education_year_id", String(opts.education_year_id));
+  if (opts?.semester_id) params.set("semester_id", String(opts.semester_id));
+  params.set("limit", String(opts?.limit ?? 20));
+  params.set("offset", String(opts?.offset ?? 0));
+  const res = await fetch(`${origin}/api/admin/subject-groups?${params.toString()}`, {
     headers: { cookie: header },
     cache: "no-store",
   });

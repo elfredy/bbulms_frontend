@@ -31,7 +31,10 @@ type Props = {
 
 function isActive(pathname: string, href: string) {
   if (href === pathname) return true;
-  if (href !== "/" && pathname.startsWith(href + "/")) return true;
+  if (href !== "/" && pathname.startsWith(href + "/")) {
+    if (/\/dashboard\/admin$/.test(href.replace(/\/$/, ""))) return false;
+    return true;
+  }
   return false;
 }
 
