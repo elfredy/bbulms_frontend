@@ -100,7 +100,14 @@
   composes: alertBase;
   background: #fef2f2;
   border: 1px solid #fecdca;
-  color: var(--error);
+  color: #b42318;
+}
+
+.alertOk {
+  composes: alertBase;
+  background: #ecfdf3;
+  border: 1px solid #abefc6;
+  color: #067647;
 }
 
 .statsGrid {
@@ -234,6 +241,14 @@
 
 .row:hover .td {
   background: rgba(11, 92, 171, 0.04);
+}
+
+.rowCreated .td {
+  background: #ecfdf3;
+}
+
+.rowCreated:hover .td {
+  background: #d1fadf;
 }
 
 .badge {

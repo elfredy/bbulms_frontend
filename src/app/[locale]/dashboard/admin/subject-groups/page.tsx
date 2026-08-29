@@ -13,6 +13,7 @@ type Props = {
     education_plan_id?: string;
     page?: string;
     pageSize?: string;
+    created?: string;
   }>;
 };
 
@@ -44,6 +45,7 @@ export default async function AdminSubjectGroupsPage({ params, searchParams }: P
 
   const q = (sp.q ?? "").trim();
   const educationPlanId = (sp.education_plan_id ?? "").trim();
+  const createdId = (sp.created ?? "").trim();
   const pageSize = Math.min(500, Math.max(1, Number(sp.pageSize) || 20));
   const page = Math.max(1, Number(sp.page) || 1);
   const offset = (page - 1) * pageSize;
@@ -69,6 +71,7 @@ export default async function AdminSubjectGroupsPage({ params, searchParams }: P
   }
 
   const totalPages = Math.max(1, Math.ceil((data.total || 0) / pageSize));
+  const createdItem = createdId ? data.items.find((g) => g.id === createdId) : undefined;
   const qs = (extra: Record<string, string | number | undefined>) => {
     const params = new URLSearchParams();
     if (q) params.set("q", q);
@@ -112,6 +115,14 @@ export default async function AdminSubjectGroupsPage({ params, searchParams }: P
           </button>
         </form>
 
+        {createdId ? (
+          <p className={styles.alertOk}>
+            {t("subjectGroupCreated", {
+              label: [createdItem?.subject_name_az, createdItem?.code].filter(Boolean).join(" — ") || createdId,
+            })}
+          </p>
+        ) : null}
+
         {data.items.length === 0 ? (
           <p className={styles.alertMuted}>{t("empty")}</p>
         ) : (
@@ -133,7 +144,7 @@ export default async function AdminSubjectGroupsPage({ params, searchParams }: P
               </thead>
               <tbody>
                 {data.items.map((g, i) => (
-                  <tr key={g.id} className={styles.row}>
+                  <tr key={g.id} className={g.id === createdId ? `${styles.row} ${styles.rowCreated}` : styles.row}>
                     <td className={`${styles.td} ${styles.tdNum}`}>{offset + i + 1}</td>
                     <td className={styles.td}>{specialtyLabel(g)}</td>
                     <td className={`${styles.td} ${styles.tdName}`}>{g.subject_name_az ?? "—"}</td>

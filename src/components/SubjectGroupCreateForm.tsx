@@ -20,6 +20,7 @@ type Opt = {
   group_name?: string | null;
   season_code?: string | null;
   start_date?: string | null;
+  org_name_az?: string | null;
 };
 type SubjectOpt = Opt & {
   semester_id?: string | null;
@@ -64,6 +65,18 @@ type Lookups = {
 function labelOf(o: Opt) {
   if (o.faculty_name_az) return [o.name_az, o.code, o.faculty_name_az].filter(Boolean).join(" — ");
   return o.name_az || o.name || o.id;
+}
+
+function subjectLabel(o: SubjectOpt) {
+  const hours = [
+    o.m_hours ? `${o.m_hours}m` : null,
+    o.s_hours ? `${o.s_hours}s` : null,
+    o.l_hours ? `${o.l_hours}l` : null,
+    o.fm_hours ? `${o.fm_hours}k` : null,
+  ].filter(Boolean).join("/");
+  return [o.name_az || o.id, o.code ? `(${o.code})` : "", hours, o.semester_name_az ? `· ${o.semester_name_az}` : ""]
+    .filter(Boolean)
+    .join(" ");
 }
 
 function n0(v: number | null | undefined) {
@@ -237,11 +250,17 @@ export function SubjectGroupCreateForm({ initialPlanId }: { initialPlanId?: stri
   }, [subjectId, evaluationType]);
 
   useEffect(() => {
-    fetch(`/api/admin/education-plans/lookups/teachers?limit=200`, { credentials: "include", cache: "no-store" })
+    if (!orgId) {
+      setTeachers([]);
+      return;
+    }
+    const params = new URLSearchParams({ limit: "200", organization_id: orgId });
+    if (subjectId) params.set("education_plan_subject_id", subjectId);
+    fetch(`/api/admin/education-plans/lookups/teachers?${params}`, { credentials: "include", cache: "no-store" })
       .then((r) => (r.ok ? r.json() : { items: [] }))
       .then((d) => setTeachers(d.items ?? []))
       .catch(() => setTeachers([]));
-  }, []);
+  }, [orgId, subjectId]);
 
   useEffect(() => {
     if (!groupIds.length) {
@@ -400,7 +419,10 @@ export function SubjectGroupCreateForm({ initialPlanId }: { initialPlanId?: stri
         setError(await readDetail(res, "Fənn qrupu yaradılmadı"));
         return;
       }
-      router.push(`/${locale}/dashboard/admin/subject-groups`);
+      const created = await res.json().catch(() => null);
+      const createdId = created?.course_id ? String(created.course_id) : "";
+      const qs = createdId ? `?created=${encodeURIComponent(createdId)}` : "";
+      router.push(`/${locale}/dashboard/admin/subject-groups${qs}`);
       router.refresh();
     } catch {
       setError("Serverə qoşulmaq mümkün olmadı.");
@@ -521,9 +543,7 @@ export function SubjectGroupCreateForm({ initialPlanId }: { initialPlanId?: stri
                   searchPlaceholder="Axtar…"
                   options={subjects.map((o) => ({
                     id: o.id,
-                    label: [o.name_az || o.id, o.code ? `(${o.code})` : "", o.semester_name_az ? `· ${o.semester_name_az}` : ""]
-                      .filter(Boolean)
-                      .join(" "),
+                    label: subjectLabel(o),
                   }))}
                 />
               </label>
@@ -716,6 +736,10 @@ export function SubjectGroupCreateForm({ initialPlanId }: { initialPlanId?: stri
       <div className={tab === "teacher" ? undefined : styles.hidden}>
         <section className={styles.card}>
           <h2 className={styles.cardTitle}>Müəllim</h2>
+          {!orgId ? <p className={styles.label}>Əvvəl ixtisas seçin. Yalnız həmin fakültənin kafedra müəllimləri görünür.</p> : null}
+          {orgId && teachers.length === 0 ? (
+            <p className={styles.label}>Bu ixtisasın kafedralarında təhkim olunmuş müəllim tapılmadı.</p>
+          ) : null}
           {teacherPicks.map((row, idx) => (
             <div key={idx} className={styles.teacherRow}>
               <label className={styles.field}>
@@ -725,7 +749,10 @@ export function SubjectGroupCreateForm({ initialPlanId }: { initialPlanId?: stri
                   onChange={(id) => setTeacherPicks((prev) => prev.map((x, i) => (i === idx ? { ...x, teacher_id: id } : x)))}
                   placeholder="— seç —"
                   searchPlaceholder="Axtar…"
-                  options={teacherOptions.map((t) => ({ id: t.id, label: t.name || t.id }))}
+                  options={teacherOptions.map((t) => ({
+                    id: t.id,
+                    label: t.org_name_az ? `${t.name || t.id} · ${t.org_name_az}` : t.name || t.id,
+                  }))}
                 />
               </label>
               <label className={styles.field}>
@@ -830,7 +857,10 @@ export function SubjectGroupCreateForm({ initialPlanId }: { initialPlanId?: stri
                   onChange={(id) => setHalfPicks((prev) => prev.map((x) => (x.half_group_id === hg.id ? { ...x, teacher_id: id } : x)))}
                   placeholder="Müəllim (istəyə bağlı)"
                   searchPlaceholder="Axtar…"
-                  options={teacherOptions.map((t) => ({ id: t.id, label: t.name || t.id }))}
+                  options={teacherOptions.map((t) => ({
+                    id: t.id,
+                    label: t.org_name_az ? `${t.name || t.id} · ${t.org_name_az}` : t.name || t.id,
+                  }))}
                 />
               </div>
             );

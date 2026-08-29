@@ -76,6 +76,7 @@
     "subjectGroups": "Fənn qrupları",
     "subjectGroupsHint": "Tədris planından sonra yaradılan fənn qrupları. Dərs cədvəli bu qruplar üzrə tərtib olunur.",
     "subjectGroupCreate": "Fənn qrupu əlavə et",
+    "subjectGroupCreated": "Fənn qrupu siyahıya əlavə olundu: {label}. Aşağıda ilk sətirdə işarələnib.",
     "colName": "Adı",
     "colSpecialty": "İxtisas",
     "colSubject": "Fənn adı",

@@ -76,6 +76,7 @@
     "subjectGroups": "Subject groups",
     "subjectGroupsHint": "Subject groups created after the education plan. The timetable is built from these groups.",
     "subjectGroupCreate": "Add subject group",
+    "subjectGroupCreated": "Subject group added to the list: {label}. It is highlighted in the first rows below.",
     "colName": "Name",
     "colSpecialty": "Specialty",
     "colSubject": "Subject",
