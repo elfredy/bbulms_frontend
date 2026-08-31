@@ -1,0 +1,203 @@
+.wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .wrap {
+    grid-template-columns: 1fr;
+  }
+}
+
+.gridCard {
+  background: #eceff3;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: auto;
+  padding: 8px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 6px;
+  min-width: 720px;
+}
+
+.thDay,
+.thTime {
+  text-align: center;
+  font-weight: 700;
+  color: #5b6473;
+  font-size: 0.95rem;
+  padding: 4px;
+}
+
+.thTime {
+  width: 118px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 0.82rem;
+}
+
+.timeCell {
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #4b5563;
+  white-space: nowrap;
+  padding: 0 6px;
+}
+
+.split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  min-height: 72px;
+}
+
+.slot {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  min-height: 72px;
+  padding: 6px 7px 18px;
+  border: none;
+  border-radius: 3px;
+  background: #d5dae2;
+  color: #1f2937;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.slot:hover {
+  filter: brightness(0.97);
+}
+
+.slotFilled {
+  background: #cfd5de;
+  cursor: pointer;
+}
+
+.slotActive {
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+}
+
+.slotDisabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.slotName {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  font-size: 0.78rem;
+  line-height: 1.25;
+  font-weight: 600;
+}
+
+.letter {
+  position: absolute;
+  right: 6px;
+  bottom: 3px;
+  color: #1d4ed8;
+  font-weight: 800;
+  font-size: 0.78rem;
+}
+
+.side {
+  display: grid;
+  gap: 10px;
+  padding: 10px 12px 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.field {
+  display: grid;
+  gap: 4px;
+}
+
+.label {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.select {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  font: inherit;
+}
+
+.chips {
+  display: grid;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 42px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 4px;
+  background: #4b5563;
+  color: #fff;
+  font: inherit;
+  font-weight: 650;
+  font-size: 0.84rem;
+  text-align: left;
+  cursor: grab;
+}
+
+.chip:hover {
+  background: #374151;
+}
+
+.chipSelected {
+  background: #111827;
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.chipLetter {
+  flex: 0 0 auto;
+  color: #93c5fd;
+  font-weight: 800;
+}
+
+.hint,
+.error {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.hint {
+  color: var(--muted);
+}
+
+.error {
+  color: var(--error);
+}
+
+.emptyChips {
+  padding: 10px 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+}

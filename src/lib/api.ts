@@ -185,6 +185,8 @@ export type AdminSubjectGroupItem = {
   status_name_az: string | null;
   education_plan_id: string | null;
   education_plan_name: string | null;
+  organization_id?: string | null;
+  education_plan_subject_id?: string | null;
   edu_group_ids: string | null;
 };
 

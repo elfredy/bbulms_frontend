@@ -3,7 +3,7 @@
 import { useLocale } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { SearchableSelect } from "./SearchableSelect";
 import styles from "./SubjectGroupCreateForm.module.css";
@@ -93,7 +93,13 @@ async function readDetail(res: Response, fallback: string) {
   return fallback;
 }
 
-export function SubjectGroupCreateForm({ initialPlanId }: { initialPlanId?: string | null }) {
+export function SubjectGroupCreateForm({
+  initialPlanId,
+  initialCourseId,
+}: {
+  initialPlanId?: string | null;
+  initialCourseId?: string | null;
+}) {
   const locale = useLocale();
   const router = useRouter();
   const [lookups, setLookups] = useState<Lookups | null>(null);
@@ -133,7 +139,12 @@ export function SubjectGroupCreateForm({ initialPlanId }: { initialPlanId?: stri
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [createdCourseId, setCreatedCourseId] = useState("");
+  const [createdCourseId, setCreatedCourseId] = useState(initialCourseId ?? "");
+  const skipCascade = useRef({
+    students: Boolean(initialCourseId),
+    startDate: Boolean(initialCourseId),
+    evas: Boolean(initialCourseId),
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -142,6 +153,7 @@ export function SubjectGroupCreateForm({ initialPlanId }: { initialPlanId?: stri
       .then((data: Lookups | null) => {
         if (cancelled || !data) return;
         setLookups(data);
+        if (initialCourseId) return;
         const az = data.education_langs.find((x) => (x.name_az || "").toLowerCase().includes("azərbaycan"));
         const main = data.course_types.find((x) => (x.name_az || "").toLowerCase().includes("əsas"));
         const year = data.education_years[0];
@@ -160,13 +172,71 @@ export function SubjectGroupCreateForm({ initialPlanId }: { initialPlanId?: stri
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [initialCourseId]);
 
   useEffect(() => {
-    if (!initialPlanId || !lookups) return;
+    if (!initialPlanId || !lookups || initialCourseId) return;
     applyPlan(initialPlanId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialPlanId, lookups]);
+  }, [initialPlanId, lookups, initialCourseId]);
+
+  useEffect(() => {
+    if (!initialCourseId || !lookups) return;
+    let cancelled = false;
+    fetch(`/api/admin/subject-groups/${encodeURIComponent(initialCourseId)}`, { credentials: "include", cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancelled || !d) {
+          if (!cancelled) setError("Fənn qrupu tapılmadı.");
+          return;
+        }
+        skipCascade.current = { students: true, startDate: true, evas: true };
+        setCreatedCourseId(String(d.id || initialCourseId));
+        setCourseWork(String(d.course_work ?? 0));
+        if (d.education_level_id) setLevelId(String(d.education_level_id));
+        if (d.organization_id) setOrgId(String(d.organization_id));
+        if (d.education_type_id) setTypeId(String(d.education_type_id));
+        if (d.education_plan_id) setPlanId(String(d.education_plan_id));
+        if (d.plan_semester_id) setPlanSemesterId(String(d.plan_semester_id));
+        if (d.education_plan_subject_id) setSubjectId(String(d.education_plan_subject_id));
+        if (d.education_year_id) setYearId(String(d.education_year_id));
+        if (d.education_lang_id) setLangId(String(d.education_lang_id));
+        if (d.semester_id) setSemesterId(String(d.semester_id));
+        if (d.start_date) setStartDate(String(d.start_date));
+        if (d.type_id) setGroupTypeId(String(d.type_id));
+        setGroupIds(Array.isArray(d.education_group_ids) ? d.education_group_ids.map(String) : []);
+        setNote(d.note ?? "");
+        setMHours(n0(d.m_hours));
+        setSHours(n0(d.s_hours));
+        setLHours(n0(d.l_hours));
+        setFmHours(n0(d.fm_hours));
+        setMWeek(n0(d.m_week_charge));
+        setSWeek(n0(d.s_week_charge));
+        setLWeek(n0(d.l_week_charge));
+        setFmWeek(n0(d.fm_week_charge));
+        if (d.evaluation_type_id) setEvaluationType(String(d.evaluation_type_id));
+        const evaRows = (d.evaluations ?? []) as EvaRow[];
+        if (evaRows.length) setEvas(evaRows);
+        const tch = (d.teachers ?? []) as TeacherPick[];
+        setTeacherPicks(tch.length ? tch.map((t) => ({ teacher_id: String(t.teacher_id), lesson_type_id: String(t.lesson_type_id) })) : [{ teacher_id: "", lesson_type_id: "" }]);
+        const studs = (d.students ?? []) as Opt[];
+        if (studs.length) setStudents(studs);
+        setStudentIds((d.student_ids ?? []).map(String));
+        setHalfPicks(
+          ((d.half_groups ?? []) as HalfPick[]).map((h) => ({
+            half_group_id: String(h.half_group_id),
+            lesson_type_id: String(h.lesson_type_id),
+            teacher_id: h.teacher_id ? String(h.teacher_id) : "",
+          }))
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setError("Fənn qrupu yüklənmədi.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [initialCourseId, lookups]);
 
   const visibleOrgs = useMemo(() => {
     const all = lookups?.organizations ?? [];
@@ -280,11 +350,17 @@ export function SubjectGroupCreateForm({ initialPlanId }: { initialPlanId?: stri
     fetch(`/api/admin/subject-groups/lookups/evaluations?${params}`, { credentials: "include", cache: "no-store" })
       .then((r) => (r.ok ? r.json() : { items: [] }))
       .then((d) => {
+        if (skipCascade.current.evas) {
+          skipCascade.current.evas = false;
+          return;
+        }
         setEvas((d.items ?? []) as EvaRow[]);
         const nextType = d.evaluation_type ? String(d.evaluation_type) : "";
         if (nextType && nextType !== evaluationType) setEvaluationType(nextType);
       })
-      .catch(() => setEvas([]));
+      .catch(() => {
+        if (!skipCascade.current.evas) setEvas([]);
+      });
   }, [subjectId, evaluationType]);
 
   useEffect(() => {
@@ -302,6 +378,7 @@ export function SubjectGroupCreateForm({ initialPlanId }: { initialPlanId?: stri
 
   useEffect(() => {
     if (!groupIds.length) {
+      if (skipCascade.current.students) return;
       setStudents([]);
       setStudentIds([]);
       return;
@@ -314,9 +391,19 @@ export function SubjectGroupCreateForm({ initialPlanId }: { initialPlanId?: stri
       .then((d) => {
         const items = (d.items ?? []) as Opt[];
         setStudents(items);
+        if (skipCascade.current.students) {
+          skipCascade.current.students = false;
+          setStudentIds((prev) => {
+            const allowed = new Set(items.map((s) => s.id));
+            const kept = prev.filter((id) => allowed.has(id));
+            return kept.length ? kept : prev;
+          });
+          return;
+        }
         setStudentIds(items.map((s) => s.id));
       })
       .catch(() => {
+        if (skipCascade.current.students) return;
         setStudents([]);
         setStudentIds([]);
       });
@@ -324,6 +411,10 @@ export function SubjectGroupCreateForm({ initialPlanId }: { initialPlanId?: stri
 
   useEffect(() => {
     if (!yearId || !semesterId) return;
+    if (skipCascade.current.startDate) {
+      skipCascade.current.startDate = false;
+      return;
+    }
     fetch(
       `/api/admin/subject-groups/lookups/start-date?education_year_id=${encodeURIComponent(yearId)}&semester_id=${encodeURIComponent(semesterId)}`,
       { credentials: "include", cache: "no-store" }
@@ -990,7 +1081,7 @@ export function SubjectGroupCreateForm({ initialPlanId }: { initialPlanId?: stri
       {error ? <p className={styles.error}>{error}</p> : null}
       <div className={styles.actions}>
         <button type="submit" className={styles.buttonAdd} disabled={saving}>
-          {saving ? "Əlavə olunur…" : "Əlavə et"}
+          {saving ? (initialCourseId ? "Yadda saxlanır…" : "Əlavə olunur…") : initialCourseId ? "Yadda saxla" : "Əlavə et"}
         </button>
         {createdCourseId ? (
           <button type="button" className={styles.buttonBack} disabled={saving} onClick={() => void finishAndClose()}>

@@ -3,6 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 
 import { adminListSubjectGroups, getMe } from "@/lib/api";
+import { SubjectGroupRowMenu } from "@/components/SubjectGroupRowMenu";
 
 import styles from "../../dashboard.module.css";
 
@@ -157,14 +158,11 @@ export default async function AdminSubjectGroupsPage({ params, searchParams }: P
                       <span className={statusClass(g.status_name_az)}>{g.status_name_az ?? "—"}</span>
                     </td>
                     <td className={styles.td}>
-                      <Link
-                        className={styles.rowAction}
-                        href={`/${locale}/dashboard/admin/courses/${g.id}`}
-                        aria-label={t("timetable")}
-                        title={t("timetable")}
-                      >
-                        ☰
-                      </Link>
+                      <SubjectGroupRowMenu
+                        courseId={g.id}
+                        organizationId={g.organization_id}
+                        educationPlanSubjectId={g.education_plan_subject_id}
+                      />
                     </td>
                   </tr>
                 ))}

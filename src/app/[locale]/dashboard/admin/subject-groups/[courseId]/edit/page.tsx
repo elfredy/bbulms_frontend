@@ -2,17 +2,17 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 
-import { TimetableBuilder } from "@/components/TimetableBuilder";
+import { SubjectGroupCreateForm } from "@/components/SubjectGroupCreateForm";
 import { getMe } from "@/lib/api";
 
-import styles from "../../dashboard.module.css";
+import styles from "../../../../dashboard.module.css";
 
 type Props = {
-  params: Promise<{ locale: string }>;
+  params: Promise<{ locale: string; courseId: string }>;
 };
 
-export default async function AdminCoursesPage({ params }: Props) {
-  const { locale } = await params;
+export default async function AdminSubjectGroupEditPage({ params }: Props) {
+  const { locale, courseId } = await params;
   const t = await getTranslations("admin");
 
   const me = await getMe();
@@ -23,16 +23,15 @@ export default async function AdminCoursesPage({ params }: Props) {
     <div className={styles.pageWide}>
       <header className={styles.headerCard}>
         <div>
-          <h1 className={styles.title}>{t("timetableCreate")}</h1>
-          <p className={styles.meta}>{t("timetableCreateHint")}</p>
+          <h1 className={styles.title}>{t("subjectGroupEdit")}</h1>
+          <p className={styles.meta}>{t("subjectGroupsHint")}</p>
         </div>
-        <Link className={styles.meta} href={`/${locale}/dashboard/admin`}>
+        <Link className={styles.meta} href={`/${locale}/dashboard/admin/subject-groups`}>
           {t("back")}
         </Link>
       </header>
-
       <div className={styles.content}>
-        <TimetableBuilder />
+        <SubjectGroupCreateForm initialCourseId={courseId} />
       </div>
     </div>
   );

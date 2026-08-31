@@ -159,3 +159,129 @@ export async function confirmTeacherCourseExercise(
   );
   return jsonOrNull(res);
 }
+
+export type TimetableLookups = {
+  faculties: { id: string; name_az: string | null }[];
+  years: { id: string; name: string | null }[];
+  semesters: { id: string; code: string | null; name_az: string | null }[];
+  subject_types: { id: string; code: string | null; name_az: string | null }[];
+  clocks: { id: string; start_time: string | null; end_time: string | null }[];
+  kurs_options: number[];
+  days: { week_day: number; label: string }[];
+};
+
+export type TimetableGroupItem = {
+  education_group_id: string;
+  education_group_name: string | null;
+};
+
+export type TimetableAvailableLesson = {
+  course_id: string;
+  course_code: string | null;
+  subject_name_az: string | null;
+  course_teacher_id: string | null;
+  teacher_id: string | null;
+  lesson_type_id: string;
+  lesson_code: string | null;
+  lesson_type_az: string | null;
+  lesson_letter: string;
+  up_hours: number;
+  down_hours: number;
+  remaining_up: number;
+  remaining_down: number;
+};
+
+export type TimetableAssignedSlot = {
+  course_id: string;
+  lesson_type_id: string;
+  clock_id: string;
+  week_day: number;
+  week_type: number;
+  subject_name_az: string | null;
+  lesson_code: string | null;
+  lesson_type_az: string | null;
+  lesson_letter: string;
+  room_name: string | null;
+  room_id: string | null;
+};
+
+export type TimetableBoard = {
+  clocks: { id: string; start_time: string | null; end_time: string | null }[];
+  assigned: TimetableAssignedSlot[];
+  available: TimetableAvailableLesson[];
+};
+
+export async function adminTimetableLookups(): Promise<TimetableLookups | null> {
+  const res = await fetch("/api/admin/timetable/lookups", { credentials: "include", cache: "no-store" });
+  return jsonOrNull(res);
+}
+
+export async function adminTimetableGroups(opts: {
+  faculty_id: string;
+  education_year_id: string;
+  kurs: number;
+}): Promise<{ items: TimetableGroupItem[] } | null> {
+  const params = new URLSearchParams({
+    faculty_id: opts.faculty_id,
+    education_year_id: opts.education_year_id,
+    kurs: String(opts.kurs),
+  });
+  const res = await fetch(`/api/admin/timetable/groups?${params}`, { credentials: "include", cache: "no-store" });
+  return jsonOrNull(res);
+}
+
+export async function adminTimetableBoard(opts: {
+  education_group_id: string;
+  education_year_id: string;
+  semester_id: string;
+  subject_type_id?: string;
+}): Promise<TimetableBoard | null> {
+  const params = new URLSearchParams({
+    education_group_id: opts.education_group_id,
+    education_year_id: opts.education_year_id,
+    semester_id: opts.semester_id,
+  });
+  if (opts.subject_type_id) params.set("subject_type_id", opts.subject_type_id);
+  const res = await fetch(`/api/admin/timetable/board?${params}`, { credentials: "include", cache: "no-store" });
+  return jsonOrNull(res);
+}
+
+export async function adminTimetablePlace(body: {
+  education_group_id: string;
+  education_year_id: string;
+  semester_id: string;
+  course_id: string;
+  lesson_type_id: string;
+  clock_id: string;
+  week_day: number;
+  week_type: number;
+}): Promise<{ ok: true; created_count: number } | { ok: false; error: string }> {
+  const res = await fetch("/api/admin/timetable/place", {
+    method: "POST",
+    credentials: "include",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) return { ok: false, error: (await readErrorDetail(res)) || "Yerləşdirilmədi" };
+  const data = (await res.json()) as { created_count?: number };
+  return { ok: true, created_count: Number(data.created_count ?? 0) };
+}
+
+export async function adminTimetableUnplace(body: {
+  education_group_id: string;
+  course_id: string;
+  lesson_type_id: string;
+  clock_id: string;
+  week_day: number;
+  week_type: number;
+}): Promise<{ ok: true; removed_count: number } | { ok: false; error: string }> {
+  const res = await fetch("/api/admin/timetable/unplace", {
+    method: "POST",
+    credentials: "include",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) return { ok: false, error: (await readErrorDetail(res)) || "Silinmədi" };
+  const data = (await res.json()) as { removed_count?: number };
+  return { ok: true, removed_count: Number(data.removed_count ?? 0) };
+}
