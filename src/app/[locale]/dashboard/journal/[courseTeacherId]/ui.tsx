@@ -107,14 +107,21 @@ function parseNum(v: string | null | undefined): number | null {
 
 function fmtDateLabel(d: string | null | undefined): string {
   if (!d) return "—";
-  const s = String(d);
-  const yyyy = s.slice(0, 4);
-  const mm = s.slice(5, 7);
-  const dd = s.slice(8, 10);
-  if (yyyy.length === 4 && mm.length === 2 && dd.length === 2 && s[4] === "-" && s[7] === "-") {
-    return `${dd}-${mm}-${yyyy}`;
-  }
+  const s = String(d).trim();
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[3]}-${iso[2]}-${iso[1]}`;
+  const dmy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (dmy) return `${dmy[1].padStart(2, "0")}-${dmy[2].padStart(2, "0")}-${dmy[3]}`;
   return s;
+}
+
+function exercisePointDisplay(v: string | null | undefined): string {
+  const s = String(v ?? "").trim();
+  if (!s) return "";
+  const n = parseNum(s);
+  if (n == null) return s;
+  if (n >= 0 && n <= 100) return String(n);
+  return "";
 }
 
 function fmtTimeRange(start: string | null | undefined, end: string | null | undefined): string {
@@ -442,7 +449,7 @@ export function JournalClient({
         const pts = await getTeacherCourseExercisePoints(courseId, type, it.course_execises_id);
         if (!pts) continue;
         const m: Record<string, string> = {};
-        for (const c of pts.cells) m[String(c.student_id)] = c.value ?? "";
+        for (const c of pts.cells) m[String(c.student_id)] = exercisePointDisplay(c.value);
         pointsMapByExerciseId[String(it.course_execises_id)] = m;
       }
       setExercisePointsByExerciseId((prev) => ({ ...prev, ...pointsMapByExerciseId }));
@@ -733,7 +740,7 @@ export function JournalClient({
           return;
         }
         const m: Record<string, string> = {};
-        for (const c of res.cells) m[String(c.student_id)] = c.value ?? "";
+        for (const c of res.cells) m[String(c.student_id)] = exercisePointDisplay(c.value);
         setExercisePointsByExerciseId((prev) => ({ ...prev, [exerciseId]: m }));
       }
 
@@ -745,7 +752,7 @@ export function JournalClient({
           return;
         }
         const m: Record<string, string> = {};
-        for (const c of confirmed.cells) m[String(c.student_id)] = c.value ?? "";
+        for (const c of confirmed.cells) m[String(c.student_id)] = exercisePointDisplay(c.value);
         setExercisePointsByExerciseId((prev) => ({ ...prev, [exerciseId]: m }));
       }
 
@@ -1036,15 +1043,7 @@ export function JournalClient({
             </div>
             <div className={styles.muted}>Qeyd: Bu cədvəl serverdə “köhnə sistem” hesablanma qaydası ilə çıxarılır.</div>
           </div>
-        ) : tab === "attendance" ? null : visibleEvals.length === 0 ? (
-          tab === "colloquium" || tab === "referat" ? (
-            <div className={styles.tableWrap}>
-              <div className={styles.muted}>Yüklənir…</div>
-            </div>
-          ) : (
-            <div className={styles.muted}>Bu bölmə üçün qiymətləndirmə tapılmadı.</div>
-          )
-        ) : (
+        ) : tab === "attendance" ? null : tab === "colloquium" || tab === "referat" || visibleEvals.length > 0 ? (
           <div className={styles.tableWrap}>
             {tab === "colloquium" || tab === "referat" ? (
               (() => {
@@ -1120,7 +1119,7 @@ export function JournalClient({
                       </thead>
                       <tbody>
                         {roster.map((s, idx) => {
-                          const vals = items.map((it) => parseNum(exercisePointsByExerciseId[it.course_execises_id]?.[s.student_id] ?? "") ?? 0);
+                          const vals = items.map((it) => parseNum(exercisePointDisplay(exercisePointsByExerciseId[it.course_execises_id]?.[s.student_id])) ?? 0);
                           const avg = exType === "colloquium" ? (items.length ? vals.reduce((a, b) => a + b, 0) / items.length : 0) : 0;
                           return (
                             <tr key={s.student_id} className={styles.row}>
@@ -1128,7 +1127,7 @@ export function JournalClient({
                                 {idx + 1}. {s.person_fullname}
                               </td>
                               {items.map((it) => {
-                                const current = exercisePointsByExerciseId[it.course_execises_id]?.[s.student_id] ?? "";
+                                const current = exercisePointDisplay(exercisePointsByExerciseId[it.course_execises_id]?.[s.student_id]);
                                 const tone = cellToneClass(styles, current, false);
                                 return (
                                   <td key={it.course_execises_id} className={`${styles.td} ${styles.tdCell}`}>
@@ -1237,6 +1236,8 @@ export function JournalClient({
             </table>
             )}
           </div>
+        ) : (
+          <div className={styles.muted}>Bu bölmə üçün qiymətləndirmə tapılmadı.</div>
         )}
 
         {err ? <div className={styles.error}>{err}</div> : null}

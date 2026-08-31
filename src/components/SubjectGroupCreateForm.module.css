@@ -157,6 +157,12 @@
   font-size: 0.9rem;
 }
 
+.ok {
+  margin: 0;
+  color: #12b76a;
+  font-size: 0.9rem;
+}
+
 .tabs {
   display: flex;
   gap: 0;

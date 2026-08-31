@@ -131,7 +131,9 @@ export function SubjectGroupCreateForm({ initialPlanId }: { initialPlanId?: stri
   const [studentIds, setStudentIds] = useState<string[]>([]);
   const [halfPicks, setHalfPicks] = useState<HalfPick[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [createdCourseId, setCreatedCourseId] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -166,6 +168,18 @@ export function SubjectGroupCreateForm({ initialPlanId }: { initialPlanId?: stri
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialPlanId, lookups]);
 
+  const visibleOrgs = useMemo(() => {
+    const all = lookups?.organizations ?? [];
+    if (!levelId) return all;
+    const fromPlans = new Set(
+      (lookups?.plans ?? [])
+        .filter((p) => p.education_level_id === levelId)
+        .map((p) => p.organization_id)
+        .filter((id): id is string => Boolean(id))
+    );
+    return all.filter((o) => o.education_level_id === levelId || fromPlans.has(o.id));
+  }, [lookups, levelId]);
+
   const visiblePlans = useMemo(() => {
     const all = lookups?.plans ?? [];
     if (!all.length) return [];
@@ -173,13 +187,37 @@ export function SubjectGroupCreateForm({ initialPlanId }: { initialPlanId?: stri
     if (orgId) list = list.filter((p) => p.organization_id === orgId);
     if (levelId) list = list.filter((p) => p.education_level_id === levelId);
     if (typeId) list = list.filter((p) => p.education_type_id === typeId);
-    if (list.length === 0) list = all;
     if (planId && !list.some((p) => p.id === planId)) {
       const cur = all.find((p) => p.id === planId);
       if (cur) return [cur, ...list];
     }
     return list;
   }, [lookups, orgId, levelId, typeId, planId]);
+
+  function resetDownstreamFromOrg() {
+    setPlanId("");
+    setPlanSemesterId("");
+    setSubjectId("");
+    setGroupIds([]);
+    setEvas([]);
+  }
+
+  function changeLevel(id: string) {
+    setLevelId(id);
+    if (!id) return;
+    const allowed = new Set(
+      (lookups?.plans ?? [])
+        .filter((p) => p.education_level_id === id)
+        .map((p) => p.organization_id)
+        .filter((oid): oid is string => Boolean(oid))
+    );
+    const orgOk =
+      !orgId || allowed.has(orgId) || Boolean(lookups?.organizations.some((o) => o.id === orgId && o.education_level_id === id));
+    if (!orgOk) {
+      setOrgId("");
+      resetDownstreamFromOrg();
+    }
+  }
 
   function applyPlan(id: string) {
     setPlanId(id);
@@ -356,6 +394,7 @@ export function SubjectGroupCreateForm({ initialPlanId }: { initialPlanId?: stri
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setInfo(null);
     const missing =
       !levelId || !orgId || !typeId || !planId || !planSemesterId || !subjectId || !yearId || !langId || !semesterId || !startDate || !groupTypeId;
     if (missing) {
@@ -369,41 +408,105 @@ export function SubjectGroupCreateForm({ initialPlanId }: { initialPlanId?: stri
       return;
     }
     setSaving(true);
+    const payload = {
+      course_work: Number(courseWork),
+      education_level_id: levelId,
+      organization_id: orgId,
+      education_type_id: typeId,
+      education_plan_id: planId,
+      plan_semester_id: planSemesterId,
+      education_plan_subject_id: subjectId,
+      education_year_id: yearId,
+      education_lang_id: langId,
+      semester_id: semesterId,
+      start_date: startDate,
+      type_id: groupTypeId,
+      education_group_ids: groupIds,
+      note: note.trim() || null,
+      m_hours: Number(mHours || 0),
+      s_hours: Number(sHours || 0),
+      l_hours: Number(lHours || 0),
+      fm_hours: Number(fmHours || 0),
+      m_week_charge: Number(mWeek || 0),
+      s_week_charge: Number(sWeek || 0),
+      l_week_charge: Number(lWeek || 0),
+      fm_week_charge: Number(fmWeek || 0),
+      evaluation_type_id: evaluationType,
+      evaluations: evas.map((row) => ({
+        eva_type_id: row.eva_type_id,
+        successful_pass_percent: row.successful_pass_percent,
+        automatic: row.automatic,
+        access_s: row.access_s,
+      })),
+      teachers: teacherPicks.filter((t) => t.teacher_id && t.lesson_type_id),
+      student_ids: studentIds,
+      half_groups: halfPicks
+        .filter((h) => h.half_group_id && h.lesson_type_id)
+        .map((h) => ({
+          half_group_id: h.half_group_id,
+          lesson_type_id: h.lesson_type_id,
+          teacher_id: h.teacher_id || null,
+        })),
+    };
     try {
-      const res = await fetch("/api/admin/subject-groups", {
-        method: "POST",
+      const updating = Boolean(createdCourseId);
+      const res = await fetch(updating ? `/api/admin/subject-groups/${encodeURIComponent(createdCourseId)}` : "/api/admin/subject-groups", {
+        method: updating ? "PATCH" : "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(
+          updating
+            ? {
+                teachers: payload.teachers,
+                student_ids: payload.student_ids,
+                half_groups: payload.half_groups,
+                note: payload.note,
+                course_work: payload.course_work,
+                m_hours: payload.m_hours,
+                s_hours: payload.s_hours,
+                l_hours: payload.l_hours,
+                fm_hours: payload.fm_hours,
+                m_week_charge: payload.m_week_charge,
+                s_week_charge: payload.s_week_charge,
+                l_week_charge: payload.l_week_charge,
+                fm_week_charge: payload.fm_week_charge,
+              }
+            : payload
+        ),
+      });
+      if (!res.ok) {
+        setError(await readDetail(res, updating ? "Fənn qrupu yenilənmədi" : "Fənn qrupu yaradılmadı"));
+        return;
+      }
+      const saved = await res.json().catch(() => null);
+      const savedId = saved?.course_id ? String(saved.course_id) : createdCourseId;
+      if (savedId) setCreatedCourseId(savedId);
+      if (updating) {
+        setInfo("Məlumatlar yadda saxlanıldı. Müəllim, tələbə və yarımqrup tablarını doldurmağa davam edə və ya Geri ilə çıxa bilərsiniz.");
+      } else {
+        setTab("teacher");
+        setInfo("Fənn qrupu yaradıldı. Səhifə açıq qalır — Müəllim, Tələbələr və Yarımqruplar tablarını doldurun. Bitirdikdən sonra Geri ilə çıxın.");
+      }
+    } catch {
+      setError("Serverə qoşulmaq mümkün olmadı.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function finishAndClose() {
+    if (!createdCourseId) {
+      router.push(`/${locale}/dashboard/admin/subject-groups`);
+      return;
+    }
+    setError(null);
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/admin/subject-groups/${encodeURIComponent(createdCourseId)}`, {
+        method: "PATCH",
         credentials: "include",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          course_work: Number(courseWork),
-          education_level_id: levelId,
-          organization_id: orgId,
-          education_type_id: typeId,
-          education_plan_id: planId,
-          plan_semester_id: planSemesterId,
-          education_plan_subject_id: subjectId,
-          education_year_id: yearId,
-          education_lang_id: langId,
-          semester_id: semesterId,
-          start_date: startDate,
-          type_id: groupTypeId,
-          education_group_ids: groupIds,
-          note: note.trim() || null,
-          m_hours: Number(mHours || 0),
-          s_hours: Number(sHours || 0),
-          l_hours: Number(lHours || 0),
-          fm_hours: Number(fmHours || 0),
-          m_week_charge: Number(mWeek || 0),
-          s_week_charge: Number(sWeek || 0),
-          l_week_charge: Number(lWeek || 0),
-          fm_week_charge: Number(fmWeek || 0),
-          evaluation_type_id: evaluationType,
-          evaluations: evas.map((row) => ({
-            eva_type_id: row.eva_type_id,
-            successful_pass_percent: row.successful_pass_percent,
-            automatic: row.automatic,
-            access_s: row.access_s,
-          })),
           teachers: teacherPicks.filter((t) => t.teacher_id && t.lesson_type_id),
           student_ids: studentIds,
           half_groups: halfPicks
@@ -413,16 +516,23 @@ export function SubjectGroupCreateForm({ initialPlanId }: { initialPlanId?: stri
               lesson_type_id: h.lesson_type_id,
               teacher_id: h.teacher_id || null,
             })),
+          note: note.trim() || null,
+          course_work: Number(courseWork),
+          m_hours: Number(mHours || 0),
+          s_hours: Number(sHours || 0),
+          l_hours: Number(lHours || 0),
+          fm_hours: Number(fmHours || 0),
+          m_week_charge: Number(mWeek || 0),
+          s_week_charge: Number(sWeek || 0),
+          l_week_charge: Number(lWeek || 0),
+          fm_week_charge: Number(fmWeek || 0),
         }),
       });
       if (!res.ok) {
-        setError(await readDetail(res, "Fənn qrupu yaradılmadı"));
+        setError(await readDetail(res, "Fənn qrupu yenilənmədi"));
         return;
       }
-      const created = await res.json().catch(() => null);
-      const createdId = created?.course_id ? String(created.course_id) : "";
-      const qs = createdId ? `?created=${encodeURIComponent(createdId)}` : "";
-      router.push(`/${locale}/dashboard/admin/subject-groups${qs}`);
+      router.push(`/${locale}/dashboard/admin/subject-groups?created=${encodeURIComponent(createdCourseId)}`);
       router.refresh();
     } catch {
       setError("Serverə qoşulmaq mümkün olmadı.");
@@ -435,6 +545,7 @@ export function SubjectGroupCreateForm({ initialPlanId }: { initialPlanId?: stri
     return <p className={styles.error}>{error || "Yüklənir…"}</p>;
   }
 
+  const locked = Boolean(createdCourseId);
   const seminarId = lookups.lesson_types.find((x) => (x.name_az || "").toLowerCase().includes("seminar"))?.id || lookups.lesson_types[0]?.id || "";
   const selectedTeacherIds = [...teacherPicks.map((t) => t.teacher_id), ...halfPicks.map((h) => h.teacher_id)].filter(Boolean);
   const teacherOptions = (() => {
@@ -467,7 +578,7 @@ export function SubjectGroupCreateForm({ initialPlanId }: { initialPlanId?: stri
             <div className={styles.row}>
               <label className={styles.field}>
                 <span className={`${styles.label} ${styles.req}`}>Kurs işi</span>
-                <select className={styles.select} value={courseWork} onChange={(e) => setCourseWork(e.target.value)} required>
+                <select className={styles.select} value={courseWork} onChange={(e) => setCourseWork(e.target.value)} required disabled={locked}>
                   {lookups.course_work_options.map((o) => (
                     <option key={o.id} value={o.id}>
                       {o.name_az}
@@ -477,7 +588,7 @@ export function SubjectGroupCreateForm({ initialPlanId }: { initialPlanId?: stri
               </label>
               <label className={styles.field}>
                 <span className={`${styles.label} ${styles.req}`}>Təhsil səviyyəsi</span>
-                <select className={styles.select} value={levelId} onChange={(e) => setLevelId(e.target.value)} required>
+                <select className={styles.select} value={levelId} onChange={(e) => changeLevel(e.target.value)} required disabled={locked}>
                   <option value="">— seç —</option>
                   {lookups.education_levels.map((o) => (
                     <option key={o.id} value={o.id}>
@@ -492,15 +603,19 @@ export function SubjectGroupCreateForm({ initialPlanId }: { initialPlanId?: stri
                 <span className={`${styles.label} ${styles.req}`}>İxtisas</span>
                 <SearchableSelect
                   value={orgId}
-                  onChange={setOrgId}
+                  onChange={(id) => {
+                    setOrgId(id);
+                    resetDownstreamFromOrg();
+                  }}
                   placeholder="— seç —"
                   searchPlaceholder="Axtar…"
-                  options={lookups.organizations.map((o) => ({ id: o.id, label: labelOf(o) }))}
+                  disabled={locked}
+                  options={visibleOrgs.map((o) => ({ id: o.id, label: labelOf(o) }))}
                 />
               </label>
               <label className={styles.field}>
                 <span className={`${styles.label} ${styles.req}`}>Təhsil forması</span>
-                <select className={styles.select} value={typeId} onChange={(e) => setTypeId(e.target.value)} required>
+                <select className={styles.select} value={typeId} onChange={(e) => setTypeId(e.target.value)} required disabled={locked}>
                   <option value="">— seç —</option>
                   {lookups.education_types.map((o) => (
                     <option key={o.id} value={o.id}>
@@ -518,12 +633,13 @@ export function SubjectGroupCreateForm({ initialPlanId }: { initialPlanId?: stri
                   onChange={applyPlan}
                   placeholder="— seç —"
                   searchPlaceholder="Axtar…"
+                  disabled={locked}
                   options={visiblePlans.map((o) => ({ id: o.id, label: labelOf(o) }))}
                 />
               </label>
               <label className={styles.field}>
                 <span className={`${styles.label} ${styles.req}`}>Tədris planı semestr</span>
-                <select className={styles.select} value={planSemesterId} onChange={(e) => applyPlanSemester(e.target.value)} required>
+                <select className={styles.select} value={planSemesterId} onChange={(e) => applyPlanSemester(e.target.value)} required disabled={locked}>
                   <option value="">— seç —</option>
                   {planSemesters.map((o) => (
                     <option key={o.id} value={o.id}>
@@ -541,6 +657,7 @@ export function SubjectGroupCreateForm({ initialPlanId }: { initialPlanId?: stri
                   onChange={applySubject}
                   placeholder="— seç —"
                   searchPlaceholder="Axtar…"
+                  disabled={locked}
                   options={subjects.map((o) => ({
                     id: o.id,
                     label: subjectLabel(o),
@@ -549,7 +666,7 @@ export function SubjectGroupCreateForm({ initialPlanId }: { initialPlanId?: stri
               </label>
               <label className={styles.field}>
                 <span className={`${styles.label} ${styles.req}`}>Tədris ili</span>
-                <select className={styles.select} value={yearId} onChange={(e) => setYearId(e.target.value)} required>
+                <select className={styles.select} value={yearId} onChange={(e) => setYearId(e.target.value)} required disabled={locked}>
                   <option value="">— seç —</option>
                   {lookups.education_years.map((o) => (
                     <option key={o.id} value={o.id}>
@@ -562,7 +679,7 @@ export function SubjectGroupCreateForm({ initialPlanId }: { initialPlanId?: stri
             <div className={styles.row}>
               <label className={styles.field}>
                 <span className={`${styles.label} ${styles.req}`}>Tədris dili</span>
-                <select className={styles.select} value={langId} onChange={(e) => setLangId(e.target.value)} required>
+                <select className={styles.select} value={langId} onChange={(e) => setLangId(e.target.value)} required disabled={locked}>
                   <option value="">— seç —</option>
                   {lookups.education_langs.map((o) => (
                     <option key={o.id} value={o.id}>
@@ -573,7 +690,7 @@ export function SubjectGroupCreateForm({ initialPlanId }: { initialPlanId?: stri
               </label>
               <label className={styles.field}>
                 <span className={`${styles.label} ${styles.req}`}>Fənn qrupu semestr</span>
-                <select className={styles.select} value={semesterId} onChange={(e) => setSemesterId(e.target.value)} required>
+                <select className={styles.select} value={semesterId} onChange={(e) => setSemesterId(e.target.value)} required disabled={locked}>
                   <option value="">— seç —</option>
                   {lookups.course_semesters.map((o) => (
                     <option key={o.id} value={o.id}>
@@ -586,11 +703,11 @@ export function SubjectGroupCreateForm({ initialPlanId }: { initialPlanId?: stri
             <div className={styles.row}>
               <label className={styles.field}>
                 <span className={`${styles.label} ${styles.req}`}>Başlama tarixi</span>
-                <input className={styles.input} type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required />
+                <input className={styles.input} type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required disabled={locked} />
               </label>
               <label className={styles.field}>
                 <span className={`${styles.label} ${styles.req}`}>Fənn qrupu növü</span>
-                <select className={styles.select} value={groupTypeId} onChange={(e) => setGroupTypeId(e.target.value)} required>
+                <select className={styles.select} value={groupTypeId} onChange={(e) => setGroupTypeId(e.target.value)} required disabled={locked}>
                   <option value="">— seç —</option>
                   {lookups.course_types.map((o) => (
                     <option key={o.id} value={o.id}>
@@ -611,6 +728,7 @@ export function SubjectGroupCreateForm({ initialPlanId }: { initialPlanId?: stri
                       <input
                         type="checkbox"
                         checked={checked}
+                        disabled={locked}
                         onChange={() => setGroupIds((prev) => (checked ? prev.filter((x) => x !== g.id) : [...prev, g.id]))}
                       />
                       <span>{g.name || g.name_az || g.id}</span>
@@ -664,7 +782,7 @@ export function SubjectGroupCreateForm({ initialPlanId }: { initialPlanId?: stri
             </div>
             <label className={styles.field}>
               <span className={`${styles.label} ${styles.req}`}>Qiymətləndirmə növü</span>
-              <select className={styles.select} value={evaluationType} onChange={(e) => setEvaluationType(e.target.value)} required>
+              <select className={styles.select} value={evaluationType} onChange={(e) => setEvaluationType(e.target.value)} required disabled={locked}>
                 {lookups.evaluation_types.map((o) => (
                   <option key={o.id} value={o.id}>
                     {labelOf(o)}
@@ -868,14 +986,21 @@ export function SubjectGroupCreateForm({ initialPlanId }: { initialPlanId?: stri
         </section>
       </div>
 
+      {info ? <p className={styles.ok}>{info}</p> : null}
       {error ? <p className={styles.error}>{error}</p> : null}
       <div className={styles.actions}>
         <button type="submit" className={styles.buttonAdd} disabled={saving}>
           {saving ? "Əlavə olunur…" : "Əlavə et"}
         </button>
-        <Link href={`/${locale}/dashboard/admin/subject-groups`} className={styles.buttonBack}>
-          Geri
-        </Link>
+        {createdCourseId ? (
+          <button type="button" className={styles.buttonBack} disabled={saving} onClick={() => void finishAndClose()}>
+            {saving ? "Yadda saxlanır…" : "Geri"}
+          </button>
+        ) : (
+          <Link href={`/${locale}/dashboard/admin/subject-groups`} className={styles.buttonBack}>
+            Geri
+          </Link>
+        )}
       </div>
     </form>
   );
