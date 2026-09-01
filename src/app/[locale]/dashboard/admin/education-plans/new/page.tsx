@@ -1,11 +1,9 @@
-import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 
 import { EducationPlanCreateForm } from "@/components/EducationPlanCreateForm";
+import { AdminFormPage } from "@/components/admin/form-shared";
 import { adminEducationPlanLookups, getMe } from "@/lib/api";
-
-import styles from "../../../dashboard.module.css";
 
 type Props = { params: Promise<{ locale: string }> };
 
@@ -20,34 +18,20 @@ export default async function AdminEducationPlanCreatePage({ params }: Props) {
   const lookups = await adminEducationPlanLookups();
   if (!lookups) {
     return (
-      <div className={styles.page}>
-        <header className={styles.headerCard}>
-          <div>
-            <h1 className={styles.title}>{t("educationPlanCreate")}</h1>
-            <p className={styles.meta}>{t("loadError")}</p>
-          </div>
-          <Link className={styles.meta} href={`/${locale}/dashboard/admin/education-plans`}>
-            {t("back")}
-          </Link>
-        </header>
-      </div>
+      <AdminFormPage title={t("educationPlanCreate")} hint={t("loadError")} backHref={`/${locale}/dashboard/admin/education-plans`}>
+        <p>{t("loadError")}</p>
+      </AdminFormPage>
     );
   }
 
   return (
-    <div className={styles.pageWide}>
-      <header className={styles.headerCard}>
-        <div>
-          <h1 className={styles.title}>{t("educationPlanCreate")}</h1>
-          <p className={styles.meta}>{t("educationPlanCreateHint")}</p>
-        </div>
-        <Link className={styles.meta} href={`/${locale}/dashboard/admin/education-plans`}>
-          {t("back")}
-        </Link>
-      </header>
-      <div className={styles.content}>
-        <EducationPlanCreateForm lookups={lookups} />
-      </div>
-    </div>
+    <AdminFormPage
+      wide
+      title={t("educationPlanCreate")}
+      hint={t("educationPlanCreateHint")}
+      backHref={`/${locale}/dashboard/admin/education-plans`}
+    >
+      <EducationPlanCreateForm lookups={lookups} />
+    </AdminFormPage>
   );
 }

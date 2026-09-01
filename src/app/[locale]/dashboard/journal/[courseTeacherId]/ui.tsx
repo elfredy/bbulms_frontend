@@ -48,7 +48,9 @@ const ATTENDANCE_CODE_SET = new Set(
 );
 
 const DISPLAY_START_DATE = "2026-02-16";
-const MEETING_WINDOW_SIZE = 11; // 5 days before + today + 5 days after
+const PAIR_WINDOW_SIZE = 6;
+const PAIR_WINDOW_STEP = 3;
+const WEEK_DAY_LABELS = ["", "I", "II", "III", "IV", "V", "VI", "VII"];
 
 function isAttendanceValue(rawValue: string | null | undefined): boolean {
   return ATTENDANCE_CODE_SET.has(String(rawValue ?? "").trim().toLowerCase());
@@ -145,6 +147,106 @@ function dateOnly(v: string | null | undefined): string {
   return String(v ?? "").slice(0, 10);
 }
 
+type MeetingPair = {
+  key: string;
+  week_day: number;
+  start_time: string | null;
+  end_time: string | null;
+  lesson_type_az: string | null;
+  lesson_type_id: string | null;
+  upper: CourseMeetingItem | null;
+  lower: CourseMeetingItem | null;
+};
+
+function weekDayOf(m: CourseMeetingItem): number {
+  const wd = Number(m.week_day ?? 0);
+  if (wd >= 1 && wd <= 7) return wd;
+  const d = dateOnly(m.meeting_date);
+  if (!d) return 0;
+  const js = new Date(`${d}T12:00:00`).getDay();
+  return js === 0 ? 7 : js;
+}
+
+function weekHalfOf(m: CourseMeetingItem): 1 | 2 | 0 {
+  const wt = Number(m.week_type ?? 0);
+  if (wt === 1 || wt === 2) return wt;
+  return 0;
+}
+
+function daysBetween(a: string, b: string): number {
+  const da = Date.parse(`${a}T12:00:00`);
+  const db = Date.parse(`${b}T12:00:00`);
+  if (!Number.isFinite(da) || !Number.isFinite(db)) return 999;
+  return Math.round((db - da) / 86400000);
+}
+
+function pairHalves(p: MeetingPair): { tag: "Üst" | "Alt"; m: CourseMeetingItem }[] {
+  const out: { tag: "Üst" | "Alt"; m: CourseMeetingItem }[] = [];
+  if (p.upper) out.push({ tag: "Üst", m: p.upper });
+  if (p.lower) out.push({ tag: "Alt", m: p.lower });
+  return out;
+}
+
+function buildMeetingPairs(meetings: CourseMeetingItem[]): MeetingPair[] {
+  const buckets = new Map<string, CourseMeetingItem[]>();
+  for (const m of meetings) {
+    const key = `${weekDayOf(m)}|${m.clock_id ?? ""}|${m.lesson_type_id ?? ""}`;
+    const arr = buckets.get(key) ?? [];
+    arr.push(m);
+    buckets.set(key, arr);
+  }
+
+  const pairs: MeetingPair[] = [];
+  for (const [slotKey, arr] of buckets) {
+    arr.sort((a, b) => dateOnly(a.meeting_date).localeCompare(dateOnly(b.meeting_date)));
+    let i = 0;
+    while (i < arr.length) {
+      const a = arr[i];
+      const b = arr[i + 1];
+      const gap = b ? daysBetween(dateOnly(a.meeting_date), dateOnly(b.meeting_date)) : 999;
+      const canPair = Boolean(b) && gap >= 5 && gap <= 10;
+      let upper: CourseMeetingItem | null = null;
+      let lower: CourseMeetingItem | null = null;
+      if (canPair && b) {
+        const ha = weekHalfOf(a);
+        const hb = weekHalfOf(b);
+        if (ha === 2 && hb !== 2) {
+          upper = b;
+          lower = a;
+        } else {
+          upper = a;
+          lower = b;
+        }
+        i += 2;
+      } else {
+        if (weekHalfOf(a) === 2) lower = a;
+        else upper = a;
+        i += 1;
+      }
+      const sample = upper ?? lower;
+      if (!sample) continue;
+      pairs.push({
+        key: `${slotKey}|${dateOnly(sample.meeting_date)}|${sample.course_meeting_id}`,
+        week_day: weekDayOf(sample),
+        start_time: sample.start_time ?? null,
+        end_time: sample.end_time ?? null,
+        lesson_type_az: sample.lesson_type_az ?? null,
+        lesson_type_id: sample.lesson_type_id ?? null,
+        upper,
+        lower,
+      });
+    }
+  }
+
+  pairs.sort((p, q) => {
+    const da = dateOnly((p.upper ?? p.lower)?.meeting_date);
+    const db = dateOnly((q.upper ?? q.lower)?.meeting_date);
+    if (da !== db) return da.localeCompare(db);
+    return String(p.start_time ?? "").localeCompare(String(q.start_time ?? ""));
+  });
+  return pairs;
+}
+
 export function JournalClient({
   locale,
   courseTeacherId,
@@ -174,6 +276,8 @@ export function JournalClient({
         return da.localeCompare(db);
       });
   }, [meetings]);
+
+  const meetingPairs = useMemo(() => buildMeetingPairs(visibleMeetings), [visibleMeetings]);
 
   const [tab, setTab] = useState<TabId>("attendance");
   const [meetingId, setMeetingId] = useState<string>("");
@@ -230,10 +334,13 @@ export function JournalClient({
     return [];
   }, [tab, evalAttendance, evalSeminar, evalReferat, evalColloq, evalExam]);
 
+  const pairWindow = useMemo(() => {
+    return meetingPairs.slice(meetingWindowStart, meetingWindowStart + PAIR_WINDOW_SIZE);
+  }, [meetingPairs, meetingWindowStart]);
+
   const meetingWindow = useMemo(() => {
-    const slice = visibleMeetings.slice(meetingWindowStart, meetingWindowStart + MEETING_WINDOW_SIZE);
-    return slice;
-  }, [visibleMeetings, meetingWindowStart]);
+    return pairWindow.flatMap((p) => pairHalves(p).map((h) => h.m));
+  }, [pairWindow]);
 
   function meetingCellKey(mid: string, studentId: string, courseEvaId: string): string {
     return `${mid}:${studentId}:${courseEvaId}`;
@@ -511,13 +618,19 @@ export function JournalClient({
     if (Object.keys(initialLocked).length) setMeetingLockedById(initialLocked);
 
     const today = new Date().toISOString().slice(0, 10);
-    const idxToday = visibleMeetings.findIndex((m) => dateOnly(m.meeting_date) === today);
-    const maxStart = Math.max(0, visibleMeetings.length - MEETING_WINDOW_SIZE);
-    const initialStart = Math.min(maxStart, Math.max(0, (idxToday >= 0 ? idxToday : 0) - 5));
+    const idxToday = meetingPairs.findIndex((p) => {
+      const du = dateOnly(p.upper?.meeting_date);
+      const dl = dateOnly(p.lower?.meeting_date);
+      return du === today || dl === today;
+    });
+    const maxStart = Math.max(0, meetingPairs.length - PAIR_WINDOW_SIZE);
+    const initialStart = Math.min(maxStart, Math.max(0, (idxToday >= 0 ? idxToday : 0) - 2));
     setMeetingWindowStart(initialStart);
 
     const initialMeetingId =
-      (idxToday >= 0 ? String(visibleMeetings[idxToday]?.course_meeting_id ?? "") : "") ||
+      String(
+        (idxToday >= 0 ? meetingPairs[idxToday]?.upper ?? meetingPairs[idxToday]?.lower : null)?.course_meeting_id ?? "",
+      ) ||
       String(visibleMeetings[0]?.course_meeting_id ?? "") ||
       String(meetings[0]?.course_meeting_id ?? "");
     setMeetingId(initialMeetingId);
@@ -858,6 +971,9 @@ export function JournalClient({
             <div className={styles.muted} style={{ alignSelf: "end" }}>
               {meetingPendingCount ? `${meetingPendingCount} dəyişiklik gözləyir` : "Dəyişiklik yoxdur"}
             </div>
+            <div className={styles.muted} style={{ alignSelf: "end", padding: 0 }}>
+              Üst və alt həftə eyni xanada düzəldilir (sol — üst, sağ — alt).
+            </div>
           </div>
         ) : null}
 
@@ -867,51 +983,58 @@ export function JournalClient({
               <thead>
                 <tr>
                   <th className={`${styles.th} ${styles.nameCol}`}>Tələbə</th>
-                  {meetingWindow.map((m) => {
-                    const mid = String(m.course_meeting_id);
-                    const lt = lessonTypeShort(m);
-                    const locked = Boolean(meetingLockedById[mid]);
+                  {pairWindow.map((p) => {
+                    const halves = pairHalves(p);
+                    const lt = lessonTypeShort(p.upper ?? p.lower ?? ({} as CourseMeetingItem));
+                    const dayLabel = WEEK_DAY_LABELS[p.week_day] ?? "";
+                    const split = halves.length > 1;
                     return (
-                      <th key={m.course_meeting_id} className={`${styles.th} ${styles.thCell}`}>
-                        <div>{fmtDateLabel(m.meeting_date)}</div>
-                        <div className={styles.muted} style={{ fontSize: 12, padding: 0 }}>
-                          {fmtTimeRange(m.start_time, m.end_time)}
+                      <th key={p.key} className={`${styles.th} ${styles.thCell} ${split ? styles.thPair : ""}`}>
+                        <div className={styles.pairTitle}>
+                          {[dayLabel, fmtTimeRange(p.start_time, p.end_time), lt].filter(Boolean).join(" · ")}
                         </div>
-                        {lt ? (
-                          <div className={styles.muted} style={{ fontSize: 12, fontWeight: 600, padding: 0 }} title={m.lesson_type_az ?? undefined}>
-                            {lt}
-                          </div>
-                        ) : null}
-                        {locked ? (
-                          <div className={styles.muted} style={{ fontSize: 12, fontWeight: 700, padding: "0.35rem 0 0", color: "rgba(20, 83, 45, 1)" }}>
-                            Təsdiqlənib
-                          </div>
-                        ) : (
-                          <div className={styles.bulkRowStack}>
-                            <select
-                              className={styles.cellSelect}
-                              value={bulkValueByMeetingId[mid] ?? ""}
-                              onChange={(ev) =>
-                                setBulkValueByMeetingId((prev) => ({ ...prev, [mid]: String(ev.target.value) }))
-                              }
-                              disabled={isPending}
-                            >
-                              {meetingCombinedOpts.map((o) => (
-                                <option key={`${o.value}-${o.label}`} value={o.value}>
-                                  {o.label}
-                                </option>
-                              ))}
-                            </select>
-                            <button
-                              type="button"
-                              className={styles.bulkButton}
-                              onClick={() => bulkApplyMeeting(mid)}
-                              disabled={isPending}
-                            >
-                              Hamıya eyni
-                            </button>
-                          </div>
-                        )}
+                        <div className={split ? styles.splitHead : undefined}>
+                          {halves.map(({ tag, m }) => {
+                            const mid = String(m.course_meeting_id);
+                            const locked = Boolean(meetingLockedById[mid]);
+                            return (
+                              <div key={mid} className={styles.halfHead}>
+                                <div className={tag === "Üst" ? styles.weekTagUp : styles.weekTagDown}>{tag}</div>
+                                <div>{fmtDateLabel(m.meeting_date)}</div>
+                                {locked ? (
+                                  <div className={styles.muted} style={{ fontSize: 12, fontWeight: 700, padding: "0.35rem 0 0", color: "rgba(20, 83, 45, 1)" }}>
+                                    Təsdiqlənib
+                                  </div>
+                                ) : (
+                                  <div className={styles.bulkRowStack}>
+                                    <select
+                                      className={styles.cellSelect}
+                                      value={bulkValueByMeetingId[mid] ?? ""}
+                                      onChange={(ev) =>
+                                        setBulkValueByMeetingId((prev) => ({ ...prev, [mid]: String(ev.target.value) }))
+                                      }
+                                      disabled={isPending}
+                                    >
+                                      {meetingCombinedOpts.map((o) => (
+                                        <option key={`${o.value}-${o.label}`} value={o.value}>
+                                          {o.label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    <button
+                                      type="button"
+                                      className={styles.bulkButton}
+                                      onClick={() => bulkApplyMeeting(mid)}
+                                      disabled={isPending}
+                                    >
+                                      Hamıya eyni
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
                       </th>
                     );
                   })}
@@ -923,27 +1046,35 @@ export function JournalClient({
                     <td className={`${styles.td} ${styles.nameCol}`}>
                       {idx + 1}. {s.person_fullname}
                     </td>
-                    {meetingWindow.map((m) => {
-                      const mid = String(m.course_meeting_id);
-                      const locked = Boolean(meetingLockedById[mid]);
-                      const cellMap = meetingWindowCellsByMeetingId[mid] ?? {};
-                      const display = meetingCombinedDisplay(cellMap, s.student_id);
-                      const tone = cellToneClass(styles, display, isAttendanceValue(display));
-
+                    {pairWindow.map((p) => {
+                      const halves = pairHalves(p);
+                      const split = halves.length > 1;
                       return (
-                        <td key={mid} className={`${styles.td} ${styles.tdCell}`}>
-                          <select
-                            className={`${styles.cellSelect} ${tone}`}
-                            value={display}
-                            onChange={(ev) => setMeetingCombined(mid, s.student_id, String(ev.target.value))}
-                            disabled={isPending || locked}
-                          >
-                            {meetingCombinedOpts.map((o) => (
-                              <option key={`${o.value}-${o.label}`} value={o.value}>
-                                {o.label}
-                              </option>
-                            ))}
-                          </select>
+                        <td key={p.key} className={`${styles.td} ${styles.tdCell} ${split ? styles.tdPair : ""}`}>
+                          <div className={split ? styles.splitBody : undefined}>
+                            {halves.map(({ m }) => {
+                              const mid = String(m.course_meeting_id);
+                              const locked = Boolean(meetingLockedById[mid]);
+                              const cellMap = meetingWindowCellsByMeetingId[mid] ?? {};
+                              const display = meetingCombinedDisplay(cellMap, s.student_id);
+                              const tone = cellToneClass(styles, display, isAttendanceValue(display));
+                              return (
+                                <select
+                                  key={mid}
+                                  className={`${styles.cellSelect} ${tone}`}
+                                  value={display}
+                                  onChange={(ev) => setMeetingCombined(mid, s.student_id, String(ev.target.value))}
+                                  disabled={isPending || locked}
+                                >
+                                  {meetingCombinedOpts.map((o) => (
+                                    <option key={`${o.value}-${o.label}`} value={o.value}>
+                                      {o.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              );
+                            })}
+                          </div>
                         </td>
                       );
                     })}
@@ -957,7 +1088,7 @@ export function JournalClient({
                       <button
                         type="button"
                         className={`${styles.btn} ${styles.btnNav}`}
-                        onClick={() => setMeetingWindowStart((s) => Math.max(0, s - 5))}
+                        onClick={() => setMeetingWindowStart((s) => Math.max(0, s - PAIR_WINDOW_STEP))}
                         disabled={isPending || meetingWindowStart <= 0}
                       >
                         Prev
@@ -967,25 +1098,25 @@ export function JournalClient({
                         className={`${styles.btn} ${styles.btnNav}`}
                         onClick={() =>
                           setMeetingWindowStart((s) =>
-                            Math.min(Math.max(0, visibleMeetings.length - MEETING_WINDOW_SIZE), s + 5),
+                            Math.min(Math.max(0, meetingPairs.length - PAIR_WINDOW_SIZE), s + PAIR_WINDOW_STEP),
                           )
                         }
-                        disabled={isPending || meetingWindowStart + MEETING_WINDOW_SIZE >= visibleMeetings.length}
+                        disabled={isPending || meetingWindowStart + PAIR_WINDOW_SIZE >= meetingPairs.length}
                       >
                         Next
                       </button>
                     </div>
-                    {meetingWindow.length === 0 ? (
+                    {pairWindow.length === 0 ? (
                       <div className={styles.pagerMeta}>Dərs tarixi yoxdur</div>
                     ) : null}
                   </td>
-                  {meetingWindow.length > 0 ? (
+                  {pairWindow.length > 0 ? (
                     <td
                       className={`${styles.td} ${styles.pagerMetaCell}`}
-                      colSpan={meetingWindow.length}
+                      colSpan={pairWindow.length}
                     >
                       <div className={styles.pagerMeta}>
-                        {`${meetingWindowStart + 1}-${Math.min(visibleMeetings.length, meetingWindowStart + meetingWindow.length)} / ${visibleMeetings.length}`}
+                        {`${meetingWindowStart + 1}-${Math.min(meetingPairs.length, meetingWindowStart + pairWindow.length)} / ${meetingPairs.length}`}
                       </div>
                     </td>
                   ) : null}

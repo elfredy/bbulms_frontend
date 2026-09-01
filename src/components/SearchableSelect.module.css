@@ -9,9 +9,10 @@
   gap: 8px;
   width: 100%;
   padding: 10px 12px;
+  min-height: 42px;
   border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--card);
+  border: 1px solid #d0d5dd;
+  background: #fff;
   color: var(--text);
   font: inherit;
   text-align: left;
@@ -43,7 +44,7 @@
 
 .menu {
   position: absolute;
-  z-index: 20;
+  z-index: 40;
   top: calc(100% + 4px);
   left: 0;
   right: 0;

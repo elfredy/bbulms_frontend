@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -31,8 +32,10 @@ type Props = {
 
 function isActive(pathname: string, href: string) {
   if (href === pathname) return true;
+  const normalized = href.replace(/\/$/, "");
+  if (/\/dashboard$/.test(normalized)) return false;
   if (href !== "/" && pathname.startsWith(href + "/")) {
-    if (/\/dashboard\/admin$/.test(href.replace(/\/$/, ""))) return false;
+    if (/\/dashboard\/admin$/.test(normalized)) return false;
     return true;
   }
   return false;
@@ -49,6 +52,33 @@ export function DashboardShell({ me, items, children }: Props) {
   }, {});
 
   const sections = Object.keys(grouped);
+
+  const activeSections = useMemo(() => {
+    const open = new Set<string>();
+    for (const item of items) {
+      if (pathname && isActive(pathname, item.href) && item.section) open.add(item.section);
+    }
+    return open;
+  }, [items, pathname]);
+
+  const [openSections, setOpenSections] = useState<Set<string>>(() => new Set(activeSections));
+
+  useEffect(() => {
+    setOpenSections((prev) => {
+      const next = new Set(prev);
+      activeSections.forEach((s) => next.add(s));
+      return next;
+    });
+  }, [activeSections]);
+
+  function toggleSection(section: string) {
+    setOpenSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(section)) next.delete(section);
+      else next.add(section);
+      return next;
+    });
+  }
 
   return (
     <div className={styles.shell}>
@@ -67,25 +97,66 @@ export function DashboardShell({ me, items, children }: Props) {
         </div>
 
         <nav className={styles.nav}>
-          {sections.map((section) => (
-            <div key={section}>
-              {section ? <div className={styles.navSectionLabel}>{section}</div> : null}
-              {grouped[section].map((item) => {
-                const active = pathname ? isActive(pathname, item.href) : false;
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`${styles.navItem} ${active ? styles.navItemActive : ""}`}
-                    aria-current={active ? "page" : undefined}
-                  >
-                    <span>{item.label}</span>
-                    {item.badge ? <span className={styles.pill}>{item.badge}</span> : null}
-                  </Link>
-                );
-              })}
-            </div>
-          ))}
+          <div className={styles.menuTitle}>Menyu</div>
+          {sections.map((section) => {
+            const sectionItems = grouped[section];
+            if (!section) {
+              return (
+                <div key="root">
+                  {sectionItems.map((item) => {
+                    const active = pathname ? isActive(pathname, item.href) : false;
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={`${styles.navItem} ${active ? styles.navItemActive : ""}`}
+                        aria-current={active ? "page" : undefined}
+                      >
+                        <span>{item.label}</span>
+                        {item.badge ? <span className={styles.pill}>{item.badge}</span> : null}
+                      </Link>
+                    );
+                  })}
+                </div>
+              );
+            }
+
+            const expanded = openSections.has(section);
+            return (
+              <div key={section} className={styles.navSection}>
+                <button
+                  type="button"
+                  className={styles.navSectionToggle}
+                  aria-expanded={expanded}
+                  onClick={() => toggleSection(section)}
+                >
+                  <span className={styles.sectionIcon} aria-hidden>
+                    {expanded ? "−" : "+"}
+                  </span>
+                  <span>{section}</span>
+                </button>
+                {expanded ? (
+                  <div className={styles.navSub}>
+                    {sectionItems.map((item) => {
+                      const active = pathname ? isActive(pathname, item.href) : false;
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          className={`${styles.navSubItem} ${active ? styles.navSubItemActive : ""}`}
+                          aria-current={active ? "page" : undefined}
+                        >
+                          <span className={styles.bullet} aria-hidden />
+                          <span>{item.label}</span>
+                          {item.badge ? <span className={styles.pill}>{item.badge}</span> : null}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
         </nav>
       </aside>
 
@@ -99,4 +170,3 @@ export function DashboardShell({ me, items, children }: Props) {
     </div>
   );
 }
-

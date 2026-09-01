@@ -335,6 +335,8 @@ export type CourseMeetingItem = {
   point_status: string | null;
   lesson_type_id?: string | null;
   lesson_type_az?: string | null;
+  week_type?: number | null;
+  week_day?: number | null;
 };
 
 export type CourseMeetingListResponse = {

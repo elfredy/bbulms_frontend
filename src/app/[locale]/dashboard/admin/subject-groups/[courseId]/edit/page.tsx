@@ -1,11 +1,9 @@
-import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 
 import { SubjectGroupCreateForm } from "@/components/SubjectGroupCreateForm";
+import { AdminFormPage } from "@/components/admin/form-shared";
 import { getMe } from "@/lib/api";
-
-import styles from "../../../../dashboard.module.css";
 
 type Props = {
   params: Promise<{ locale: string; courseId: string }>;
@@ -20,19 +18,8 @@ export default async function AdminSubjectGroupEditPage({ params }: Props) {
   if (!me.is_superadmin) redirect(`/${locale}/dashboard`);
 
   return (
-    <div className={styles.pageWide}>
-      <header className={styles.headerCard}>
-        <div>
-          <h1 className={styles.title}>{t("subjectGroupEdit")}</h1>
-          <p className={styles.meta}>{t("subjectGroupsHint")}</p>
-        </div>
-        <Link className={styles.meta} href={`/${locale}/dashboard/admin/subject-groups`}>
-          {t("back")}
-        </Link>
-      </header>
-      <div className={styles.content}>
-        <SubjectGroupCreateForm initialCourseId={courseId} />
-      </div>
-    </div>
+    <AdminFormPage wide title={t("subjectGroupEdit")} hint={t("subjectGroupsHint")} backHref={`/${locale}/dashboard/admin/subject-groups`}>
+      <SubjectGroupCreateForm initialCourseId={courseId} />
+    </AdminFormPage>
   );
 }

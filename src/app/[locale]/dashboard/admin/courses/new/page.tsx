@@ -1,11 +1,9 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 
+import formStyles from "@/components/admin/AdminForm.module.css";
 import { adminListCourses, getMe } from "@/lib/api";
-
-import styles from "../../../dashboard.module.css";
 
 type Props = {
   params: Promise<{ locale: string }>;
@@ -15,8 +13,6 @@ type Props = {
 export default async function AdminCourseCreatePage({ params, searchParams }: Props) {
   const { locale } = await params;
   const sp = (await searchParams) ?? {};
-  const t = await getTranslations("admin");
-
   const me = await getMe();
   if (!me) redirect(`/${locale}/login`);
   if (!me.is_superadmin) redirect(`/${locale}/dashboard`);
@@ -86,116 +82,103 @@ export default async function AdminCourseCreatePage({ params, searchParams }: Pr
   }
 
   return (
-    <div className={styles.page}>
-      <header className={styles.headerCard}>
-        <div>
-          <h1 className={styles.title}>Course yarat</h1>
-          <p className={styles.meta}>Sıfırdan yarat və ya mövcud course-u clone et.</p>
+    <div className={formStyles.pageWrap} style={{ flexDirection: "column", alignItems: "center", gap: 20 }}>
+      <div className={`${formStyles.panel} ${formStyles.panelWide}`}>
+        <header className={formStyles.panelHead}>
+          <div>
+            <h1 className={formStyles.panelTitle}>Dərs cədvəli əlavə et</h1>
+            <p className={formStyles.panelHint}>Sıfırdan yaradın və ya mövcud dərs cədvəlini köçürün.</p>
+          </div>
+          <Link href={`/${locale}/dashboard/admin/courses`} className={formStyles.close} aria-label="Bağla">
+            ×
+          </Link>
+        </header>
+        <div className={formStyles.panelBody}>
+          {sp.ok === "1" ? <p className={formStyles.hint}>Dərs cədvəli yaradıldı.</p> : null}
+          {sp.err ? <p className={formStyles.error}>Xəta: {sp.err}</p> : null}
+          <form action={createFromScratchAction} className={formStyles.form}>
+            <section className={formStyles.group}>
+              <h2 className={formStyles.groupTitle}>Sıfırdan yarat</h2>
+              <div className={formStyles.grid2}>
+                <label className={formStyles.field}>
+                  <span className={formStyles.label}>Kod</span>
+                  <input name="code" placeholder="TEST-001" className={formStyles.input} />
+                </label>
+                <label className={formStyles.field}>
+                  <span className={formStyles.label}>Qiymətləndirmə tipi ID</span>
+                  <input name="evaluation_type_id" placeholder="110000..." className={formStyles.input} />
+                </label>
+                <label className={formStyles.field}>
+                  <span className={formStyles.label}>Tədris planı fənn ID</span>
+                  <input name="education_plan_subject_id" placeholder="12345" className={formStyles.input} />
+                </label>
+                <label className={formStyles.field}>
+                  <span className={formStyles.label}>Tədris ili ID</span>
+                  <input name="education_year_id" placeholder="2026..." className={formStyles.input} />
+                </label>
+                <label className={formStyles.field}>
+                  <span className={formStyles.label}>Mühazirə saatı</span>
+                  <input name="m_hours" type="number" min={0} defaultValue={15} className={formStyles.input} />
+                </label>
+                <label className={formStyles.field}>
+                  <span className={formStyles.label}>Seminar saatı</span>
+                  <input name="s_hours" type="number" min={0} defaultValue={15} className={formStyles.input} />
+                </label>
+                <label className={formStyles.field}>
+                  <span className={formStyles.label}>Laboratoriya saatı</span>
+                  <input name="l_hours" type="number" min={0} defaultValue={0} className={formStyles.input} />
+                </label>
+                <label className={formStyles.field}>
+                  <span className={formStyles.label}>FM saatı</span>
+                  <input name="fm_hours" type="number" min={0} defaultValue={0} className={formStyles.input} />
+                </label>
+              </div>
+            </section>
+            <div className={formStyles.actions}>
+              <button type="submit" className={formStyles.submit}>
+                Əlavə et
+              </button>
+            </div>
+          </form>
         </div>
-        <Link className={styles.meta} href={`/${locale}/dashboard/admin/courses`}>
-          {t("back")}
-        </Link>
-      </header>
+      </div>
 
-      <div className={styles.content} style={{ display: "grid", gap: 14 }}>
-        {sp.ok === "1" ? <p className={styles.alertMuted}>Course yaradıldı.</p> : null}
-        {sp.err ? <p className={styles.alertMuted}>Xəta: {sp.err}</p> : null}
-
-        <form action={createFromScratchAction} style={{ display: "grid", gap: 10, padding: 12, border: "1px solid var(--border)", borderRadius: 12 }}>
-          <div className={styles.meta} style={{ fontWeight: 600 }}>
-            Sıfırdan yarat
+      <div className={`${formStyles.panel} ${formStyles.panelWide}`}>
+        <header className={formStyles.panelHead}>
+          <div>
+            <h1 className={formStyles.panelTitle}>Mövcud cədvəldən köçür</h1>
+            <p className={formStyles.panelHint}>Köhnə dərs cədvəlini klonlayın.</p>
           </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <label style={{ display: "grid", gap: 6 }}>
-              <span className={styles.meta}>Code (opsional)</span>
-              <input name="code" placeholder="TEST-001" style={inputStyle} />
-            </label>
-            <label style={{ display: "grid", gap: 6 }}>
-              <span className={styles.meta}>Evaluation type id (opsional)</span>
-              <input name="evaluation_type_id" placeholder="110000..." style={inputStyle} />
-            </label>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <label style={{ display: "grid", gap: 6 }}>
-              <span className={styles.meta}>Education plan subject id (opsional)</span>
-              <input name="education_plan_subject_id" placeholder="12345" style={inputStyle} />
-            </label>
-            <label style={{ display: "grid", gap: 6 }}>
-              <span className={styles.meta}>Education year id (opsional)</span>
-              <input name="education_year_id" placeholder="2026..." style={inputStyle} />
-            </label>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10 }}>
-            <label style={{ display: "grid", gap: 6 }}>
-              <span className={styles.meta}>M (lecture) hours</span>
-              <input name="m_hours" type="number" min={0} defaultValue={15} style={inputStyle} />
-            </label>
-            <label style={{ display: "grid", gap: 6 }}>
-              <span className={styles.meta}>S (seminar) hours</span>
-              <input name="s_hours" type="number" min={0} defaultValue={15} style={inputStyle} />
-            </label>
-            <label style={{ display: "grid", gap: 6 }}>
-              <span className={styles.meta}>L (lab) hours</span>
-              <input name="l_hours" type="number" min={0} defaultValue={0} style={inputStyle} />
-            </label>
-            <label style={{ display: "grid", gap: 6 }}>
-              <span className={styles.meta}>FM hours</span>
-              <input name="fm_hours" type="number" min={0} defaultValue={0} style={inputStyle} />
-            </label>
-          </div>
-
-          <button type="submit" style={buttonStyle}>
-            Course yarat (create)
-          </button>
-        </form>
-
-        <form action={createByCloneAction} style={{ display: "grid", gap: 10, padding: 12, border: "1px solid var(--border)", borderRadius: 12 }}>
-          <div className={styles.meta} style={{ fontWeight: 600 }}>
-            Clone (köhnə course-dan)
-          </div>
-          <label style={{ display: "grid", gap: 6 }}>
-            <span className={styles.meta}>Source course</span>
-            <select name="source_course_id" defaultValue="" style={inputStyle}>
-              <option value="">— seç —</option>
-              {courses.map((c) => (
-                <option key={c.course_id} value={c.course_id}>
-                  {c.subject_name_az ?? c.course_code ?? c.course_id}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label style={{ display: "grid", gap: 6 }}>
-            <span className={styles.meta}>New code (opsional)</span>
-            <input name="new_code" placeholder="TEST-001" style={inputStyle} />
-          </label>
-
-          <button type="submit" style={buttonStyle}>
-            Course yarat (clone)
-          </button>
-        </form>
+        </header>
+        <div className={formStyles.panelBody}>
+          <form action={createByCloneAction} className={formStyles.form}>
+            <section className={formStyles.group}>
+              <div className={formStyles.grid1}>
+                <label className={formStyles.field}>
+                  <span className={formStyles.label}>Mənbə dərs cədvəli</span>
+                  <select name="source_course_id" defaultValue="" className={formStyles.select}>
+                    <option value="">— seç —</option>
+                    {courses.map((c) => (
+                      <option key={c.course_id} value={c.course_id}>
+                        {c.subject_name_az ?? c.course_code ?? c.course_id}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className={formStyles.field}>
+                  <span className={formStyles.label}>Yeni kod</span>
+                  <input name="new_code" placeholder="TEST-001" className={formStyles.input} />
+                </label>
+              </div>
+            </section>
+            <div className={formStyles.actions}>
+              <button type="submit" className={formStyles.submit}>
+                Əlavə et
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );
 }
-
-const inputStyle: React.CSSProperties = {
-  padding: "10px 12px",
-  borderRadius: 10,
-  border: "1px solid var(--border)",
-  background: "var(--card)",
-  color: "var(--text)",
-};
-
-const buttonStyle: React.CSSProperties = {
-  padding: "10px 12px",
-  borderRadius: 10,
-  border: "1px solid var(--border)",
-  background: "var(--card)",
-  color: "var(--text)",
-  cursor: "pointer",
-};
-

@@ -63,7 +63,7 @@
   },
   "admin": {
     "title": "Admin panel",
-    "subtitle": "Education plans, groups, teachers and related courses.",
+    "subtitle": "Student orders, students, teaching staff, groups and the subject catalog are linked together.",
     "educationPlans": "Education plans",
     "educationPlansHint": "Existing education plans. Create the plan first, then subject groups, then the timetable.",
     "educationPlanCreate": "Add education plan",

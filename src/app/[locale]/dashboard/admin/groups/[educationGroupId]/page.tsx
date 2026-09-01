@@ -195,9 +195,14 @@ export default async function AdminGroupDetailPage({ params, searchParams }: Pro
             {[g.education_year_name, g.education_type_az, g.education_lang_az].filter(Boolean).join(" · ") || "\u00a0"}
           </p>
         </div>
-        <Link className={styles.meta} href={`/${locale}/dashboard/admin/groups`}>
-          {t("back")}
-        </Link>
+        <div className={styles.headerActions}>
+          <Link href={`/${locale}/dashboard/admin/groups/${educationGroupId}/edit`} className={styles.actionLink}>
+            Qrupu yenilə
+          </Link>
+          <Link className={styles.meta} href={`/${locale}/dashboard/admin/groups`}>
+            {t("back")}
+          </Link>
+        </div>
       </header>
 
       <div className={styles.content} style={{ display: "grid", gap: 18 }}>

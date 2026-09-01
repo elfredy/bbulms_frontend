@@ -63,7 +63,7 @@
   },
   "admin": {
     "title": "Admin panel",
-    "subtitle": "Tədris planları, qruplar, müəllimlər və əlaqəli fənnlər üzrə baxış.",
+    "subtitle": "Tələbə əmrləri, tələbələr, pedaqoji heyət, qruplar və fənn kataloqu bir-birinə bağlıdır.",
     "educationPlans": "Tədris planları",
     "educationPlansHint": "Mövcud tədris planları. Əvvəl plan, sonra fənn qrupu, sonra dərs cədvəli yaradılır.",
     "educationPlanCreate": "Tədris planı əlavə et",

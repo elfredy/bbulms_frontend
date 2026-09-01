@@ -19,16 +19,20 @@ export default async function DashboardLayout({ children, params }: Props) {
   }
 
   const items = [
-    { href: `/${locale}/dashboard`, label: "Dashboard" },
+    { href: `/${locale}/dashboard`, label: "Şəxsi kabinet" },
     ...(me.is_superadmin
       ? [
-          { href: `/${locale}/dashboard/admin`, label: "Admin panel", badge: "Admin", section: "Admin" },
+          { href: `/${locale}/dashboard/admin/edu-years`, label: "Tədris illərinin qrafiki", section: "Planlama" },
+          { href: `/${locale}/dashboard/admin/academic-calendar`, label: "Akademik təqvim", section: "Planlama" },
+          { href: `/${locale}/dashboard/admin/evaluation`, label: "Qiymətləndirmə sistemi", section: "Planlama" },
+          { href: `/${locale}/dashboard/admin/orders`, label: "Tələbə əmrləri", section: "Müəssisə idarəsi" },
+          { href: `/${locale}/dashboard/admin/students`, label: "Tələbələr", section: "Müəssisə idarəsi" },
+          { href: `/${locale}/dashboard/admin/teachers`, label: "Pedaqoji heyət", section: "Müəssisə idarəsi" },
+          { href: `/${locale}/dashboard/admin/groups`, label: "Tələbə qrupları", section: "Müəssisə idarəsi" },
+          { href: `/${locale}/dashboard/admin/subject-catalog`, label: "Kafedralar üzrə fənn kataloqu", section: "Təhsil proqramları" },
           { href: `/${locale}/dashboard/admin/education-plans`, label: "Tədris planları", section: "Təhsil proqramları" },
           { href: `/${locale}/dashboard/admin/subject-groups`, label: "Fənn qrupları", section: "Təhsil proqramları" },
-          { href: `/${locale}/dashboard/admin/courses`, label: "Dərs cədvəli", section: "Təhsil proqramları" },
-          { href: `/${locale}/dashboard/admin/groups`, label: "Qruplar", section: "İdarəetmə" },
-          { href: `/${locale}/dashboard/admin/teachers`, label: "Müəllimlər", section: "İdarəetmə" },
-          { href: `/${locale}/dashboard/admin/departments`, label: "Kafedralar", section: "İdarəetmə" },
+          { href: `/${locale}/dashboard/admin/courses`, label: "Cari semestrin dərs cədvəli", section: "Təhsil proqramları" },
         ]
       : []),
     ...(me.is_department_user

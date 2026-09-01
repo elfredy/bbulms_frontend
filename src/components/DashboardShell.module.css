@@ -1,6 +1,6 @@
 .shell {
   display: grid;
-  grid-template-columns: 260px 1fr;
+  grid-template-columns: 280px 1fr;
   gap: 18px;
   max-width: 1560px;
   margin: 0 auto;
@@ -60,7 +60,95 @@
 .nav {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
+}
+
+.menuTitle {
+  margin: 4px 8px 8px;
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.navSection {
+  display: grid;
+  gap: 2px;
+}
+
+.navSectionToggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 8px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.92rem;
+  cursor: pointer;
+  text-align: left;
+  border-radius: 10px;
+}
+
+.navSectionToggle:hover {
+  background: rgba(11, 92, 171, 0.05);
+}
+
+.sectionIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-size: 0.78rem;
+  line-height: 1;
+  color: var(--muted);
+  flex: 0 0 auto;
+}
+
+.navSub {
+  display: grid;
+  gap: 2px;
+  padding-left: 6px;
+}
+
+.navSubItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px 7px 8px;
+  border-radius: 10px;
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.navSubItem:hover {
+  background: rgba(11, 92, 171, 0.06);
+  text-decoration: none;
+}
+
+.navSubItemActive {
+  background: rgba(11, 92, 171, 0.1);
+  color: #c1354a;
+  font-weight: 650;
+}
+
+.bullet {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #d0d5dd;
+  flex: 0 0 auto;
+}
+
+.navSubItemActive .bullet {
+  background: #1570ef;
 }
 
 .navSectionLabel {

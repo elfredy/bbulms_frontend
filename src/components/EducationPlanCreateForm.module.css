@@ -6,10 +6,9 @@
 .card {
   display: grid;
   gap: 10px;
-  padding: 14px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--card);
+  padding: 0;
+  border: none;
+  background: transparent;
 }
 
 .cardTitle {
@@ -57,10 +56,13 @@
 .input,
 .select,
 .textarea {
-  padding: 10px 12px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 11px 12px;
+  min-height: 42px;
   border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--card);
+  border: 1px solid #d0d5dd;
+  background: #fff;
   color: var(--text);
   font: inherit;
 }
@@ -103,12 +105,32 @@
 }
 
 .actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  display: grid;
+  padding-top: 4px;
 }
 
-.button,
+.button {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid #12b76a;
+  background: #12b76a;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+}
+
+.button:hover:not(:disabled) {
+  background: #099455;
+  border-color: #099455;
+}
+
+.button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
 .buttonGhost {
   padding: 10px 12px;
   border-radius: 10px;
@@ -117,15 +139,6 @@
   color: var(--text);
   cursor: pointer;
   font: inherit;
-  font-weight: 600;
-}
-
-.button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.buttonGhost {
   font-weight: 500;
 }
 

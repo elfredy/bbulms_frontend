@@ -206,6 +206,49 @@
   vertical-align: top;
 }
 
+.thPair,
+.tdPair {
+  min-width: 228px;
+}
+
+.pairTitle {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: rgba(15, 23, 42, 0.88);
+  margin-bottom: 0.35rem;
+}
+
+.splitHead,
+.splitBody {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  align-items: start;
+}
+
+.halfHead {
+  min-width: 0;
+}
+
+.weekTagUp,
+.weekTagDown {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0;
+}
+
+.weekTagUp {
+  color: rgba(30, 64, 175, 1);
+}
+
+.splitHead > :nth-child(2),
+.splitBody > :nth-child(2) {
+  border-left: 1px dashed rgba(2, 6, 23, 0.16);
+  padding-left: 8px;
+}
+
 .bulkRow {
   margin-top: 0.5rem;
   display: grid;

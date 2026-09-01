@@ -545,25 +545,7 @@ export function SubjectGroupCreateForm({
         method: updating ? "PATCH" : "POST",
         credentials: "include",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(
-          updating
-            ? {
-                teachers: payload.teachers,
-                student_ids: payload.student_ids,
-                half_groups: payload.half_groups,
-                note: payload.note,
-                course_work: payload.course_work,
-                m_hours: payload.m_hours,
-                s_hours: payload.s_hours,
-                l_hours: payload.l_hours,
-                fm_hours: payload.fm_hours,
-                m_week_charge: payload.m_week_charge,
-                s_week_charge: payload.s_week_charge,
-                l_week_charge: payload.l_week_charge,
-                fm_week_charge: payload.fm_week_charge,
-              }
-            : payload
-        ),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         setError(await readDetail(res, updating ? "Fənn qrupu yenilənmədi" : "Fənn qrupu yaradılmadı"));
@@ -573,7 +555,7 @@ export function SubjectGroupCreateForm({
       const savedId = saved?.course_id ? String(saved.course_id) : createdCourseId;
       if (savedId) setCreatedCourseId(savedId);
       if (updating) {
-        setInfo("Məlumatlar yadda saxlanıldı. Müəllim, tələbə və yarımqrup tablarını doldurmağa davam edə və ya Geri ilə çıxa bilərsiniz.");
+        setInfo(initialCourseId ? "Məlumatlar yadda saxlanıldı." : "Məlumatlar yadda saxlanıldı. Davam edə və ya Geri ilə çıxa bilərsiniz.");
       } else {
         setTab("teacher");
         setInfo("Fənn qrupu yaradıldı. Səhifə açıq qalır — Müəllim, Tələbələr və Yarımqruplar tablarını doldurun. Bitirdikdən sonra Geri ilə çıxın.");
@@ -598,6 +580,35 @@ export function SubjectGroupCreateForm({
         credentials: "include",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
+          course_work: Number(courseWork),
+          education_level_id: levelId,
+          organization_id: orgId,
+          education_type_id: typeId,
+          education_plan_id: planId,
+          plan_semester_id: planSemesterId,
+          education_plan_subject_id: subjectId,
+          education_year_id: yearId,
+          education_lang_id: langId,
+          semester_id: semesterId,
+          start_date: startDate,
+          type_id: groupTypeId,
+          education_group_ids: groupIds,
+          note: note.trim() || null,
+          m_hours: Number(mHours || 0),
+          s_hours: Number(sHours || 0),
+          l_hours: Number(lHours || 0),
+          fm_hours: Number(fmHours || 0),
+          m_week_charge: Number(mWeek || 0),
+          s_week_charge: Number(sWeek || 0),
+          l_week_charge: Number(lWeek || 0),
+          fm_week_charge: Number(fmWeek || 0),
+          evaluation_type_id: evaluationType,
+          evaluations: evas.map((row) => ({
+            eva_type_id: row.eva_type_id,
+            successful_pass_percent: row.successful_pass_percent,
+            automatic: row.automatic,
+            access_s: row.access_s,
+          })),
           teachers: teacherPicks.filter((t) => t.teacher_id && t.lesson_type_id),
           student_ids: studentIds,
           half_groups: halfPicks
@@ -607,16 +618,6 @@ export function SubjectGroupCreateForm({
               lesson_type_id: h.lesson_type_id,
               teacher_id: h.teacher_id || null,
             })),
-          note: note.trim() || null,
-          course_work: Number(courseWork),
-          m_hours: Number(mHours || 0),
-          s_hours: Number(sHours || 0),
-          l_hours: Number(lHours || 0),
-          fm_hours: Number(fmHours || 0),
-          m_week_charge: Number(mWeek || 0),
-          s_week_charge: Number(sWeek || 0),
-          l_week_charge: Number(lWeek || 0),
-          fm_week_charge: Number(fmWeek || 0),
         }),
       });
       if (!res.ok) {
@@ -636,7 +637,7 @@ export function SubjectGroupCreateForm({
     return <p className={styles.error}>{error || "Yüklənir…"}</p>;
   }
 
-  const locked = Boolean(createdCourseId);
+  const locked = Boolean(createdCourseId) && !initialCourseId;
   const seminarId = lookups.lesson_types.find((x) => (x.name_az || "").toLowerCase().includes("seminar"))?.id || lookups.lesson_types[0]?.id || "";
   const selectedTeacherIds = [...teacherPicks.map((t) => t.teacher_id), ...halfPicks.map((h) => h.teacher_id)].filter(Boolean);
   const teacherOptions = (() => {
