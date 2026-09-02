@@ -215,6 +215,11 @@ export type TimetableBoard = {
   clocks: { id: string; start_time: string | null; end_time: string | null }[];
   assigned: TimetableAssignedSlot[];
   available: TimetableAvailableLesson[];
+  meeting_count?: number;
+  pending_count?: number;
+  confirmed_count?: number;
+  teacher_count?: number;
+  confirmed?: boolean;
 };
 
 export async function adminTimetableLookups(): Promise<TimetableLookups | null> {
@@ -311,4 +316,34 @@ export async function adminTimetableSetRoom(body: {
   if (!res.ok) return { ok: false, error: (await readErrorDetail(res)) || "Otaq dəyişdirilmədi" };
   const data = (await res.json()) as { updated_count?: number };
   return { ok: true, updated_count: Number(data.updated_count ?? 0) };
+}
+
+export async function adminTimetableConfirm(body: {
+  education_group_id: string;
+  education_year_id: string;
+  semester_id: string;
+}): Promise<
+  | { ok: true; updated_count: number; teacher_count: number; confirmed: boolean; meeting_count: number }
+  | { ok: false; error: string }
+> {
+  const res = await fetch("/api/admin/timetable/confirm", {
+    method: "POST",
+    credentials: "include",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) return { ok: false, error: (await readErrorDetail(res)) || "Təsdiqlənmədi" };
+  const data = (await res.json()) as {
+    updated_count?: number;
+    teacher_count?: number;
+    confirmed?: boolean;
+    meeting_count?: number;
+  };
+  return {
+    ok: true,
+    updated_count: Number(data.updated_count ?? 0),
+    teacher_count: Number(data.teacher_count ?? 0),
+    confirmed: Boolean(data.confirmed),
+    meeting_count: Number(data.meeting_count ?? 0),
+  };
 }

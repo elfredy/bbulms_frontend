@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState, type DragEvent } from "react
 import styles from "./TimetableBuilder.module.css";
 import {
   adminTimetableBoard,
+  adminTimetableConfirm,
   adminTimetableGroups,
   adminTimetableLookups,
   adminTimetablePlace,
@@ -53,6 +54,14 @@ export function TimetableBuilder() {
   const [selected, setSelected] = useState<SelectedLesson | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [okMsg, setOkMsg] = useState<string | null>(null);
+  const [confirmInfo, setConfirmInfo] = useState({
+    meeting_count: 0,
+    pending_count: 0,
+    confirmed_count: 0,
+    teacher_count: 0,
+    confirmed: false,
+  });
 
   useEffect(() => {
     let alive = true;
@@ -96,6 +105,7 @@ export function TimetableBuilder() {
     if (!groupId || !yearId || !semesterId) {
       setAssigned([]);
       setAvailable([]);
+      setConfirmInfo({ meeting_count: 0, pending_count: 0, confirmed_count: 0, teacher_count: 0, confirmed: false });
       return;
     }
     const data = await adminTimetableBoard({
@@ -111,6 +121,13 @@ export function TimetableBuilder() {
     setClocks(data.clocks);
     setAssigned(data.assigned);
     setAvailable(data.available);
+    setConfirmInfo({
+      meeting_count: Number(data.meeting_count ?? 0),
+      pending_count: Number(data.pending_count ?? 0),
+      confirmed_count: Number(data.confirmed_count ?? 0),
+      teacher_count: Number(data.teacher_count ?? 0),
+      confirmed: Boolean(data.confirmed),
+    });
     setSelected((cur) => {
       if (!cur) return cur;
       const still = data.available.find((a) => a.course_id === cur.course_id && a.lesson_type_id === cur.lesson_type_id);
@@ -158,6 +175,37 @@ export function TimetableBuilder() {
   }, [available]);
 
   const rooms = lookups?.rooms ?? [];
+
+  async function confirmTimetable() {
+    if (!groupId || !yearId || !semesterId) return;
+    if (confirmInfo.meeting_count <= 0) {
+      setError("Əvvəl cədvələ dərs qoyun");
+      return;
+    }
+    const ok = window.confirm(
+      "Cədvəl təsdiqlənsin? Təsdiqdən sonra bu qrupun dərsləri aid olduğu müəllimlərin kabinetində və e-jurnda görünəcək."
+    );
+    if (!ok) return;
+    setBusy(true);
+    setError(null);
+    setOkMsg(null);
+    const res = await adminTimetableConfirm({
+      education_group_id: groupId,
+      education_year_id: yearId,
+      semester_id: semesterId,
+    });
+    setBusy(false);
+    if (!res.ok) {
+      setError(res.error);
+      return;
+    }
+    setOkMsg(
+      res.teacher_count > 0
+        ? `Cədvəl təsdiqləndi. ${res.teacher_count} müəllimin kabinetində dərslər görünəcək.`
+        : "Cədvəl təsdiqləndi."
+    );
+    await loadBoard();
+  }
 
   async function place(weekDay: number, clockId: string, weekType: 1 | 2 | 3, lesson: SelectedLesson) {
     if (!groupId || !yearId || !semesterId) return;
@@ -473,7 +521,26 @@ export function TimetableBuilder() {
           ) : null}
         </label>
 
-        {error ? <p className={styles.error}>{error}</p> : <p className={styles.hint}>Fənni seçib üst/alt həftəyə və ya sağdakı tam dərs blokuna qoyun.</p>}
+        {error ? <p className={styles.error}>{error}</p> : null}
+        {okMsg ? <p className={styles.okMsg}>{okMsg}</p> : null}
+        {!error && !okMsg ? (
+          <p className={styles.hint}>Fənni seçib üst/alt həftəyə və ya sağdakı tam dərs blokuna qoyun. Bitirdikdən sonra təsdiq edin.</p>
+        ) : null}
+
+        <button
+          type="button"
+          className={styles.confirmBtn}
+          disabled={busy || !groupId || confirmInfo.meeting_count <= 0 || confirmInfo.confirmed}
+          onClick={() => void confirmTimetable()}
+        >
+          {confirmInfo.confirmed ? "Təsdiqlənib" : "Təsdiq et"}
+        </button>
+        {confirmInfo.meeting_count > 0 && !confirmInfo.confirmed ? (
+          <p className={styles.hint}>
+            {confirmInfo.pending_count} dərs təsdiq gözləyir
+            {confirmInfo.teacher_count > 0 ? ` · ${confirmInfo.teacher_count} müəllim` : ""}.
+          </p>
+        ) : null}
 
         <div className={styles.chips}>
           {!groupId ? (

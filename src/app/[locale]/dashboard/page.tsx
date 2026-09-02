@@ -15,7 +15,7 @@ export default async function DashboardPage({ params }: Props) {
   const user = await getMe();
   if (!user) return null;
 
-  const isTeacher = user.user_type === "TEACHER" && user.teacher_id != null;
+  const isTeacher = user.teacher_id != null;
   const isStudent = user.user_type === "STUDENT" && user.student_id != null;
   const isDepartmentUser = Boolean(user.is_department_user);
   const isSuperadmin = Boolean(user.is_superadmin);

@@ -18,7 +18,7 @@ export default async function JournalPage({ params, searchParams }: Props) {
   if (!user) {
     redirect(`/${locale}/login`);
   }
-  if (user.user_type !== "TEACHER" || user.teacher_id == null) {
+  if (user.teacher_id == null) {
     redirect(`/${locale}/dashboard`);
   }
 

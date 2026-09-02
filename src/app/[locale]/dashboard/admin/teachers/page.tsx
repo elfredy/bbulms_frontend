@@ -98,6 +98,7 @@ export default async function AdminTeachersPage({ params, searchParams }: Props)
                 <tr>
                   <th className={styles.th}>#</th>
                   <th className={styles.th}>Soyad Ad Ata adı</th>
+                  <th className={styles.th}>Vəzifə</th>
                   <th className={styles.th}>Cinsi</th>
                   <th className={styles.th}>Qəbul forması</th>
                   <th className={styles.th}>Başlama tarixi</th>
@@ -112,6 +113,7 @@ export default async function AdminTeachersPage({ params, searchParams }: Props)
                     <td className={`${styles.td} ${styles.tdName}`}>
                       <Link href={`/${locale}/dashboard/admin/teachers/${x.teacher_id}`}>{x.teacher_fullname ?? x.teacher_id}</Link>
                     </td>
+                    <td className={styles.td}>{x.position_name_az ?? "—"}</td>
                     <td className={styles.td}>{x.gender_name_az ?? "—"}</td>
                     <td className={styles.td}>{x.in_action_name_az ?? "—"}</td>
                     <td className={styles.td}>{x.in_action_date ?? "—"}</td>
