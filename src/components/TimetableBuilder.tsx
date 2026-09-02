@@ -141,15 +141,18 @@ export function TimetableBuilder() {
   );
 
   const groupedLessons = useMemo(() => {
-    const map = new Map<string, { course_id: string; subject_name_az: string | null; items: TimetableAvailableLesson[] }>();
+    const map = new Map<string, { key: string; subject_name_az: string | null; items: TimetableAvailableLesson[] }>();
     for (const lesson of available) {
-      const cur = map.get(lesson.course_id) ?? {
-        course_id: lesson.course_id,
+      const key = (lesson.subject_name_az || lesson.course_id).trim().toLocaleLowerCase("az");
+      const cur = map.get(key) ?? {
+        key,
         subject_name_az: lesson.subject_name_az,
         items: [],
       };
-      cur.items.push(lesson);
-      map.set(lesson.course_id, cur);
+      if (!cur.items.some((x) => x.lesson_type_id === lesson.lesson_type_id)) {
+        cur.items.push(lesson);
+      }
+      map.set(key, cur);
     }
     return [...map.values()];
   }, [available]);
@@ -479,7 +482,7 @@ export function TimetableBuilder() {
             <div className={styles.emptyChips}>Yerləşdiriləcək fənn qalmayıb.</div>
           ) : (
             groupedLessons.map((group) => (
-              <div key={group.course_id} className={styles.subjectBlock}>
+              <div key={group.key} className={styles.subjectBlock}>
                 <div className={styles.subjectTitle}>{group.subject_name_az}</div>
                 {group.items.map((lesson) => {
                   const isSel = selected?.course_id === lesson.course_id && selected?.lesson_type_id === lesson.lesson_type_id;
