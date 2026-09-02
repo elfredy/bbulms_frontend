@@ -21,6 +21,7 @@ type Opt = {
   season_code?: string | null;
   start_date?: string | null;
   org_name_az?: string | null;
+  position_name_az?: string | null;
 };
 type SubjectOpt = Opt & {
   semester_id?: string | null;
@@ -77,6 +78,10 @@ function subjectLabel(o: SubjectOpt) {
   return [o.name_az || o.id, o.code ? `(${o.code})` : "", hours, o.semester_name_az ? `· ${o.semester_name_az}` : ""]
     .filter(Boolean)
     .join(" ");
+}
+
+function teacherSearchLabel(t: { id: string; name?: string | null; org_name_az?: string | null; position_name_az?: string | null }) {
+  return [t.position_name_az, t.name || t.id, t.org_name_az].filter(Boolean).join(" · ");
 }
 
 function n0(v: number | null | undefined) {
@@ -961,7 +966,7 @@ export function SubjectGroupCreateForm({
                   searchPlaceholder="Axtar…"
                   options={teacherOptions.map((t) => ({
                     id: t.id,
-                    label: t.org_name_az ? `${t.name || t.id} · ${t.org_name_az}` : t.name || t.id,
+                    label: teacherSearchLabel(t),
                   }))}
                 />
               </label>
@@ -1069,7 +1074,7 @@ export function SubjectGroupCreateForm({
                   searchPlaceholder="Axtar…"
                   options={teacherOptions.map((t) => ({
                     id: t.id,
-                    label: t.org_name_az ? `${t.name || t.id} · ${t.org_name_az}` : t.name || t.id,
+                    label: teacherSearchLabel(t),
                   }))}
                 />
               </div>

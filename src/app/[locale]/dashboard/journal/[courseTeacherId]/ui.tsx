@@ -47,7 +47,6 @@ const ATTENDANCE_CODE_SET = new Set(
   ATTENDANCE_OPTIONS.map((o) => o.value.trim().toLowerCase()).filter(Boolean),
 );
 
-const DISPLAY_START_DATE = "2026-02-16";
 const PAIR_WINDOW_SIZE = 6;
 const PAIR_WINDOW_STEP = 3;
 const WEEK_DAY_LABELS = ["", "I", "II", "III", "IV", "V", "VI", "VII"];
@@ -144,7 +143,12 @@ function lessonTypeShort(m: CourseMeetingItem): string | null {
 }
 
 function dateOnly(v: string | null | undefined): string {
-  return String(v ?? "").slice(0, 10);
+  const s = String(v ?? "").trim();
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  const dmy = s.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})/);
+  if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}`;
+  return s.slice(0, 10);
 }
 
 type MeetingPair = {
@@ -265,11 +269,8 @@ export function JournalClient({
   evaluations: CourseEvaluationItem[];
 }) {
   const visibleMeetings = useMemo(() => {
-    return meetings
-      .filter((m) => {
-        const d = dateOnly(m.meeting_date);
-        return d ? d >= DISPLAY_START_DATE : false;
-      })
+    return [...meetings]
+      .filter((m) => Boolean(dateOnly(m.meeting_date)))
       .sort((a, b) => {
         const da = dateOnly(a.meeting_date);
         const db = dateOnly(b.meeting_date);
@@ -1169,9 +1170,6 @@ export function JournalClient({
                 })}
               </tbody>
             </table>
-            <div className={styles.muted}>
-              Dərslər: {DISPLAY_START_DATE}-dən etibarən e-jurnalda göstərilir. Köhnə tarixlər oxuna bilər, amma dəyişiklik edilmir.
-            </div>
             <div className={styles.muted}>Qeyd: Bu cədvəl serverdə “köhnə sistem” hesablanma qaydası ilə çıxarılır.</div>
           </div>
         ) : tab === "attendance" ? null : tab === "colloquium" || tab === "referat" || visibleEvals.length > 0 ? (

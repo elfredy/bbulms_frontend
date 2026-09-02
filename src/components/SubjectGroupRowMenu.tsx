@@ -7,7 +7,11 @@ import { useEffect, useRef, useState } from "react";
 import { SearchableSelect } from "./SearchableSelect";
 import styles from "./SubjectGroupRowMenu.module.css";
 
-type Opt = { id: string; name?: string | null; name_az?: string | null; org_name_az?: string | null };
+type Opt = { id: string; name?: string | null; name_az?: string | null; org_name_az?: string | null; position_name_az?: string | null };
+
+function teacherSearchLabel(t: Opt) {
+  return [t.position_name_az, t.name || t.id, t.org_name_az].filter(Boolean).join(" · ");
+}
 
 async function readDetail(res: Response, fallback: string) {
   try {
@@ -232,7 +236,7 @@ export function SubjectGroupRowMenu({
                 searchPlaceholder="Axtar…"
                 options={teachers.map((t) => ({
                   id: t.id,
-                  label: t.org_name_az ? `${t.name || t.id} · ${t.org_name_az}` : t.name || t.id,
+                  label: teacherSearchLabel(t),
                 }))}
               />
             </label>
