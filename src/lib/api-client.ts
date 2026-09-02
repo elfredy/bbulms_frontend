@@ -166,7 +166,7 @@ export type TimetableLookups = {
   semesters: { id: string; code: string | null; name_az: string | null }[];
   subject_types: { id: string; code: string | null; name_az: string | null }[];
   clocks: { id: string; start_time: string | null; end_time: string | null }[];
-  rooms: { id: string; name: string | null; faculty_id: string | null }[];
+  rooms: { id: string; name: string | null; faculty_id: string | null; parent_id?: string | null }[];
   kurs_options: number[];
   days: { week_day: number; label: string }[];
 };
@@ -211,10 +211,21 @@ export type TimetableAssignedSlot = {
   room_id: string | null;
 };
 
+export type TimetableOccupiedRoom = {
+  clock_id: string;
+  week_day: number;
+  week_type: number;
+  room_id: string;
+  course_id: string;
+  lesson_type_id: string;
+};
+
 export type TimetableBoard = {
   clocks: { id: string; start_time: string | null; end_time: string | null }[];
   assigned: TimetableAssignedSlot[];
   available: TimetableAvailableLesson[];
+  occupied_rooms?: TimetableOccupiedRoom[];
+  hours_remaining?: number;
   meeting_count?: number;
   pending_count?: number;
   confirmed_count?: number;

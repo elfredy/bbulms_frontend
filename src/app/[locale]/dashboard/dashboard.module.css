@@ -310,6 +310,18 @@
   color: var(--muted);
 }
 
+.blockHead td {
+  background: #eef2f6 !important;
+  font-weight: 700;
+  color: #344054;
+  white-space: nowrap;
+}
+
+.toolbarGrow {
+  flex: 1;
+  min-width: 180px;
+}
+
 .pager {
   display: flex;
   gap: 6px;

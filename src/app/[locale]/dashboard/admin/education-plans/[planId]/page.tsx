@@ -2,7 +2,8 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { notFound, redirect } from "next/navigation";
 
-import { adminGetEducationPlan, getMe } from "@/lib/api";
+import { EducationPlanSubjectsBoard } from "@/components/admin/EducationPlanSubjectsBoard";
+import { adminEducationPlanLookups, adminGetEducationPlan, getMe } from "@/lib/api";
 
 import styles from "../../../dashboard.module.css";
 
@@ -16,111 +17,47 @@ export default async function AdminEducationPlanDetailPage({ params }: Props) {
   if (!me) redirect(`/${locale}/login`);
   if (!me.is_superadmin) redirect(`/${locale}/dashboard`);
 
-  const data = await adminGetEducationPlan(planId);
+  const [data, lookups] = await Promise.all([adminGetEducationPlan(planId), adminEducationPlanLookups()]);
   if (!data) notFound();
 
   const p = data.plan;
   const specialty = [p.specialty_name_az, p.faculty_name_az].filter(Boolean).join(" / ") || p.org_name_az;
-  const subjectsBySemester: { title: string; items: typeof data.subjects }[] = [];
-  const seen = new Map<string, typeof data.subjects>();
-  for (const s of data.subjects) {
-    const title = s.semester_name_az?.trim() || "Semestr göstərilməyib";
-    const arr = seen.get(title) ?? [];
-    arr.push(s);
-    seen.set(title, arr);
-  }
-  for (const [title, items] of seen) subjectsBySemester.push({ title, items });
+  const creditTotal = data.subjects.reduce((a, s) => a + Number(s.credit || 0), 0);
 
   return (
     <div className={styles.pageWide}>
       <header className={styles.headerCard}>
         <div>
-          <h1 className={styles.title}>{p.name ?? t("educationPlanDetail")}</h1>
+          <h1 className={styles.title}>
+            {p.name ?? t("educationPlanDetail")}
+            {creditTotal ? ` · Kredit ${creditTotal}` : ""}
+          </h1>
           <p className={styles.meta}>
             {[specialty, p.education_level_name_az, p.education_type_name_az].filter(Boolean).join(" · ")}
           </p>
           {p.note ? <p className={styles.meta}>{p.note}</p> : null}
         </div>
         <div className={styles.headerActions}>
-          <Link
-            className={styles.actionLink}
-            href={`/${locale}/dashboard/admin/subject-groups/new?education_plan_id=${encodeURIComponent(planId)}`}
-          >
-            {t("subjectGroupCreate")}
-          </Link>
-          <Link
-            className={styles.actionLink}
-            href={`/${locale}/dashboard/admin/education-plans/${planId}/groups`}
-          >
+          <Link className={styles.actionLink} href={`/${locale}/dashboard/admin/education-plans/${planId}/groups`}>
             Qrup əlavə et
           </Link>
-          <Link
-            className={styles.actionLink}
-            href={`/${locale}/dashboard/admin/education-plans/${planId}/edit`}
-          >
+          <Link className={styles.actionLink} href={`/${locale}/dashboard/admin/education-plans/${planId}/edit`}>
             Yenilə
           </Link>
-          <Link
-            className={styles.actionLink}
-            href={`/${locale}/dashboard/admin/subject-groups?education_plan_id=${encodeURIComponent(planId)}`}
-          >
-            {t("subjectGroups")}
-          </Link>
-          <Link className={styles.meta} href={`/${locale}/dashboard/admin/education-plans`}>
-            {t("back")}
+          <Link className={styles.actionLink} href={`/${locale}/dashboard/admin/education-plans`} aria-label="Bağla">
+            ×
           </Link>
         </div>
       </header>
 
       <div className={styles.content} style={{ display: "grid", gap: 18 }}>
         <section>
-          <h2 className={styles.welcome} style={{ fontSize: "1.05rem" }}>
-            {t("educationPlanSubjects")}
-          </h2>
-          {data.subjects.length === 0 ? (
-            <p className={styles.alertMuted}>{t("empty")}</p>
-          ) : (
-            <div style={{ display: "grid", gap: 16 }}>
-              {subjectsBySemester.map((block) => (
-                <div key={block.title} className={styles.tableCard}>
-                  <div className={styles.tableFooter} style={{ borderBottom: "1px solid var(--border)", borderTop: "none" }}>
-                    <strong>{block.title}</strong>
-                    <span>
-                      {t("rowCount")}: {block.items.length}
-                    </span>
-                  </div>
-                  <table className={styles.table}>
-                    <thead>
-                      <tr>
-                        <th className={styles.th}>#</th>
-                        <th className={styles.th}>{t("colSubject")}</th>
-                        <th className={styles.th}>Kod</th>
-                        <th className={styles.th}>Kredit</th>
-                        <th className={styles.th}>M</th>
-                        <th className={styles.th}>S</th>
-                        <th className={styles.th}>L</th>
-                        <th className={styles.th}>Blok</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {block.items.map((s, i) => (
-                        <tr key={s.id} className={styles.row}>
-                          <td className={`${styles.td} ${styles.tdNum}`}>{i + 1}</td>
-                          <td className={`${styles.td} ${styles.tdName}`}>{s.subject_name_az ?? s.code ?? s.id}</td>
-                          <td className={styles.td}>{s.code ?? "—"}</td>
-                          <td className={styles.td}>{s.credit ?? "—"}</td>
-                          <td className={styles.td}>{s.m_hours ?? "—"}</td>
-                          <td className={styles.td}>{s.s_hours ?? "—"}</td>
-                          <td className={styles.td}>{s.l_hours ?? "—"}</td>
-                          <td className={styles.td}>{s.subject_block_name_az ?? "—"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ))}
-            </div>
-          )}
+          <EducationPlanSubjectsBoard
+            locale={locale}
+            planId={planId}
+            subjects={data.subjects}
+            semesters={lookups?.semesters ?? []}
+          />
         </section>
 
         <section>

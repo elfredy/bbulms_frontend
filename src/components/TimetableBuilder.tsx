@@ -14,6 +14,7 @@ import {
   type TimetableAssignedSlot,
   type TimetableAvailableLesson,
   type TimetableLookups,
+  type TimetableOccupiedRoom,
 } from "@/lib/api-client";
 
 type SelectedLesson = {
@@ -21,7 +22,7 @@ type SelectedLesson = {
   lesson_type_id: string;
 };
 
-type RoomOpt = { id: string; name: string | null; faculty_id?: string | null };
+type RoomOpt = { id: string; name: string | null; faculty_id?: string | null; occupied?: boolean };
 
 function lessonKey(courseId: string, lessonTypeId: string) {
   return `${courseId}:${lessonTypeId}`;
@@ -35,6 +36,10 @@ function remainingOf(lesson: TimetableAvailableLesson | null | undefined) {
   if (!lesson) return 0;
   if (typeof lesson.remaining === "number") return lesson.remaining;
   return Number(lesson.remaining_up || 0) + Number(lesson.remaining_down || 0);
+}
+
+function weekTypesOverlap(a: number, b: number) {
+  return a === 3 || b === 3 || a === b;
 }
 
 export function TimetableBuilder() {
@@ -51,6 +56,8 @@ export function TimetableBuilder() {
   const [clocks, setClocks] = useState<{ id: string; start_time: string | null; end_time: string | null }[]>([]);
   const [available, setAvailable] = useState<TimetableAvailableLesson[]>([]);
   const [assigned, setAssigned] = useState<TimetableAssignedSlot[]>([]);
+  const [occupiedRooms, setOccupiedRooms] = useState<TimetableOccupiedRoom[]>([]);
+  const [hoursRemaining, setHoursRemaining] = useState(0);
   const [selected, setSelected] = useState<SelectedLesson | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -105,6 +112,8 @@ export function TimetableBuilder() {
     if (!groupId || !yearId || !semesterId) {
       setAssigned([]);
       setAvailable([]);
+      setOccupiedRooms([]);
+      setHoursRemaining(0);
       setConfirmInfo({ meeting_count: 0, pending_count: 0, confirmed_count: 0, teacher_count: 0, confirmed: false });
       return;
     }
@@ -121,6 +130,8 @@ export function TimetableBuilder() {
     setClocks(data.clocks);
     setAssigned(data.assigned);
     setAvailable(data.available);
+    setOccupiedRooms(data.occupied_rooms ?? []);
+    setHoursRemaining(Number(data.hours_remaining ?? 0));
     setConfirmInfo({
       meeting_count: Number(data.meeting_count ?? 0),
       pending_count: Number(data.pending_count ?? 0),
@@ -180,6 +191,10 @@ export function TimetableBuilder() {
     if (!groupId || !yearId || !semesterId) return;
     if (confirmInfo.meeting_count <= 0) {
       setError("Əvvəl cədvələ dərs qoyun");
+      return;
+    }
+    if (hoursRemaining > 0) {
+      setError("Bütün fənn saatları cədvələ qoyulmadan təsdiq etmək olmaz");
       return;
     }
     const ok = window.confirm(
@@ -341,10 +356,25 @@ export function TimetableBuilder() {
   function renderSlot(weekDay: number, clockId: string, weekType: 1 | 2 | 3, occ: TimetableAssignedSlot | undefined, canPlace: boolean) {
     const half = weekType !== 3;
     const title = weekType === 1 ? "Üst həftə" : weekType === 2 ? "Alt həftə" : "Tam dərs";
-    const roomOptions: RoomOpt[] =
-      occ?.room_id && !rooms.some((r) => r.id === occ.room_id)
-        ? [{ id: occ.room_id, name: occ.room_name || occ.room_id }, ...rooms]
-        : rooms;
+    const roomOptions: RoomOpt[] = (occ?.room_id && !rooms.some((r) => r.id === occ.room_id)
+      ? [{ id: occ.room_id, name: occ.room_name || occ.room_id }, ...rooms]
+      : rooms
+    ).map((r) => {
+      const occupied = occupiedRooms.some(
+        (o) =>
+          o.room_id === r.id &&
+          o.clock_id === clockId &&
+          Number(o.week_day) === weekDay &&
+          weekTypesOverlap(Number(o.week_type), weekType) &&
+          !(
+            occ &&
+            o.course_id === occ.course_id &&
+            o.lesson_type_id === occ.lesson_type_id &&
+            Number(o.week_type) === weekType
+          ),
+      );
+      return { ...r, occupied };
+    });
 
     return (
       <div
@@ -365,8 +395,8 @@ export function TimetableBuilder() {
             >
               <option value="">Otaq</option>
               {roomOptions.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name || r.id}
+                <option key={r.id} value={r.id} disabled={Boolean(r.occupied)}>
+                  {r.occupied ? `${r.name || r.id} · doludur` : r.name || r.id}
                 </option>
               ))}
             </select>
@@ -530,15 +560,16 @@ export function TimetableBuilder() {
         <button
           type="button"
           className={styles.confirmBtn}
-          disabled={busy || !groupId || confirmInfo.meeting_count <= 0 || confirmInfo.confirmed}
+          disabled={busy || !groupId || confirmInfo.meeting_count <= 0 || hoursRemaining > 0 || confirmInfo.confirmed}
           onClick={() => void confirmTimetable()}
         >
           {confirmInfo.confirmed ? "Təsdiqlənib" : "Təsdiq et"}
         </button>
         {confirmInfo.meeting_count > 0 && !confirmInfo.confirmed ? (
           <p className={styles.hint}>
-            {confirmInfo.pending_count} dərs təsdiq gözləyir
-            {confirmInfo.teacher_count > 0 ? ` · ${confirmInfo.teacher_count} müəllim` : ""}.
+            {hoursRemaining > 0
+              ? `Təsdiq üçün qalan ${hoursRemaining} saatı da cədvələ qoyun.`
+              : `${confirmInfo.pending_count} dərs təsdiq gözləyir${confirmInfo.teacher_count > 0 ? ` · ${confirmInfo.teacher_count} müəllim` : ""}.`}
           </p>
         ) : null}
 

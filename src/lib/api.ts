@@ -201,14 +201,26 @@ export type AdminEducationPlanSubjectItem = {
   id: string;
   code: string | null;
   subject_name_az: string | null;
+  subject_id?: string | null;
+  subject_group_id?: string | null;
   semester_id: string | null;
   semester_name_az: string | null;
+  subject_block_id?: string | null;
   subject_block_name_az: string | null;
   m_hours: number | null;
   s_hours: number | null;
   l_hours: number | null;
+  fm_hours?: number | null;
+  in_hours?: number | null;
+  out_hours?: number | null;
   credit: number | null;
   week_charge: number | null;
+  m_week_charge?: number | null;
+  s_week_charge?: number | null;
+  l_week_charge?: number | null;
+  fm_week_charge?: number | null;
+  course_work?: number | null;
+  chosen_status?: number | null;
   type_name: string | null;
 };
 
