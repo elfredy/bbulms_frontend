@@ -8,6 +8,7 @@ import {
   adminTimetableGroups,
   adminTimetableLookups,
   adminTimetablePlace,
+  adminTimetableSetRoom,
   adminTimetableUnplace,
   type TimetableAssignedSlot,
   type TimetableAvailableLesson,
@@ -19,12 +20,20 @@ type SelectedLesson = {
   lesson_type_id: string;
 };
 
+type RoomOpt = { id: string; name: string | null; faculty_id?: string | null };
+
 function lessonKey(courseId: string, lessonTypeId: string) {
   return `${courseId}:${lessonTypeId}`;
 }
 
 function slotKey(weekDay: number, clockId: string, weekType: number) {
   return `${weekDay}:${clockId}:${weekType}`;
+}
+
+function remainingOf(lesson: TimetableAvailableLesson | null | undefined) {
+  if (!lesson) return 0;
+  if (typeof lesson.remaining === "number") return lesson.remaining;
+  return Number(lesson.remaining_up || 0) + Number(lesson.remaining_down || 0);
 }
 
 export function TimetableBuilder() {
@@ -104,8 +113,9 @@ export function TimetableBuilder() {
     setAvailable(data.available);
     setSelected((cur) => {
       if (!cur) return cur;
-      const still = data.available.some((a) => a.course_id === cur.course_id && a.lesson_type_id === cur.lesson_type_id);
-      return still ? cur : null;
+      const still = data.available.find((a) => a.course_id === cur.course_id && a.lesson_type_id === cur.lesson_type_id);
+      if (!still || remainingOf(still) <= 0) return null;
+      return cur;
     });
   }, [groupId, yearId, semesterId, subjectTypeId]);
 
@@ -129,6 +139,22 @@ export function TimetableBuilder() {
     () => available.find((a) => selected && a.course_id === selected.course_id && a.lesson_type_id === selected.lesson_type_id) ?? null,
     [available, selected]
   );
+
+  const groupedLessons = useMemo(() => {
+    const map = new Map<string, { course_id: string; subject_name_az: string | null; items: TimetableAvailableLesson[] }>();
+    for (const lesson of available) {
+      const cur = map.get(lesson.course_id) ?? {
+        course_id: lesson.course_id,
+        subject_name_az: lesson.subject_name_az,
+        items: [],
+      };
+      cur.items.push(lesson);
+      map.set(lesson.course_id, cur);
+    }
+    return [...map.values()];
+  }, [available]);
+
+  const rooms = lookups?.rooms ?? [];
 
   async function place(weekDay: number, clockId: string, weekType: 1 | 2 | 3, lesson: SelectedLesson) {
     if (!groupId || !yearId || !semesterId) return;
@@ -165,6 +191,27 @@ export function TimetableBuilder() {
       clock_id: slot.clock_id,
       week_day: Number(slot.week_day),
       week_type: Number(slot.week_type),
+    });
+    setBusy(false);
+    if (!res.ok) {
+      setError(res.error);
+      return;
+    }
+    await loadBoard();
+  }
+
+  async function setRoom(slot: TimetableAssignedSlot, roomId: string | null) {
+    if (!groupId) return;
+    setBusy(true);
+    setError(null);
+    const res = await adminTimetableSetRoom({
+      education_group_id: groupId,
+      course_id: slot.course_id,
+      lesson_type_id: slot.lesson_type_id,
+      clock_id: slot.clock_id,
+      week_day: Number(slot.week_day),
+      week_type: Number(slot.week_type),
+      room_id: roomId,
     });
     setBusy(false);
     if (!res.ok) {
@@ -214,12 +261,16 @@ export function TimetableBuilder() {
   }
 
   function onDragStart(e: DragEvent<HTMLButtonElement>, lesson: TimetableAvailableLesson) {
+    if (remainingOf(lesson) <= 0) {
+      e.preventDefault();
+      return;
+    }
     setSelected({ course_id: lesson.course_id, lesson_type_id: lesson.lesson_type_id });
     e.dataTransfer.setData("text/plain", lessonKey(lesson.course_id, lesson.lesson_type_id));
     e.dataTransfer.effectAllowed = "copy";
   }
 
-  function onDrop(e: DragEvent<HTMLButtonElement>, weekDay: number, clockId: string, weekType: 1 | 2 | 3) {
+  function onDrop(e: DragEvent<HTMLElement>, weekDay: number, clockId: string, weekType: 1 | 2 | 3) {
     e.preventDefault();
     const raw = e.dataTransfer.getData("text/plain");
     const [courseId, lessonTypeId] = raw.split(":");
@@ -235,6 +286,66 @@ export function TimetableBuilder() {
     { week_day: 4, label: "IV" },
     { week_day: 5, label: "V" },
   ];
+
+  function renderSlot(weekDay: number, clockId: string, weekType: 1 | 2 | 3, occ: TimetableAssignedSlot | undefined, canPlace: boolean) {
+    const half = weekType !== 3;
+    const title = weekType === 1 ? "Üst həftə" : weekType === 2 ? "Alt həftə" : "Tam dərs";
+    const roomOptions: RoomOpt[] =
+      occ?.room_id && !rooms.some((r) => r.id === occ.room_id)
+        ? [{ id: occ.room_id, name: occ.room_name || occ.room_id }, ...rooms]
+        : rooms;
+
+    return (
+      <div
+        className={`${styles.slot} ${half ? styles.slotHalf : styles.slotFull} ${occ ? styles.slotFilled : ""} ${canPlace ? styles.slotActive : ""} ${!groupId ? styles.slotDisabled : ""}`}
+      >
+        {occ ? (
+          <>
+            <select
+              className={styles.slotRoom}
+              value={occ.room_id ?? ""}
+              disabled={busy}
+              title="Otaq"
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => {
+                void setRoom(occ, e.target.value || null);
+              }}
+            >
+              <option value="">Otaq</option>
+              {roomOptions.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name || r.id}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className={styles.slotBody}
+              disabled={busy}
+              title={`${title} · silmək üçün klik`}
+              onClick={() => onHalfClick(weekDay, clockId, weekType)}
+            >
+              <span className={styles.slotName}>{occ.subject_name_az}</span>
+              <span className={styles.letter}>{occ.lesson_letter}</span>
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            className={styles.slotBody}
+            disabled={busy || !groupId}
+            title={title}
+            onClick={() => onHalfClick(weekDay, clockId, weekType)}
+            onDragOver={(e) => {
+              e.preventDefault();
+            }}
+            onDrop={(e) => onDrop(e, weekDay, clockId, weekType)}
+          />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className={styles.wrap}>
@@ -273,50 +384,10 @@ export function TimetableBuilder() {
                     <td key={`${clock.id}-${d.week_day}`}>
                       <div className={styles.cell}>
                         <div className={styles.halves}>
-                          {([1, 2] as const).map((wt) => {
-                            const occ = wt === 1 ? up : down;
-                            const canPlace = wt === 1 ? canUp : canDown;
-                            return (
-                              <button
-                                key={wt}
-                                type="button"
-                                disabled={busy || (!occ && !groupId)}
-                                className={`${styles.slot} ${styles.slotHalf} ${occ ? styles.slotFilled : ""} ${canPlace ? styles.slotActive : ""} ${!groupId ? styles.slotDisabled : ""}`}
-                                onClick={() => onHalfClick(d.week_day, clock.id, wt)}
-                                onDragOver={(e) => {
-                                  e.preventDefault();
-                                }}
-                                onDrop={(e) => onDrop(e, d.week_day, clock.id, wt)}
-                                title={wt === 1 ? "Üst həftə" : "Alt həftə"}
-                              >
-                                {occ ? (
-                                  <>
-                                    <span className={styles.slotName}>{occ.subject_name_az}</span>
-                                    <span className={styles.letter}>{occ.lesson_letter}</span>
-                                  </>
-                                ) : null}
-                              </button>
-                            );
-                          })}
+                          {renderSlot(d.week_day, clock.id, 1, up, canUp)}
+                          {renderSlot(d.week_day, clock.id, 2, down, canDown)}
                         </div>
-                        <button
-                          type="button"
-                          disabled={busy || (!full && !groupId)}
-                          className={`${styles.slot} ${styles.slotFull} ${full ? styles.slotFilled : ""} ${canFull ? styles.slotActive : ""} ${!groupId ? styles.slotDisabled : ""}`}
-                          onClick={() => onHalfClick(d.week_day, clock.id, 3)}
-                          onDragOver={(e) => {
-                            e.preventDefault();
-                          }}
-                          onDrop={(e) => onDrop(e, d.week_day, clock.id, 3)}
-                          title="Tam dərs"
-                        >
-                          {full ? (
-                            <>
-                              <span className={styles.slotName}>{full.subject_name_az}</span>
-                              <span className={styles.letter}>{full.lesson_letter}</span>
-                            </>
-                          ) : null}
-                        </button>
+                        {renderSlot(d.week_day, clock.id, 3, full, canFull)}
                       </div>
                     </td>
                   );
@@ -404,26 +475,40 @@ export function TimetableBuilder() {
         <div className={styles.chips}>
           {!groupId ? (
             <div className={styles.emptyChips}>Qrup seçəndən sonra fənnlər burada görünəcək.</div>
-          ) : available.length === 0 ? (
+          ) : groupedLessons.length === 0 ? (
             <div className={styles.emptyChips}>Yerləşdiriləcək fənn qalmayıb.</div>
           ) : (
-            available.map((lesson) => {
-              const isSel = selected?.course_id === lesson.course_id && selected?.lesson_type_id === lesson.lesson_type_id;
-              return (
-                <button
-                  key={lessonKey(lesson.course_id, lesson.lesson_type_id)}
-                  type="button"
-                  draggable
-                  className={`${styles.chip} ${isSel ? styles.chipSelected : ""}`}
-                  onClick={() => setSelected({ course_id: lesson.course_id, lesson_type_id: lesson.lesson_type_id })}
-                  onDragStart={(e) => onDragStart(e, lesson)}
-                  title={`${lesson.lesson_type_az ?? ""} · üst ${lesson.remaining_up} / alt ${lesson.remaining_down}`}
-                >
-                  <span>{lesson.subject_name_az}</span>
-                  <span className={styles.chipLetter}>{lesson.lesson_letter}</span>
-                </button>
-              );
-            })
+            groupedLessons.map((group) => (
+              <div key={group.course_id} className={styles.subjectBlock}>
+                <div className={styles.subjectTitle}>{group.subject_name_az}</div>
+                {group.items.map((lesson) => {
+                  const isSel = selected?.course_id === lesson.course_id && selected?.lesson_type_id === lesson.lesson_type_id;
+                  const rem = remainingOf(lesson);
+                  const done = rem <= 0;
+                  return (
+                    <button
+                      key={lessonKey(lesson.course_id, lesson.lesson_type_id)}
+                      type="button"
+                      draggable={!done}
+                      disabled={done}
+                      className={`${styles.chip} ${isSel ? styles.chipSelected : ""} ${done ? styles.chipDone : ""}`}
+                      onClick={() => {
+                        if (done) return;
+                        setSelected({ course_id: lesson.course_id, lesson_type_id: lesson.lesson_type_id });
+                      }}
+                      onDragStart={(e) => onDragStart(e, lesson)}
+                      title={`${lesson.lesson_type_az ?? ""} · qalan ${rem} saat (üst ${lesson.remaining_up} / alt ${lesson.remaining_down})`}
+                    >
+                      <span className={styles.chipName}>
+                        <span className={styles.chipLetter}>{lesson.lesson_letter}</span>
+                        {lesson.lesson_type_az ?? lesson.lesson_letter}
+                      </span>
+                      <span className={styles.chipHours}>{rem}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ))
           )}
         </div>
       </aside>

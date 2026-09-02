@@ -166,6 +166,7 @@ export type TimetableLookups = {
   semesters: { id: string; code: string | null; name_az: string | null }[];
   subject_types: { id: string; code: string | null; name_az: string | null }[];
   clocks: { id: string; start_time: string | null; end_time: string | null }[];
+  rooms: { id: string; name: string | null; faculty_id: string | null }[];
   kurs_options: number[];
   days: { week_day: number; label: string }[];
 };
@@ -188,10 +189,12 @@ export type TimetableAvailableLesson = {
   lesson_code: string | null;
   lesson_type_az: string | null;
   lesson_letter: string;
+  week_charge: number;
   up_hours: number;
   down_hours: number;
   remaining_up: number;
   remaining_down: number;
+  remaining: number;
 };
 
 export type TimetableAssignedSlot = {
@@ -258,6 +261,7 @@ export async function adminTimetablePlace(body: {
   clock_id: string;
   week_day: number;
   week_type: number;
+  room_id?: string | null;
 }): Promise<{ ok: true; created_count: number } | { ok: false; error: string }> {
   const res = await fetch("/api/admin/timetable/place", {
     method: "POST",
@@ -287,4 +291,24 @@ export async function adminTimetableUnplace(body: {
   if (!res.ok) return { ok: false, error: (await readErrorDetail(res)) || "Silinmədi" };
   const data = (await res.json()) as { removed_count?: number };
   return { ok: true, removed_count: Number(data.removed_count ?? 0) };
+}
+
+export async function adminTimetableSetRoom(body: {
+  education_group_id: string;
+  course_id: string;
+  lesson_type_id: string;
+  clock_id: string;
+  week_day: number;
+  week_type: number;
+  room_id: string | null;
+}): Promise<{ ok: true; updated_count: number } | { ok: false; error: string }> {
+  const res = await fetch("/api/admin/timetable/room", {
+    method: "POST",
+    credentials: "include",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) return { ok: false, error: (await readErrorDetail(res)) || "Otaq dəyişdirilmədi" };
+  const data = (await res.json()) as { updated_count?: number };
+  return { ok: true, updated_count: Number(data.updated_count ?? 0) };
 }
