@@ -33,9 +33,11 @@ export function TimetableBuilder() {
   const [facultyId, setFacultyId] = useState("");
   const [yearId, setYearId] = useState("");
   const [semesterId, setSemesterId] = useState("");
-  const [kurs, setKurs] = useState("3");
+  const [kurs, setKurs] = useState("");
   const [groupId, setGroupId] = useState("");
-  const [groups, setGroups] = useState<{ education_group_id: string; education_group_name: string | null }[]>([]);
+  const [groups, setGroups] = useState<
+    { education_group_id: string; education_group_name: string | null; education_year_name?: string | null; kurs?: number | null }[]
+  >([]);
   const [clocks, setClocks] = useState<{ id: string; start_time: string | null; end_time: string | null }[]>([]);
   const [available, setAvailable] = useState<TimetableAvailableLesson[]>([]);
   const [assigned, setAssigned] = useState<TimetableAssignedSlot[]>([]);
@@ -66,9 +68,13 @@ export function TimetableBuilder() {
   useEffect(() => {
     setGroupId("");
     setGroups([]);
-    if (!facultyId || !yearId || !kurs) return;
+    if (!facultyId || !yearId) return;
     let alive = true;
-    adminTimetableGroups({ faculty_id: facultyId, education_year_id: yearId, kurs: Number(kurs) }).then((data) => {
+    adminTimetableGroups({
+      faculty_id: facultyId,
+      education_year_id: yearId,
+      kurs: kurs ? Number(kurs) : null,
+    }).then((data) => {
       if (!alive) return;
       setGroups(data?.items ?? []);
     });
@@ -111,13 +117,10 @@ export function TimetableBuilder() {
   const assignedMap = useMemo(() => {
     const map = new Map<string, TimetableAssignedSlot[]>();
     for (const slot of assigned) {
-      const wt = Number(slot.week_type);
-      const keys = wt === 3 ? [slotKey(slot.week_day, slot.clock_id, 1), slotKey(slot.week_day, slot.clock_id, 2)] : [slotKey(slot.week_day, slot.clock_id, wt)];
-      for (const k of keys) {
-        const arr = map.get(k) ?? [];
-        arr.push(slot);
-        map.set(k, arr);
-      }
+      const k = slotKey(slot.week_day, slot.clock_id, Number(slot.week_type));
+      const arr = map.get(k) ?? [];
+      arr.push(slot);
+      map.set(k, arr);
     }
     return map;
   }, [assigned]);
@@ -127,7 +130,7 @@ export function TimetableBuilder() {
     [available, selected]
   );
 
-  async function place(weekDay: number, clockId: string, weekType: 1 | 2, lesson: SelectedLesson) {
+  async function place(weekDay: number, clockId: string, weekType: 1 | 2 | 3, lesson: SelectedLesson) {
     if (!groupId || !yearId || !semesterId) return;
     setBusy(true);
     setError(null);
@@ -171,11 +174,22 @@ export function TimetableBuilder() {
     await loadBoard();
   }
 
-  function onHalfClick(weekDay: number, clockId: string, weekType: 1 | 2, lessonOverride?: SelectedLesson) {
+  function onHalfClick(weekDay: number, clockId: string, weekType: 1 | 2 | 3, lessonOverride?: SelectedLesson) {
     if (busy) return;
     const occ = assignedMap.get(slotKey(weekDay, clockId, weekType))?.[0];
     if (occ) {
       void unplace(occ);
+      return;
+    }
+    const fullOcc = assignedMap.get(slotKey(weekDay, clockId, 3))?.[0];
+    const upOcc = assignedMap.get(slotKey(weekDay, clockId, 1))?.[0];
+    const downOcc = assignedMap.get(slotKey(weekDay, clockId, 2))?.[0];
+    if (weekType === 3 && (upOcc || downOcc)) {
+      setError("Bu xanada üst və ya alt həftə dərsi var. Əvvəl onları silin.");
+      return;
+    }
+    if (weekType !== 3 && fullOcc) {
+      setError("Bu xanada tam dərs var. Əvvəl onu silin.");
       return;
     }
     const lesson = lessonOverride ?? selected;
@@ -192,6 +206,10 @@ export function TimetableBuilder() {
       setError("Bu fənn üçün alt həftə saatı qalmayıb");
       return;
     }
+    if (weekType === 3 && info && (info.remaining_up <= 0 || info.remaining_down <= 0)) {
+      setError("Tam dərs üçün həm üst, həm alt həftə saatı lazımdır");
+      return;
+    }
     void place(weekDay, clockId, weekType, lesson);
   }
 
@@ -201,7 +219,7 @@ export function TimetableBuilder() {
     e.dataTransfer.effectAllowed = "copy";
   }
 
-  function onDrop(e: DragEvent<HTMLButtonElement>, weekDay: number, clockId: string, weekType: 1 | 2) {
+  function onDrop(e: DragEvent<HTMLButtonElement>, weekDay: number, clockId: string, weekType: 1 | 2 | 3) {
     e.preventDefault();
     const raw = e.dataTransfer.getData("text/plain");
     const [courseId, lessonTypeId] = raw.split(":");
@@ -238,40 +256,71 @@ export function TimetableBuilder() {
                 <td className={styles.timeCell}>
                   {clock.start_time} - {clock.end_time}
                 </td>
-                {days.map((d) => (
-                  <td key={`${clock.id}-${d.week_day}`}>
-                    <div className={styles.split}>
-                      {([1, 2] as const).map((wt) => {
-                        const occ = assignedMap.get(slotKey(d.week_day, clock.id, wt))?.[0];
-                        const canPlace =
-                          Boolean(selected) &&
-                          !occ &&
-                          ((wt === 1 && (selectedLesson?.remaining_up ?? 0) > 0) || (wt === 2 && (selectedLesson?.remaining_down ?? 0) > 0));
-                        return (
-                          <button
-                            key={wt}
-                            type="button"
-                            disabled={busy || (!occ && !groupId)}
-                            className={`${styles.slot} ${occ ? styles.slotFilled : ""} ${canPlace ? styles.slotActive : ""} ${!groupId ? styles.slotDisabled : ""}`}
-                            onClick={() => onHalfClick(d.week_day, clock.id, wt)}
-                            onDragOver={(e) => {
-                              e.preventDefault();
-                            }}
-                            onDrop={(e) => onDrop(e, d.week_day, clock.id, wt)}
-                            title={wt === 1 ? "Üst həftə" : "Alt həftə"}
-                          >
-                            {occ ? (
-                              <>
-                                <span className={styles.slotName}>{occ.subject_name_az}</span>
-                                <span className={styles.letter}>{occ.lesson_letter}</span>
-                              </>
-                            ) : null}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </td>
-                ))}
+                {days.map((d) => {
+                  const up = assignedMap.get(slotKey(d.week_day, clock.id, 1))?.[0];
+                  const down = assignedMap.get(slotKey(d.week_day, clock.id, 2))?.[0];
+                  const full = assignedMap.get(slotKey(d.week_day, clock.id, 3))?.[0];
+                  const canUp = Boolean(selected) && !up && !full && (selectedLesson?.remaining_up ?? 0) > 0;
+                  const canDown = Boolean(selected) && !down && !full && (selectedLesson?.remaining_down ?? 0) > 0;
+                  const canFull =
+                    Boolean(selected) &&
+                    !full &&
+                    !up &&
+                    !down &&
+                    (selectedLesson?.remaining_up ?? 0) > 0 &&
+                    (selectedLesson?.remaining_down ?? 0) > 0;
+                  return (
+                    <td key={`${clock.id}-${d.week_day}`}>
+                      <div className={styles.cell}>
+                        <div className={styles.halves}>
+                          {([1, 2] as const).map((wt) => {
+                            const occ = wt === 1 ? up : down;
+                            const canPlace = wt === 1 ? canUp : canDown;
+                            return (
+                              <button
+                                key={wt}
+                                type="button"
+                                disabled={busy || (!occ && !groupId)}
+                                className={`${styles.slot} ${styles.slotHalf} ${occ ? styles.slotFilled : ""} ${canPlace ? styles.slotActive : ""} ${!groupId ? styles.slotDisabled : ""}`}
+                                onClick={() => onHalfClick(d.week_day, clock.id, wt)}
+                                onDragOver={(e) => {
+                                  e.preventDefault();
+                                }}
+                                onDrop={(e) => onDrop(e, d.week_day, clock.id, wt)}
+                                title={wt === 1 ? "Üst həftə" : "Alt həftə"}
+                              >
+                                {occ ? (
+                                  <>
+                                    <span className={styles.slotName}>{occ.subject_name_az}</span>
+                                    <span className={styles.letter}>{occ.lesson_letter}</span>
+                                  </>
+                                ) : null}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <button
+                          type="button"
+                          disabled={busy || (!full && !groupId)}
+                          className={`${styles.slot} ${styles.slotFull} ${full ? styles.slotFilled : ""} ${canFull ? styles.slotActive : ""} ${!groupId ? styles.slotDisabled : ""}`}
+                          onClick={() => onHalfClick(d.week_day, clock.id, 3)}
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                          }}
+                          onDrop={(e) => onDrop(e, d.week_day, clock.id, 3)}
+                          title="Tam dərs"
+                        >
+                          {full ? (
+                            <>
+                              <span className={styles.slotName}>{full.subject_name_az}</span>
+                              <span className={styles.letter}>{full.lesson_letter}</span>
+                            </>
+                          ) : null}
+                        </button>
+                      </div>
+                    </td>
+                  );
+                })}
               </tr>
             ))}
           </tbody>
@@ -326,7 +375,8 @@ export function TimetableBuilder() {
         <label className={styles.field}>
           <span className={styles.label}>Kurs</span>
           <select className={styles.select} value={kurs} onChange={(e) => setKurs(e.target.value)}>
-            {(lookups?.kurs_options ?? [1, 2, 3, 4]).map((n) => (
+            <option value="">Hamısı</option>
+            {(lookups?.kurs_options ?? [1, 2, 3, 4, 5]).map((n) => (
               <option key={n} value={n}>
                 {n}
               </option>
@@ -339,13 +389,17 @@ export function TimetableBuilder() {
             <option value="">— seç —</option>
             {groups.map((g) => (
               <option key={g.education_group_id} value={g.education_group_id}>
-                {g.education_group_name ?? g.education_group_id}
+                {[g.education_group_name, g.kurs != null ? `${g.kurs} kurs` : null, g.education_year_name].filter(Boolean).join(" · ") ||
+                  g.education_group_id}
               </option>
             ))}
           </select>
+          {facultyId && yearId && groups.length === 0 ? (
+            <span className={styles.hint}>Bu dekanlıq və il üçün qrup tapılmadı. Kursu “Hamısı” edin.</span>
+          ) : null}
         </label>
 
-        {error ? <p className={styles.error}>{error}</p> : <p className={styles.hint}>Fənni seçib xananın sol (üst) və ya sağ (alt) yarısına qoyun.</p>}
+        {error ? <p className={styles.error}>{error}</p> : <p className={styles.hint}>Fənni seçib üst/alt həftəyə və ya sağdakı tam dərs blokuna qoyun.</p>}
 
         <div className={styles.chips}>
           {!groupId ? (

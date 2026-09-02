@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 
+import { EducationPlanRowMenu } from "@/components/admin/EducationPlanRowMenu";
 import { adminEducationPlanLookups, adminListEducationPlans, getMe } from "@/lib/api";
 
 import styles from "../../dashboard.module.css";
@@ -203,14 +204,7 @@ export default async function AdminEducationPlansPage({ params, searchParams }: 
                       <span className={statusClass(p.status_name_az)}>{p.status_name_az ?? "—"}</span>
                     </td>
                     <td className={styles.td}>
-                      <Link
-                        className={styles.rowAction}
-                        href={`/${locale}/dashboard/admin/education-plans/${p.id}`}
-                        aria-label={t("educationPlanDetail")}
-                        title={t("educationPlanDetail")}
-                      >
-                        ☰
-                      </Link>
+                      <EducationPlanRowMenu planId={p.id} locale={locale} />
                     </td>
                   </tr>
                 ))}

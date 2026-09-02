@@ -107,7 +107,7 @@
     "teachersHint": "Teachers. Teacher detail shows course assignments.",
     "timetable": "Timetable",
     "timetableCreate": "Create timetable",
-    "timetableCreateHint": "Choose faculty, year, semester and group. Select a subject on the right and place it on the upper (left) or lower (right) half of a cell.",
+    "timetableCreateHint": "Choose faculty, year, semester and group. Select a subject on the right and place it on the upper/lower week or the full-lesson block.",
     "coursesHint": "Select a course to view meeting dates.",
     "meetingsHint": "Meeting dates and times for this course.",
     "timetableCourse": "Timetable (CourseId: {id})",

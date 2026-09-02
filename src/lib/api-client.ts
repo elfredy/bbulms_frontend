@@ -173,6 +173,9 @@ export type TimetableLookups = {
 export type TimetableGroupItem = {
   education_group_id: string;
   education_group_name: string | null;
+  education_year_name?: string | null;
+  faculty_name_az?: string | null;
+  kurs?: number | null;
 };
 
 export type TimetableAvailableLesson = {
@@ -219,13 +222,13 @@ export async function adminTimetableLookups(): Promise<TimetableLookups | null> 
 export async function adminTimetableGroups(opts: {
   faculty_id: string;
   education_year_id: string;
-  kurs: number;
+  kurs?: number | null;
 }): Promise<{ items: TimetableGroupItem[] } | null> {
   const params = new URLSearchParams({
     faculty_id: opts.faculty_id,
     education_year_id: opts.education_year_id,
-    kurs: String(opts.kurs),
   });
+  if (opts.kurs != null) params.set("kurs", String(opts.kurs));
   const res = await fetch(`/api/admin/timetable/groups?${params}`, { credentials: "include", cache: "no-store" });
   return jsonOrNull(res);
 }

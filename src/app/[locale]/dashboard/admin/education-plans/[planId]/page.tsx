@@ -21,6 +21,15 @@ export default async function AdminEducationPlanDetailPage({ params }: Props) {
 
   const p = data.plan;
   const specialty = [p.specialty_name_az, p.faculty_name_az].filter(Boolean).join(" / ") || p.org_name_az;
+  const subjectsBySemester: { title: string; items: typeof data.subjects }[] = [];
+  const seen = new Map<string, typeof data.subjects>();
+  for (const s of data.subjects) {
+    const title = s.semester_name_az?.trim() || "Semestr göstərilməyib";
+    const arr = seen.get(title) ?? [];
+    arr.push(s);
+    seen.set(title, arr);
+  }
+  for (const [title, items] of seen) subjectsBySemester.push({ title, items });
 
   return (
     <div className={styles.pageWide}>
@@ -38,6 +47,18 @@ export default async function AdminEducationPlanDetailPage({ params }: Props) {
             href={`/${locale}/dashboard/admin/subject-groups/new?education_plan_id=${encodeURIComponent(planId)}`}
           >
             {t("subjectGroupCreate")}
+          </Link>
+          <Link
+            className={styles.actionLink}
+            href={`/${locale}/dashboard/admin/education-plans/${planId}/groups`}
+          >
+            Qrup əlavə et
+          </Link>
+          <Link
+            className={styles.actionLink}
+            href={`/${locale}/dashboard/admin/education-plans/${planId}/edit`}
+          >
+            Yenilə
           </Link>
           <Link
             className={styles.actionLink}
@@ -59,42 +80,45 @@ export default async function AdminEducationPlanDetailPage({ params }: Props) {
           {data.subjects.length === 0 ? (
             <p className={styles.alertMuted}>{t("empty")}</p>
           ) : (
-            <div className={styles.tableCard}>
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    <th className={styles.th}>#</th>
-                    <th className={styles.th}>{t("colSubject")}</th>
-                    <th className={styles.th}>{t("colSemester")}</th>
-                    <th className={styles.th}>Kod</th>
-                    <th className={styles.th}>Kredit</th>
-                    <th className={styles.th}>M</th>
-                    <th className={styles.th}>S</th>
-                    <th className={styles.th}>L</th>
-                    <th className={styles.th}>Blok</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.subjects.map((s, i) => (
-                    <tr key={s.id} className={styles.row}>
-                      <td className={`${styles.td} ${styles.tdNum}`}>{i + 1}</td>
-                      <td className={`${styles.td} ${styles.tdName}`}>{s.subject_name_az ?? s.code ?? s.id}</td>
-                      <td className={styles.td}>{s.semester_name_az ?? "—"}</td>
-                      <td className={styles.td}>{s.code ?? "—"}</td>
-                      <td className={styles.td}>{s.credit ?? "—"}</td>
-                      <td className={styles.td}>{s.m_hours ?? "—"}</td>
-                      <td className={styles.td}>{s.s_hours ?? "—"}</td>
-                      <td className={styles.td}>{s.l_hours ?? "—"}</td>
-                      <td className={styles.td}>{s.subject_block_name_az ?? "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <div className={styles.tableFooter}>
-                <span>
-                  {t("rowCount")}: {data.subjects.length}
-                </span>
-              </div>
+            <div style={{ display: "grid", gap: 16 }}>
+              {subjectsBySemester.map((block) => (
+                <div key={block.title} className={styles.tableCard}>
+                  <div className={styles.tableFooter} style={{ borderBottom: "1px solid var(--border)", borderTop: "none" }}>
+                    <strong>{block.title}</strong>
+                    <span>
+                      {t("rowCount")}: {block.items.length}
+                    </span>
+                  </div>
+                  <table className={styles.table}>
+                    <thead>
+                      <tr>
+                        <th className={styles.th}>#</th>
+                        <th className={styles.th}>{t("colSubject")}</th>
+                        <th className={styles.th}>Kod</th>
+                        <th className={styles.th}>Kredit</th>
+                        <th className={styles.th}>M</th>
+                        <th className={styles.th}>S</th>
+                        <th className={styles.th}>L</th>
+                        <th className={styles.th}>Blok</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {block.items.map((s, i) => (
+                        <tr key={s.id} className={styles.row}>
+                          <td className={`${styles.td} ${styles.tdNum}`}>{i + 1}</td>
+                          <td className={`${styles.td} ${styles.tdName}`}>{s.subject_name_az ?? s.code ?? s.id}</td>
+                          <td className={styles.td}>{s.code ?? "—"}</td>
+                          <td className={styles.td}>{s.credit ?? "—"}</td>
+                          <td className={styles.td}>{s.m_hours ?? "—"}</td>
+                          <td className={styles.td}>{s.s_hours ?? "—"}</td>
+                          <td className={styles.td}>{s.l_hours ?? "—"}</td>
+                          <td className={styles.td}>{s.subject_block_name_az ?? "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
             </div>
           )}
         </section>

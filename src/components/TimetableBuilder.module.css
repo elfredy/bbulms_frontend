@@ -53,10 +53,30 @@
 }
 
 .split {
+  display: none;
+}
+
+.cell {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 4px;
-  min-height: 72px;
+  min-height: 88px;
+}
+
+.halves {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  gap: 4px;
+  min-height: 88px;
+}
+
+.slotHalf {
+  min-height: 42px;
+  padding: 5px 6px 16px;
+}
+
+.slotFull {
+  min-height: 88px;
 }
 
 .slot {

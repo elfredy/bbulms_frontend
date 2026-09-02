@@ -107,7 +107,7 @@
     "teachersHint": "Müəllimlər. Müəllim detalında course təyinatları (course_teacher) görünür.",
     "timetable": "Dərs cədvəli",
     "timetableCreate": "Cədvəl tərtib et",
-    "timetableCreateHint": "Fakültə, il, semestr və qrup seçin. Fənni sağdan seçib xananın sol (üst həftə) və ya sağ (alt həftə) yarısına qoyun.",
+    "timetableCreateHint": "Fakültə, il, semestr və qrup seçin. Fənni sağdan seçib xananın üst/alt həftəsinə və ya tam dərs blokuna qoyun.",
     "coursesHint": "Kurs seçin və dərs tarixləri (`course_meeting`) siyahısını görün.",
     "meetingsHint": "Bu kurs üzrə dərs tarixləri və saatlar. Filtrlə daralda bilərsiniz.",
     "timetableCourse": "Timetable (CourseId: {id})",
