@@ -132,13 +132,26 @@ export function SearchSelect({
   onChange,
   options,
   placeholder,
+  onQueryChange,
+  debounceMs,
 }: {
   value: string;
   onChange: (v: string) => void;
   options: FormOption[];
   placeholder?: string;
+  onQueryChange?: (q: string) => void;
+  debounceMs?: number;
 }) {
-  return <SearchableSelect value={value} onChange={onChange} options={options} placeholder={placeholder ?? "— seç —"} />;
+  return (
+    <SearchableSelect
+      value={value}
+      onChange={onChange}
+      options={options}
+      placeholder={placeholder ?? "— seç —"}
+      onQueryChange={onQueryChange}
+      debounceMs={debounceMs}
+    />
+  );
 }
 
 export async function readDetail(res: Response, fallback: string) {

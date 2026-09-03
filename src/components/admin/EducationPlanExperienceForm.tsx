@@ -32,31 +32,36 @@ export function EducationPlanExperienceForm({
 
   useEffect(() => {
     const ctrl = new AbortController();
-    const params = new URLSearchParams({ limit: "80" });
-    if (q.trim()) params.set("q", q.trim());
-    fetch(`/api/admin/education-plans/lookups/experiences?${params}`, {
-      credentials: "include",
-      cache: "no-store",
-      signal: ctrl.signal,
-    })
-      .then((r) => (r.ok ? r.json() : { items: [] }))
-      .then((d: { items?: { id: string; name_az?: string | null; code?: string | null }[] }) => {
-        const items = (d.items ?? []).map((it) => ({
-          id: it.id,
-          label: [it.name_az, it.code].filter(Boolean).join(" · ") || it.id,
-        }));
-        setOptions((prev) => {
-          if (experienceId && !items.some((x) => x.id === experienceId)) {
-            const keep = prev.find((x) => x.id === experienceId);
-            return keep ? [keep, ...items] : items;
-          }
-          return items;
-        });
+    const t = window.setTimeout(() => {
+      const params = new URLSearchParams({ limit: "500" });
+      if (q.trim()) params.set("q", q.trim());
+      fetch(`/api/admin/education-plans/lookups/experiences?${params}`, {
+        credentials: "include",
+        cache: "no-store",
+        signal: ctrl.signal,
       })
-      .catch(() => {
-        /* ignore */
-      });
-    return () => ctrl.abort();
+        .then((r) => (r.ok ? r.json() : { items: [] }))
+        .then((d: { items?: { id: string; name_az?: string | null; code?: string | null }[] }) => {
+          const items = (d.items ?? []).map((it) => ({
+            id: it.id,
+            label: [it.name_az, it.code].filter(Boolean).join(" · ") || it.id,
+          }));
+          setOptions((prev) => {
+            if (experienceId && !items.some((x) => x.id === experienceId)) {
+              const keep = prev.find((x) => x.id === experienceId);
+              return keep ? [keep, ...items] : items;
+            }
+            return items;
+          });
+        })
+        .catch(() => {
+          /* ignore */
+        });
+    }, 350);
+    return () => {
+      window.clearTimeout(t);
+      ctrl.abort();
+    };
   }, [q, experienceId]);
 
   const semesterOptions = useMemo(
@@ -85,11 +90,8 @@ export function EducationPlanExperienceForm({
       }
     >
       <FieldGroup title="Təcrübə">
-        <Field label="Təcrübə axtarışı" span2>
-          <TextInput value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ad…" />
-        </Field>
         <Field label="Təcrübə" required span2>
-          <SearchSelect value={experienceId} onChange={setExperienceId} options={options} />
+          <SearchSelect value={experienceId} onChange={setExperienceId} options={options} onQueryChange={setQ} debounceMs={350} />
         </Field>
         <Field label="Semestr" required>
           <SelectInput value={semesterId} onChange={setSemesterId} required options={semesterOptions} />

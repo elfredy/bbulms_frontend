@@ -108,6 +108,12 @@ export async function adminAcademicCalendar(educationYearId?: string | null) {
   }>(`/api/admin/academic-calendar${qs ? `?${qs}` : ""}`);
 }
 
+export async function adminListSubjectBlocks() {
+  return adminGet<{ items: { id: string; code?: string | null; name_az?: string | null; order_by?: number | null; plan_count?: number }[]; total: number }>(
+    "/api/admin/subject-blocks",
+  );
+}
+
 export async function adminListEvaluationTypes(q?: string | null) {
   const params = new URLSearchParams();
   if (q?.trim()) params.set("q", q.trim());

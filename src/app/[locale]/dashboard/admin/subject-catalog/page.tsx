@@ -21,7 +21,7 @@ export default async function SubjectCatalogPage({ params, searchParams }: Props
 
   const q = (sp.q ?? "").trim();
   const departmentId = (sp.department_id ?? "").trim();
-  const pageSize = Math.min(200, Math.max(1, Number(sp.pageSize) || 25));
+  const pageSize = Math.min(500, Math.max(1, Number(sp.pageSize) || 100));
   const page = Math.max(1, Number(sp.page) || 1);
   const [data, lookups] = await Promise.all([
     adminListSubjectCatalog({ q: q || null, department_id: departmentId || null, limit: pageSize, offset: (page - 1) * pageSize }),
@@ -83,6 +83,13 @@ export default async function SubjectCatalogPage({ params, searchParams }: Props
             {(lookups?.departments ?? []).map((d) => (
               <option key={d.id} value={d.id}>
                 {d.name_az || d.id}
+              </option>
+            ))}
+          </select>
+          <select name="pageSize" defaultValue={String(pageSize)} className={styles.select}>
+            {[25, 50, 100, 200, 500].map((n) => (
+              <option key={n} value={n}>
+                {n}
               </option>
             ))}
           </select>

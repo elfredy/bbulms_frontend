@@ -17,6 +17,8 @@ type Props = {
   emptyText?: string;
   compact?: boolean;
   triggerClassName?: string;
+  onQueryChange?: (q: string) => void;
+  debounceMs?: number;
 };
 
 export function SearchableSelect({
@@ -29,6 +31,8 @@ export function SearchableSelect({
   emptyText = "Nəticə yoxdur",
   compact = false,
   triggerClassName,
+  onQueryChange,
+  debounceMs = 350,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -36,6 +40,9 @@ export function SearchableSelect({
   const rootRef = useRef<HTMLDivElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const searchRef = useRef<HTMLInputElement | null>(null);
+  const onQueryChangeRef = useRef(onQueryChange);
+  onQueryChangeRef.current = onQueryChange;
+  const openedRef = useRef(false);
 
   const selected = options.find((o) => o.id === value);
 
@@ -47,6 +54,7 @@ export function SearchableSelect({
 
   useEffect(() => {
     if (!open) return;
+    openedRef.current = true;
     setQuery("");
 
     function placeMenu() {
@@ -71,7 +79,11 @@ export function SearchableSelect({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
     };
-    const onScroll = () => setOpen(false);
+    const onScroll = (e: Event) => {
+      const target = e.target;
+      if (target instanceof Node && menuRef.current?.contains(target)) return;
+      setOpen(false);
+    };
     document.addEventListener("mousedown", onDoc);
     document.addEventListener("keydown", onKey);
     window.addEventListener("scroll", onScroll, true);
@@ -84,6 +96,17 @@ export function SearchableSelect({
       window.removeEventListener("resize", onScroll);
     };
   }, [open, compact]);
+
+  useEffect(() => {
+    if (!open || !onQueryChangeRef.current) return;
+    if (openedRef.current) {
+      if (query !== "") return;
+      openedRef.current = false;
+      return;
+    }
+    const t = window.setTimeout(() => onQueryChangeRef.current?.(query), debounceMs);
+    return () => window.clearTimeout(t);
+  }, [open, query, debounceMs]);
 
   function pick(id: string) {
     const opt = options.find((o) => o.id === id);
@@ -99,6 +122,7 @@ export function SearchableSelect({
         className={styles.menu}
         role="listbox"
         style={{ position: "fixed", top: menuPos.top, left: menuPos.left, width: menuPos.width, zIndex: 80 }}
+        onWheel={(e) => e.stopPropagation()}
       >
         <input
           ref={searchRef}
@@ -108,7 +132,11 @@ export function SearchableSelect({
           placeholder={searchPlaceholder}
           autoComplete="off"
         />
-        <div className={styles.list}>
+        <div
+          className={styles.list}
+          onScroll={(e) => e.stopPropagation()}
+          onWheel={(e) => e.stopPropagation()}
+        >
           <button type="button" className={styles.option} onClick={() => pick("")}>
             {placeholder}
           </button>

@@ -2,8 +2,9 @@
 
 import { useLocale } from "next-intl";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { SearchableSelect } from "@/components/SearchableSelect";
 import type { AdminEducationPlanLookups } from "@/lib/api";
 
 import styles from "./EducationPlanCreateForm.module.css";
@@ -48,44 +49,28 @@ function SearchSelect({
   options,
   onChange,
   placeholder,
-  required,
+  onQueryChange,
+  required: _required,
 }: {
   label: string;
   value: string;
   options: Option[];
   onChange: (id: string, option?: Option) => void;
   placeholder?: string;
+  onQueryChange?: (q: string) => void;
   required?: boolean;
 }) {
-  const [q, setQ] = useState("");
-  const filtered = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    const list = needle ? options.filter((o) => o.label.toLowerCase().includes(needle)) : options;
-    return list.slice(0, 120);
-  }, [options, q]);
-  const selected = options.find((o) => o.id === value);
-
   return (
     <label className={styles.field}>
       <span className={styles.label}>{label}</span>
-      <input className={styles.input} value={q} onChange={(e) => setQ(e.target.value)} placeholder={placeholder ?? "Axtar…"} />
-      <select
-        className={styles.select}
+      <SearchableSelect
         value={value}
-        required={required}
-        onChange={(e) => {
-          const id = e.target.value;
-          onChange(id, options.find((o) => o.id === id));
-        }}
-      >
-        <option value="">— seç —</option>
-        {filtered.map((o) => (
-          <option key={o.id} value={o.id}>
-            {o.label}
-          </option>
-        ))}
-        {value && selected && !filtered.some((o) => o.id === value) ? <option value={value}>{selected.label}</option> : null}
-      </select>
+        options={options}
+        placeholder={placeholder ?? "— seç —"}
+        onChange={(id) => onChange(id, options.find((o) => o.id === id))}
+        onQueryChange={onQueryChange}
+        debounceMs={0}
+      />
     </label>
   );
 }
@@ -124,17 +109,20 @@ export function EducationPlanCreateForm({ lookups }: { lookups: AdminEducationPl
   const semesterOptions = lookups.semesters.map((d) => ({ id: d.id, label: d.name_az || d.id }));
   const blockOptions = lookups.subject_blocks.map((d) => ({ id: d.id, label: d.name_az || d.id }));
 
+  const subjectsRef = useRef(subjects);
+  subjectsRef.current = subjects;
+
   const loadRelated = useCallback(async (oid: string, sq?: string, gq?: string) => {
     const params = new URLSearchParams();
     if (oid) params.set("organization_id", oid);
     const qSubjects = new URLSearchParams(params);
     if (sq?.trim()) qSubjects.set("q", sq.trim());
-    qSubjects.set("limit", "80");
+    qSubjects.set("limit", "500");
     const qGroups = new URLSearchParams(params);
     if (gq?.trim()) qGroups.set("q", gq.trim());
-    qGroups.set("limit", "80");
+    qGroups.set("limit", "500");
     const qTeachers = new URLSearchParams(params);
-    qTeachers.set("limit", "40");
+    qTeachers.set("limit", "300");
 
     const [sRes, gRes, tRes] = await Promise.all([
       fetch(`/api/admin/education-plans/lookups/subjects?${qSubjects}`, { credentials: "include", cache: "no-store" }),
@@ -143,12 +131,15 @@ export function EducationPlanCreateForm({ lookups }: { lookups: AdminEducationPl
     ]);
     if (sRes.ok) {
       const json = (await sRes.json()) as { items: LookupItem[] };
-      setSubjectOptions(
-        json.items.map((it) => ({
-          id: it.id,
-          label: [it.name_az, it.org_name_az].filter(Boolean).join(" · ") || it.id,
-        }))
-      );
+      const items = json.items.map((it) => ({
+        id: it.id,
+        label: [it.name_az, it.org_name_az].filter(Boolean).join(" · ") || it.id,
+      }));
+      const keepIds = new Set(subjectsRef.current.map((s) => s.subject_id).filter(Boolean));
+      setSubjectOptions((prev) => {
+        const extra = prev.filter((p) => keepIds.has(p.id) && !items.some((i) => i.id === p.id));
+        return [...extra, ...items];
+      });
     }
     if (gRes.ok) {
       const json = (await gRes.json()) as { items: LookupItem[] };
@@ -161,13 +152,9 @@ export function EducationPlanCreateForm({ lookups }: { lookups: AdminEducationPl
   }, []);
 
   useEffect(() => {
-    void loadRelated(organizationId, subjectQuery, groupQuery);
-  }, [organizationId, loadRelated]);
-
-  useEffect(() => {
     const t = window.setTimeout(() => {
       void loadRelated(organizationId, subjectQuery, groupQuery);
-    }, 280);
+    }, 350);
     return () => window.clearTimeout(t);
   }, [subjectQuery, groupQuery, organizationId, loadRelated]);
 
@@ -262,11 +249,7 @@ export function EducationPlanCreateForm({ lookups }: { lookups: AdminEducationPl
 
       <section className={styles.card}>
         <h2 className={styles.cardTitle}>Fənnlər</h2>
-        <p className={styles.hint}>Fənn adı, semestr və blok DB-dən seçilir. Saat, kredit və kod əl ilə daxil edilir.</p>
-        <label className={styles.field}>
-          <span className={styles.label}>Fənn axtarışı (DB)</span>
-          <input className={styles.input} value={subjectQuery} onChange={(e) => setSubjectQuery(e.target.value)} placeholder="Fənn adı…" />
-        </label>
+        <p className={styles.hint}>Fənn adı, semestr və blok DB-dən seçilir. Axtarış 350 ms sonra işləyir. Saat, kredit və kod əl ilə daxil edilir.</p>
 
         {subjects.map((s, idx) => (
           <div key={s.key} className={styles.subjectCard}>
@@ -286,6 +269,7 @@ export function EducationPlanCreateForm({ lookups }: { lookups: AdminEducationPl
               label="Fənn adı (DB)"
               value={s.subject_id}
               options={subjectOptions}
+              onQueryChange={setSubjectQuery}
               onChange={(id, opt) =>
                 setSubjects((prev) => prev.map((x) => (x.key === s.key ? { ...x, subject_id: id, subject_label: opt?.label ?? "" } : x)))
               }

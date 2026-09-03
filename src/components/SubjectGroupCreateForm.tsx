@@ -89,6 +89,39 @@ function n0(v: number | null | undefined) {
   return String(v ?? 0);
 }
 
+function evalTypeCode(value: string) {
+  return value.trim().toUpperCase();
+}
+
+function hoursForEval(type: string) {
+  const t = evalTypeCode(type);
+  if (t === "MSL") return { m: true, s: true, l: true, fm: true };
+  if (t === "XDS" || t === "XD") return { m: false, s: true, l: false, fm: true };
+  return { m: true, s: true, l: false, fm: true };
+}
+
+function evalTypeLabel(o: Opt) {
+  const id = evalTypeCode(o.id);
+  if (id === "MS") return "MS — Mühazirə və məşğələ";
+  if (id === "MSL") return "MSL — Mühazirə, məşğələ və laboratoriya";
+  if (id === "XDS" || id === "XD") return "XDS — Attestasiya";
+  return labelOf(o);
+}
+
+function lessonKind(o: Opt): "m" | "s" | "l" | "fm" | "other" {
+  const id = String(o.id);
+  if (id === "110000111") return "m";
+  if (id === "110000112") return "s";
+  if (id === "110000113") return "l";
+  if (id === "110000114") return "fm";
+  const n = (o.name_az || "").toLowerCase();
+  if (n.includes("lab")) return "l";
+  if (n.includes("müha") || n.includes("muha") || n.includes("lecture")) return "m";
+  if (n.includes("sem") || n.includes("məşğ") || n.includes("mashg") || n.includes("məsg")) return "s";
+  if (n.includes("kurs") || n.includes("fərdi") || n.includes("fm")) return "fm";
+  return "other";
+}
+
 async function readDetail(res: Response, fallback: string) {
   try {
     const data = await res.json();
@@ -379,7 +412,7 @@ export function SubjectGroupCreateForm({
       setTeachers([]);
       return;
     }
-    const params = new URLSearchParams({ limit: "200", organization_id: orgId });
+    const params = new URLSearchParams({ limit: "300", organization_id: orgId });
     if (subjectId) params.set("education_plan_subject_id", subjectId);
     fetch(`/api/admin/education-plans/lookups/teachers?${params}`, { credentials: "include", cache: "no-store" })
       .then((r) => (r.ok ? r.json() : { items: [] }))
@@ -510,6 +543,7 @@ export function SubjectGroupCreateForm({
       return;
     }
     setSaving(true);
+    const hoursVis = hoursForEval(evaluationType);
     const payload = {
       course_work: Number(courseWork),
       education_level_id: levelId,
@@ -525,21 +559,21 @@ export function SubjectGroupCreateForm({
       type_id: groupTypeId,
       education_group_ids: groupIds,
       note: note.trim() || null,
-      m_hours: Number(mHours || 0),
-      s_hours: Number(sHours || 0),
-      l_hours: Number(lHours || 0),
-      fm_hours: Number(fmHours || 0),
-      m_week_charge: Number(mWeek || 0),
-      s_week_charge: Number(sWeek || 0),
-      l_week_charge: Number(lWeek || 0),
-      fm_week_charge: Number(fmWeek || 0),
+      m_hours: hoursVis.m ? Number(mHours || 0) : 0,
+      s_hours: hoursVis.s ? Number(sHours || 0) : 0,
+      l_hours: hoursVis.l ? Number(lHours || 0) : 0,
+      fm_hours: hoursVis.fm ? Number(fmHours || 0) : 0,
+      m_week_charge: hoursVis.m ? Number(mWeek || 0) : 0,
+      s_week_charge: hoursVis.s ? Number(sWeek || 0) : 0,
+      l_week_charge: hoursVis.l ? Number(lWeek || 0) : 0,
+      fm_week_charge: hoursVis.fm ? Number(fmWeek || 0) : 0,
       evaluation_type_id: evaluationType,
       evaluations: evas.map((row) => ({
         eva_type_id: row.eva_type_id,
         successful_pass_percent: row.successful_pass_percent,
         automatic: row.automatic,
         access_s: row.access_s,
-        access_l: row.access_l,
+        access_l: hoursVis.l ? row.access_l : false,
       })),
       teachers: teacherPicks.filter((t) => t.teacher_id && t.lesson_type_id),
       student_ids: studentIds,
@@ -569,8 +603,7 @@ export function SubjectGroupCreateForm({
       if (updating) {
         setInfo(initialCourseId ? "Məlumatlar yadda saxlanıldı." : "Məlumatlar yadda saxlanıldı. Davam edə və ya Geri ilə çıxa bilərsiniz.");
       } else {
-        setTab("teacher");
-        setInfo("Fənn qrupu yaradıldı. Səhifə açıq qalır — Müəllim, Tələbələr və Yarımqruplar tablarını doldurun. Bitirdikdən sonra Geri ilə çıxın.");
+        setInfo("Fənn qrupu yaradıldı. Müəllimi sonra, jurnalı təsdiqləməzdən əvvəl əlavə edə bilərsiniz. Səhifə açıq qalır — Müəllim, Tələbələr və Yarımqruplar tablarını doldurun. Bitirdikdən sonra Geri ilə çıxın.");
       }
     } catch {
       setError("Serverə qoşulmaq mümkün olmadı.");
@@ -586,6 +619,7 @@ export function SubjectGroupCreateForm({
     }
     setError(null);
     setSaving(true);
+    const hoursVis = hoursForEval(evaluationType);
     try {
       const res = await fetch(`/api/admin/subject-groups/${encodeURIComponent(createdCourseId)}`, {
         method: "PATCH",
@@ -606,21 +640,21 @@ export function SubjectGroupCreateForm({
           type_id: groupTypeId,
           education_group_ids: groupIds,
           note: note.trim() || null,
-          m_hours: Number(mHours || 0),
-          s_hours: Number(sHours || 0),
-          l_hours: Number(lHours || 0),
-          fm_hours: Number(fmHours || 0),
-          m_week_charge: Number(mWeek || 0),
-          s_week_charge: Number(sWeek || 0),
-          l_week_charge: Number(lWeek || 0),
-          fm_week_charge: Number(fmWeek || 0),
+          m_hours: hoursVis.m ? Number(mHours || 0) : 0,
+          s_hours: hoursVis.s ? Number(sHours || 0) : 0,
+          l_hours: hoursVis.l ? Number(lHours || 0) : 0,
+          fm_hours: hoursVis.fm ? Number(fmHours || 0) : 0,
+          m_week_charge: hoursVis.m ? Number(mWeek || 0) : 0,
+          s_week_charge: hoursVis.s ? Number(sWeek || 0) : 0,
+          l_week_charge: hoursVis.l ? Number(lWeek || 0) : 0,
+          fm_week_charge: hoursVis.fm ? Number(fmWeek || 0) : 0,
           evaluation_type_id: evaluationType,
           evaluations: evas.map((row) => ({
             eva_type_id: row.eva_type_id,
             successful_pass_percent: row.successful_pass_percent,
             automatic: row.automatic,
             access_s: row.access_s,
-            access_l: row.access_l,
+            access_l: hoursVis.l ? row.access_l : false,
           })),
           teachers: teacherPicks.filter((t) => t.teacher_id && t.lesson_type_id),
           student_ids: studentIds,
@@ -651,7 +685,20 @@ export function SubjectGroupCreateForm({
   }
 
   const locked = Boolean(createdCourseId) && !initialCourseId;
-  const seminarId = lookups.lesson_types.find((x) => (x.name_az || "").toLowerCase().includes("seminar"))?.id || lookups.lesson_types[0]?.id || "";
+  const hoursVis = hoursForEval(evaluationType);
+  const visibleLessonTypes = lookups.lesson_types.filter((o) => {
+    const k = lessonKind(o);
+    if (k === "l") return hoursVis.l;
+    if (k === "m") return hoursVis.m;
+    if (k === "s") return hoursVis.s;
+    if (k === "fm") return hoursVis.fm;
+    return true;
+  });
+  const seminarId =
+    visibleLessonTypes.find((x) => lessonKind(x) === "s")?.id ||
+    visibleLessonTypes[0]?.id ||
+    lookups.lesson_types[0]?.id ||
+    "";
   const selectedTeacherIds = [...teacherPicks.map((t) => t.teacher_id), ...halfPicks.map((h) => h.teacher_id)].filter(Boolean);
   const teacherOptions = (() => {
     const map = new Map(teachers.map((t) => [t.id, t]));
@@ -744,14 +791,14 @@ export function SubjectGroupCreateForm({
               </label>
               <label className={styles.field}>
                 <span className={`${styles.label} ${styles.req}`}>Tədris planı semestr</span>
-                <select className={styles.select} value={planSemesterId} onChange={(e) => applyPlanSemester(e.target.value)} required disabled={locked}>
-                  <option value="">— seç —</option>
-                  {planSemesters.map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {labelOf(o)}
-                    </option>
-                  ))}
-                </select>
+                <SearchableSelect
+                  value={planSemesterId}
+                  onChange={(id) => applyPlanSemester(id)}
+                  placeholder="— seç —"
+                  searchPlaceholder="Axtar…"
+                  disabled={locked}
+                  options={planSemesters.map((o) => ({ id: o.id, label: labelOf(o) }))}
+                />
               </label>
             </div>
             <div className={styles.row}>
@@ -850,47 +897,63 @@ export function SubjectGroupCreateForm({
 
           <section className={styles.card}>
             <div className={styles.row4}>
-              <label className={styles.field}>
-                <span className={styles.label}>Mühazirə saatı</span>
-                <input className={styles.input} type="number" min={0} value={mHours} onChange={(e) => setMHours(e.target.value)} />
-              </label>
-              <label className={styles.field}>
-                <span className={styles.label}>Seminar saatı</span>
-                <input className={styles.input} type="number" min={0} value={sHours} onChange={(e) => setSHours(e.target.value)} />
-              </label>
-              <label className={styles.field}>
-                <span className={styles.label}>Laboratoriya saatı</span>
-                <input className={styles.input} type="number" min={0} value={lHours} onChange={(e) => setLHours(e.target.value)} />
-              </label>
-              <label className={styles.field}>
-                <span className={styles.label}>Kurs işi/layihəsi</span>
-                <input className={styles.input} type="number" min={0} value={fmHours} onChange={(e) => setFmHours(e.target.value)} />
-              </label>
+              {hoursVis.m ? (
+                <label className={styles.field}>
+                  <span className={styles.label}>Mühazirə saatı</span>
+                  <input className={styles.input} type="number" min={0} value={mHours} onChange={(e) => setMHours(e.target.value)} />
+                </label>
+              ) : null}
+              {hoursVis.s ? (
+                <label className={styles.field}>
+                  <span className={styles.label}>Seminar saatı</span>
+                  <input className={styles.input} type="number" min={0} value={sHours} onChange={(e) => setSHours(e.target.value)} />
+                </label>
+              ) : null}
+              {hoursVis.l ? (
+                <label className={styles.field}>
+                  <span className={styles.label}>Laboratoriya saatı</span>
+                  <input className={styles.input} type="number" min={0} value={lHours} onChange={(e) => setLHours(e.target.value)} />
+                </label>
+              ) : null}
+              {hoursVis.fm ? (
+                <label className={styles.field}>
+                  <span className={styles.label}>Kurs işi/layihəsi</span>
+                  <input className={styles.input} type="number" min={0} value={fmHours} onChange={(e) => setFmHours(e.target.value)} />
+                </label>
+              ) : null}
             </div>
             <div className={styles.row4}>
-              <label className={styles.field}>
-                <span className={styles.label}>Müh. həftəlik yük</span>
-                <input className={styles.input} type="number" min={0} value={mWeek} onChange={(e) => setMWeek(e.target.value)} />
-              </label>
-              <label className={styles.field}>
-                <span className={styles.label}>Sem. həftəlik yük</span>
-                <input className={styles.input} type="number" min={0} value={sWeek} onChange={(e) => setSWeek(e.target.value)} />
-              </label>
-              <label className={styles.field}>
-                <span className={styles.label}>Lab. həftəlik yük</span>
-                <input className={styles.input} type="number" min={0} value={lWeek} onChange={(e) => setLWeek(e.target.value)} />
-              </label>
-              <label className={styles.field}>
-                <span className={styles.label}>K.i həftəlik yük</span>
-                <input className={styles.input} type="number" min={0} value={fmWeek} onChange={(e) => setFmWeek(e.target.value)} />
-              </label>
+              {hoursVis.m ? (
+                <label className={styles.field}>
+                  <span className={styles.label}>Müh. həftəlik yük</span>
+                  <input className={styles.input} type="number" min={0} value={mWeek} onChange={(e) => setMWeek(e.target.value)} />
+                </label>
+              ) : null}
+              {hoursVis.s ? (
+                <label className={styles.field}>
+                  <span className={styles.label}>Sem. həftəlik yük</span>
+                  <input className={styles.input} type="number" min={0} value={sWeek} onChange={(e) => setSWeek(e.target.value)} />
+                </label>
+              ) : null}
+              {hoursVis.l ? (
+                <label className={styles.field}>
+                  <span className={styles.label}>Lab. həftəlik yük</span>
+                  <input className={styles.input} type="number" min={0} value={lWeek} onChange={(e) => setLWeek(e.target.value)} />
+                </label>
+              ) : null}
+              {hoursVis.fm ? (
+                <label className={styles.field}>
+                  <span className={styles.label}>K.i həftəlik yük</span>
+                  <input className={styles.input} type="number" min={0} value={fmWeek} onChange={(e) => setFmWeek(e.target.value)} />
+                </label>
+              ) : null}
             </div>
             <label className={styles.field}>
               <span className={`${styles.label} ${styles.req}`}>Qiymətləndirmə növü</span>
               <select className={styles.select} value={evaluationType} onChange={(e) => setEvaluationType(e.target.value)} required disabled={locked}>
                 {lookups.evaluation_types.map((o) => (
                   <option key={o.id} value={o.id}>
-                    {labelOf(o)}
+                    {evalTypeLabel(o)}
                   </option>
                 ))}
               </select>
@@ -904,13 +967,13 @@ export function SubjectGroupCreateForm({
                     <th className={styles.th}>Keçid faizi</th>
                     <th className={styles.th}>Avtomatik (hesablama)</th>
                     <th className={styles.th}>Sem. müəlliminə icazə</th>
-                    <th className={styles.th}>Lab. müəlliminə icazə</th>
+                    {hoursVis.l ? <th className={styles.th}>Lab. müəlliminə icazə</th> : null}
                   </tr>
                 </thead>
                 <tbody>
                   {evas.length === 0 ? (
                     <tr>
-                      <td className={styles.td} colSpan={6}>
+                      <td className={styles.td} colSpan={hoursVis.l ? 6 : 5}>
                         Fənn seçiləndə cədvəl avtomatik doldurulur.
                       </td>
                     </tr>
@@ -948,13 +1011,15 @@ export function SubjectGroupCreateForm({
                             onChange={(e) => setEvas((prev) => prev.map((x) => (x.eva_type_id === row.eva_type_id ? { ...x, access_s: e.target.checked } : x)))}
                           />
                         </td>
-                        <td className={styles.td}>
-                          <input
-                            type="checkbox"
-                            checked={row.access_l}
-                            onChange={(e) => setEvas((prev) => prev.map((x) => (x.eva_type_id === row.eva_type_id ? { ...x, access_l: e.target.checked } : x)))}
-                          />
-                        </td>
+                        {hoursVis.l ? (
+                          <td className={styles.td}>
+                            <input
+                              type="checkbox"
+                              checked={row.access_l}
+                              onChange={(e) => setEvas((prev) => prev.map((x) => (x.eva_type_id === row.eva_type_id ? { ...x, access_l: e.target.checked } : x)))}
+                            />
+                          </td>
+                        ) : null}
                       </tr>
                     ))
                   )}
@@ -967,6 +1032,7 @@ export function SubjectGroupCreateForm({
       <div className={tab === "teacher" ? undefined : styles.hidden}>
         <section className={styles.card}>
           <h2 className={styles.cardTitle}>Müəllim</h2>
+          <p className={styles.label}>Müəllim indi mütləq deyil. Jurnalı təsdiqləməzdən əvvəl əlavə edilə bilər.</p>
           {!orgId ? <p className={styles.label}>Əvvəl ixtisas seçin. Yalnız həmin fakültənin kafedra müəllimləri görünür.</p> : null}
           {orgId && teachers.length === 0 ? (
             <p className={styles.label}>Bu ixtisasın kafedralarında təhkim olunmuş müəllim tapılmadı.</p>
@@ -994,7 +1060,7 @@ export function SubjectGroupCreateForm({
                   onChange={(e) => setTeacherPicks((prev) => prev.map((x, i) => (i === idx ? { ...x, lesson_type_id: e.target.value } : x)))}
                 >
                   <option value="">— seç —</option>
-                  {lookups.lesson_types.map((o) => (
+                  {visibleLessonTypes.map((o) => (
                     <option key={o.id} value={o.id}>
                       {labelOf(o)}
                     </option>
@@ -1076,7 +1142,7 @@ export function SubjectGroupCreateForm({
                   }
                 >
                   <option value="">Dərs növü</option>
-                  {lookups.lesson_types.map((o) => (
+                  {visibleLessonTypes.map((o) => (
                     <option key={o.id} value={o.id}>
                       {labelOf(o)}
                     </option>

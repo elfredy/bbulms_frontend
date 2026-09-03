@@ -49,7 +49,7 @@ export function EducationPlanSubjectForm({
 
   useEffect(() => {
     const ctrl = new AbortController();
-    const params = new URLSearchParams({ limit: "80" });
+    const params = new URLSearchParams({ limit: "500" });
     if (organizationId) params.set("organization_id", organizationId);
     if (subjectQuery.trim()) params.set("q", subjectQuery.trim());
     fetch(`/api/admin/education-plans/lookups/subjects?${params}`, {
@@ -114,11 +114,14 @@ export function EducationPlanSubjectForm({
       }
     >
       <FieldGroup title="Fənn">
-        <Field label="Fənn axtarışı" span2>
-          <TextInput value={subjectQuery} onChange={(e) => setSubjectQuery(e.target.value)} placeholder="Fənn adı…" />
-        </Field>
         <Field label="Fənn adı" required span2>
-          <SearchSelect value={subjectId} onChange={setSubjectId} options={subjectOptions} />
+          <SearchSelect
+            value={subjectId}
+            onChange={setSubjectId}
+            options={subjectOptions}
+            onQueryChange={setSubjectQuery}
+            debounceMs={350}
+          />
         </Field>
         <Field label="Semestr" required>
           <SelectInput value={semesterId} onChange={setSemesterId} required options={semesterOptions} />

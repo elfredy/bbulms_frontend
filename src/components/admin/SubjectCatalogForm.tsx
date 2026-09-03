@@ -12,13 +12,15 @@ export function SubjectCatalogForm({
   lookups,
   initial,
   locale,
+  redirectTo,
 }: {
   lookups: InstitutionLookups;
   initial?: Record<string, any> | null;
   locale: string;
+  redirectTo?: string;
 }) {
   const isEdit = Boolean(initial?.id);
-  const { error, saving, save } = useAdminSave(`/${locale}/dashboard/admin/subject-catalog`);
+  const { error, saving, save } = useAdminSave(redirectTo ?? `/${locale}/dashboard/admin/subject-catalog`);
   const [departmentId, setDepartmentId] = useState(initial?.department_id ?? "");
   const [subjectId, setSubjectId] = useState(initial?.subject_name_id ?? "");
   const [subjectQuery, setSubjectQuery] = useState(initial?.subject_name_az ?? "");
@@ -30,19 +32,23 @@ export function SubjectCatalogForm({
   useEffect(() => {
     const q = subjectQuery.trim();
     const ctrl = new AbortController();
-    const t = window.setTimeout(() => {
-      const params = new URLSearchParams({ limit: "80" });
-      if (q) params.set("q", q);
-      fetch(`/api/admin/institution/lookups/subjects?${params}`, { credentials: "include", cache: "no-store", signal: ctrl.signal })
-        .then((r) => (r.ok ? r.json() : { items: [] }))
-        .then((d) => setSubjects(d.items ?? []))
-        .catch(() => {});
-    }, 250);
-    return () => {
-      window.clearTimeout(t);
-      ctrl.abort();
-    };
-  }, [subjectQuery]);
+    const params = new URLSearchParams({ limit: "500" });
+    if (q) params.set("q", q);
+    fetch(`/api/admin/institution/lookups/subjects?${params}`, { credentials: "include", cache: "no-store", signal: ctrl.signal })
+      .then((r) => (r.ok ? r.json() : { items: [] }))
+      .then((d) => {
+        const items = (d.items ?? []) as SubjectOpt[];
+        setSubjects((prev) => {
+          if (subjectId && !items.some((x) => x.id === subjectId)) {
+            const keep = prev.find((x) => x.id === subjectId);
+            return keep ? [keep, ...items] : items;
+          }
+          return items;
+        });
+      })
+      .catch(() => {});
+    return () => ctrl.abort();
+  }, [subjectQuery, subjectId]);
 
   return (
     <AdminFormFrame
@@ -81,17 +87,30 @@ export function SubjectCatalogForm({
             }))}
           />
         </Field>
-        <Field label="Açar söz">
-          <TextInput value={subjectQuery} onChange={(e) => setSubjectQuery(e.target.value)} placeholder="Fənn adı axtar…" />
-        </Field>
         <Field label="Fənnin adı" required>
           <SearchSelect
             value={subjectId}
             onChange={setSubjectId}
             options={subjects.map((s) => ({ id: s.id, label: [s.name_az, s.code].filter(Boolean).join(" · ") || s.id }))}
+            onQueryChange={setSubjectQuery}
+            debounceMs={350}
           />
         </Field>
-        {!isEdit ? <FormHint>Siyahıda yoxdursa, axtarış xanasına yeni fənn adını yazıb kafedraya bağlaya bilərsiniz.</FormHint> : null}
+        {!isEdit ? (
+          <>
+            <Field label="Yeni fənn adı (siyahıda yoxdursa)">
+              <TextInput
+                value={subjectId ? "" : subjectQuery}
+                onChange={(e) => {
+                  setSubjectId("");
+                  setSubjectQuery(e.target.value);
+                }}
+                placeholder="Yeni fənn adı…"
+              />
+            </Field>
+            <FormHint>Siyahıda yoxdursa, yeni fənn adını yazıb kafedraya bağlaya bilərsiniz.</FormHint>
+          </>
+        ) : null}
         <Field label="Fənnin annotasiyası">
           <TextArea value={note} onChange={(e) => setNote(e.target.value)} />
         </Field>
