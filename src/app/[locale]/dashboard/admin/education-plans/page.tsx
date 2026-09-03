@@ -16,6 +16,7 @@ type Props = {
     status_id?: string;
     page?: string;
     pageSize?: string;
+    old?: string;
   }>;
 };
 
@@ -49,6 +50,7 @@ export default async function AdminEducationPlansPage({ params, searchParams }: 
   const educationTypeId = (sp.education_type_id ?? "").trim();
   const educationLevelId = (sp.education_level_id ?? "").trim();
   const statusId = (sp.status_id ?? "").trim();
+  const showOld = (sp.old ?? "").trim() === "1";
   const pageSize = Math.min(500, Math.max(1, Number(sp.pageSize) || 20));
   const page = Math.max(1, Number(sp.page) || 1);
   const offset = (page - 1) * pageSize;
@@ -59,6 +61,7 @@ export default async function AdminEducationPlansPage({ params, searchParams }: 
       education_type_id: educationTypeId || null,
       education_level_id: educationLevelId || null,
       status_id: statusId || null,
+      show_old: showOld,
       limit: pageSize,
       offset,
     }),
@@ -88,6 +91,7 @@ export default async function AdminEducationPlansPage({ params, searchParams }: 
     if (educationTypeId) params.set("education_type_id", educationTypeId);
     if (educationLevelId) params.set("education_level_id", educationLevelId);
     if (statusId) params.set("status_id", statusId);
+    if (showOld) params.set("old", "1");
     params.set("pageSize", String(pageSize));
     Object.entries(extra).forEach(([k, v]) => {
       if (v == null || v === "") params.delete(k);
@@ -97,15 +101,27 @@ export default async function AdminEducationPlansPage({ params, searchParams }: 
   };
 
   const stats = data.stats ?? { bachelor_count: 0, master_count: 0, fulltime_count: 0, parttime_count: 0, total: 0 };
+  const yearName = data.current_year_name || "2026/2027";
 
   return (
     <div className={styles.pageWide}>
       <header className={styles.headerCard}>
         <div>
           <h1 className={styles.title}>{t("educationPlans")}</h1>
-          <p className={styles.meta}>{t("educationPlansHint")}</p>
+          <p className={styles.meta}>
+            {showOld ? t("educationPlansHint") : t("educationPlansHintCurrent", { year: yearName })}
+          </p>
         </div>
         <div className={styles.headerActions}>
+          {showOld ? (
+            <Link href={`?${qs({ page: 1, old: undefined })}`} className={styles.actionLink}>
+              {t("showCurrentYearOnly", { year: yearName })}
+            </Link>
+          ) : (
+            <Link href={`?${qs({ page: 1, old: 1 })}`} className={styles.actionLink}>
+              {t("showOldYears")}
+            </Link>
+          )}
           <Link href={`/${locale}/dashboard/admin/education-plans/new`} className={styles.actionLinkPrimary}>
             {t("educationPlanCreate")}
           </Link>
@@ -162,6 +178,7 @@ export default async function AdminEducationPlansPage({ params, searchParams }: 
             ))}
           </select>
           <input type="hidden" name="page" value="1" />
+          {showOld ? <input type="hidden" name="old" value="1" /> : null}
           <button type="submit" className={styles.button}>
             {t("search")}
           </button>

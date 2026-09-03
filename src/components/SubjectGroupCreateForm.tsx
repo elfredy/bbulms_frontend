@@ -44,6 +44,7 @@ type EvaRow = {
   successful_pass_percent: number | null;
   automatic: boolean;
   access_s: boolean;
+  access_l: boolean;
 };
 type TeacherPick = { teacher_id: string; lesson_type_id: string };
 type HalfPick = { half_group_id: string; lesson_type_id: string; teacher_id: string };
@@ -220,7 +221,12 @@ export function SubjectGroupCreateForm({
         setLWeek(n0(d.l_week_charge));
         setFmWeek(n0(d.fm_week_charge));
         if (d.evaluation_type_id) setEvaluationType(String(d.evaluation_type_id));
-        const evaRows = (d.evaluations ?? []) as EvaRow[];
+        const evaRows = ((d.evaluations ?? []) as EvaRow[]).map((row) => ({
+          ...row,
+          automatic: Boolean(row.automatic),
+          access_s: Boolean(row.access_s),
+          access_l: Boolean(row.access_l),
+        }));
         if (evaRows.length) setEvas(evaRows);
         const tch = (d.teachers ?? []) as TeacherPick[];
         setTeacherPicks(tch.length ? tch.map((t) => ({ teacher_id: String(t.teacher_id), lesson_type_id: String(t.lesson_type_id) })) : [{ teacher_id: "", lesson_type_id: "" }]);
@@ -533,6 +539,7 @@ export function SubjectGroupCreateForm({
         successful_pass_percent: row.successful_pass_percent,
         automatic: row.automatic,
         access_s: row.access_s,
+        access_l: row.access_l,
       })),
       teachers: teacherPicks.filter((t) => t.teacher_id && t.lesson_type_id),
       student_ids: studentIds,
@@ -613,6 +620,7 @@ export function SubjectGroupCreateForm({
             successful_pass_percent: row.successful_pass_percent,
             automatic: row.automatic,
             access_s: row.access_s,
+            access_l: row.access_l,
           })),
           teachers: teacherPicks.filter((t) => t.teacher_id && t.lesson_type_id),
           student_ids: studentIds,
@@ -896,12 +904,13 @@ export function SubjectGroupCreateForm({
                     <th className={styles.th}>Keçid faizi</th>
                     <th className={styles.th}>Avtomatik (hesablama)</th>
                     <th className={styles.th}>Sem. müəlliminə icazə</th>
+                    <th className={styles.th}>Lab. müəlliminə icazə</th>
                   </tr>
                 </thead>
                 <tbody>
                   {evas.length === 0 ? (
                     <tr>
-                      <td className={styles.td} colSpan={5}>
+                      <td className={styles.td} colSpan={6}>
                         Fənn seçiləndə cədvəl avtomatik doldurulur.
                       </td>
                     </tr>
@@ -937,6 +946,13 @@ export function SubjectGroupCreateForm({
                             type="checkbox"
                             checked={row.access_s}
                             onChange={(e) => setEvas((prev) => prev.map((x) => (x.eva_type_id === row.eva_type_id ? { ...x, access_s: e.target.checked } : x)))}
+                          />
+                        </td>
+                        <td className={styles.td}>
+                          <input
+                            type="checkbox"
+                            checked={row.access_l}
+                            onChange={(e) => setEvas((prev) => prev.map((x) => (x.eva_type_id === row.eva_type_id ? { ...x, access_l: e.target.checked } : x)))}
                           />
                         </td>
                       </tr>

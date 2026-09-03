@@ -170,6 +170,9 @@ export type AdminEducationPlanListResponse = {
   offset: number;
   total: number;
   stats: AdminEducationPlanStats;
+  show_old?: boolean;
+  current_year_id?: string | null;
+  current_year_name?: string | null;
 };
 
 export type AdminSubjectGroupItem = {
@@ -719,6 +722,7 @@ export async function adminListEducationPlans(opts?: {
   education_type_id?: string | null;
   education_level_id?: string | null;
   status_id?: string | null;
+  show_old?: boolean;
   limit?: number;
   offset?: number;
 }): Promise<AdminEducationPlanListResponse | null> {
@@ -732,6 +736,7 @@ export async function adminListEducationPlans(opts?: {
   if (opts?.education_type_id) params.set("education_type_id", String(opts.education_type_id));
   if (opts?.education_level_id) params.set("education_level_id", String(opts.education_level_id));
   if (opts?.status_id) params.set("status_id", String(opts.status_id));
+  if (opts?.show_old) params.set("show_old", "true");
   params.set("limit", String(opts?.limit ?? 20));
   params.set("offset", String(opts?.offset ?? 0));
   const res = await fetch(`${origin}/api/admin/education-plans?${params.toString()}`, {

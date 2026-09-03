@@ -43,11 +43,6 @@
 }
 
 .menu {
-  position: absolute;
-  z-index: 40;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
   display: grid;
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -97,4 +92,28 @@
   padding: 10px 12px;
   color: var(--muted);
   font-size: 0.86rem;
+}
+
+.wrapCompact {
+  width: 100%;
+}
+
+.triggerCompact {
+  min-height: 16px;
+  height: 16px;
+  padding: 0 3px;
+  border-radius: 2px;
+  border: none;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 16px;
+}
+
+.triggerCompact .chevron {
+  font-size: 0.55rem;
+}
+
+.option:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }

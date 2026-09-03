@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type DragEvent } from "react";
 
 import styles from "./TimetableBuilder.module.css";
+import { SearchableSelect } from "./SearchableSelect";
 import {
   adminTimetableBoard,
   adminTimetableConfirm,
@@ -75,7 +76,7 @@ export function TimetableBuilder() {
     adminTimetableLookups().then((data) => {
       if (!alive || !data) return;
       setLookups(data);
-      const year = data.years.find((y) => y.name === "2025/2026") ?? data.years[0];
+      const year = data.years.find((y) => y.name === "2026/2027") ?? data.years.find((y) => y.name === "2025/2026") ?? data.years[0];
       const sem = data.semesters.find((s) => (s.code || "").toUpperCase() === "PY") ?? data.semesters[0];
       const st = data.subject_types.find((t) => (t.code || "").toUpperCase() === "MAINCOURSE") ?? data.subject_types[0];
       const fac = data.faculties.find((f) => (f.name_az || "").toLowerCase().includes("biznes")) ?? data.faculties[0];
@@ -382,24 +383,22 @@ export function TimetableBuilder() {
       >
         {occ ? (
           <>
-            <select
-              className={styles.slotRoom}
+            <SearchableSelect
+              compact
               value={occ.room_id ?? ""}
               disabled={busy}
-              title="Otaq"
-              onMouseDown={(e) => e.stopPropagation()}
-              onClick={(e) => e.stopPropagation()}
-              onChange={(e) => {
-                void setRoom(occ, e.target.value || null);
+              placeholder="Otaq"
+              searchPlaceholder="Otaq axtar…"
+              triggerClassName={styles.slotRoom}
+              options={roomOptions.map((r) => ({
+                id: r.id,
+                label: r.occupied ? `${r.name || r.id} · doludur` : r.name || r.id,
+                disabled: Boolean(r.occupied),
+              }))}
+              onChange={(id) => {
+                void setRoom(occ, id || null);
               }}
-            >
-              <option value="">Otaq</option>
-              {roomOptions.map((r) => (
-                <option key={r.id} value={r.id} disabled={Boolean(r.occupied)}>
-                  {r.occupied ? `${r.name || r.id} · doludur` : r.name || r.id}
-                </option>
-              ))}
-            </select>
+            />
             <button
               type="button"
               className={styles.slotBody}
@@ -537,15 +536,19 @@ export function TimetableBuilder() {
         </label>
         <label className={styles.field}>
           <span className={styles.label}>Akademik qrup</span>
-          <select className={styles.select} value={groupId} onChange={(e) => setGroupId(e.target.value)} disabled={!facultyId}>
-            <option value="">— seç —</option>
-            {groups.map((g) => (
-              <option key={g.education_group_id} value={g.education_group_id}>
-                {[g.education_group_name, g.kurs != null ? `${g.kurs} kurs` : null, g.education_year_name].filter(Boolean).join(" · ") ||
-                  g.education_group_id}
-              </option>
-            ))}
-          </select>
+          <SearchableSelect
+            value={groupId}
+            onChange={setGroupId}
+            disabled={!facultyId}
+            placeholder="— seç —"
+            searchPlaceholder="Qrup axtar…"
+            options={groups.map((g) => ({
+              id: g.education_group_id,
+              label:
+                [g.education_group_name, g.kurs != null ? `${g.kurs} kurs` : null, g.education_year_name].filter(Boolean).join(" · ") ||
+                g.education_group_id,
+            }))}
+          />
           {facultyId && yearId && groups.length === 0 ? (
             <span className={styles.hint}>Bu dekanlıq və il üçün qrup tapılmadı. Kursu “Hamısı” edin.</span>
           ) : null}
