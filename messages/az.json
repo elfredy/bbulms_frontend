@@ -78,6 +78,7 @@
     "educationPlanTypeStats": "Əyani / Qiyabi",
     "subjectGroups": "Fənn qrupları",
     "subjectGroupsHint": "Tədris planından sonra yaradılan fənn qrupları. Dərs cədvəli bu qruplar üzrə tərtib olunur.",
+    "subjectGroupsHintCurrent": "Yalnız {year} tədris ili üçün fənn qrupları. Köhnə illər gizlidir.",
     "subjectGroupCreate": "Fənn qrupu əlavə et",
     "subjectGroupEdit": "Fənn qrupunu yenilə",
     "subjectGroupCreated": "Fənn qrupu siyahıya əlavə olundu: {label}. Aşağıda ilk sətirdə işarələnib.",

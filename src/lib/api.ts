@@ -198,6 +198,9 @@ export type AdminSubjectGroupListResponse = {
   limit: number;
   offset: number;
   total: number;
+  show_old?: boolean;
+  current_year_id?: string | null;
+  current_year_name?: string | null;
 };
 
 export type AdminEducationPlanSubjectItem = {
@@ -753,6 +756,7 @@ export async function adminListSubjectGroups(opts?: {
   education_plan_id?: string | null;
   education_year_id?: string | null;
   semester_id?: string | null;
+  show_old?: boolean;
   limit?: number;
   offset?: number;
 }): Promise<AdminSubjectGroupListResponse | null> {
@@ -765,6 +769,7 @@ export async function adminListSubjectGroups(opts?: {
   if (opts?.education_plan_id) params.set("education_plan_id", String(opts.education_plan_id));
   if (opts?.education_year_id) params.set("education_year_id", String(opts.education_year_id));
   if (opts?.semester_id) params.set("semester_id", String(opts.semester_id));
+  if (opts?.show_old) params.set("show_old", "true");
   params.set("limit", String(opts?.limit ?? 20));
   params.set("offset", String(opts?.offset ?? 0));
   const res = await fetch(`${origin}/api/admin/subject-groups?${params.toString()}`, {

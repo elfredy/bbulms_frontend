@@ -78,6 +78,7 @@
     "educationPlanTypeStats": "Full-time / Part-time",
     "subjectGroups": "Subject groups",
     "subjectGroupsHint": "Subject groups created after the education plan. The timetable is built from these groups.",
+    "subjectGroupsHintCurrent": "Only subject groups for the {year} academic year. Older years are hidden.",
     "subjectGroupCreate": "Add subject group",
     "subjectGroupEdit": "Update subject group",
     "subjectGroupCreated": "Subject group added to the list: {label}. It is highlighted in the first rows below.",

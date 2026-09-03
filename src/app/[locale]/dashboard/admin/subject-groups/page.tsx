@@ -15,6 +15,7 @@ type Props = {
     page?: string;
     pageSize?: string;
     created?: string;
+    old?: string;
   }>;
 };
 
@@ -47,6 +48,7 @@ export default async function AdminSubjectGroupsPage({ params, searchParams }: P
   const q = (sp.q ?? "").trim();
   const educationPlanId = (sp.education_plan_id ?? "").trim();
   const createdId = (sp.created ?? "").trim();
+  const showOld = (sp.old ?? "").trim() === "1";
   const pageSize = Math.min(500, Math.max(1, Number(sp.pageSize) || 20));
   const page = Math.max(1, Number(sp.page) || 1);
   const offset = (page - 1) * pageSize;
@@ -54,6 +56,7 @@ export default async function AdminSubjectGroupsPage({ params, searchParams }: P
   const data = await adminListSubjectGroups({
     q: q || null,
     education_plan_id: educationPlanId || null,
+    show_old: showOld,
     limit: pageSize,
     offset,
   });
@@ -73,10 +76,13 @@ export default async function AdminSubjectGroupsPage({ params, searchParams }: P
 
   const totalPages = Math.max(1, Math.ceil((data.total || 0) / pageSize));
   const createdItem = createdId ? data.items.find((g) => g.id === createdId) : undefined;
+  const yearName = data.current_year_name || "2026/2027";
   const qs = (extra: Record<string, string | number | undefined>) => {
     const params = new URLSearchParams();
     if (q) params.set("q", q);
     if (educationPlanId) params.set("education_plan_id", educationPlanId);
+    if (showOld) params.set("old", "1");
+    if (createdId) params.set("created", createdId);
     params.set("pageSize", String(pageSize));
     Object.entries(extra).forEach(([k, v]) => {
       if (v == null || v === "") params.delete(k);
@@ -90,9 +96,20 @@ export default async function AdminSubjectGroupsPage({ params, searchParams }: P
       <header className={styles.headerCard}>
         <div>
           <h1 className={styles.title}>{t("subjectGroups")}</h1>
-          <p className={styles.meta}>{t("subjectGroupsHint")}</p>
+          <p className={styles.meta}>
+            {showOld ? t("subjectGroupsHint") : t("subjectGroupsHintCurrent", { year: yearName })}
+          </p>
         </div>
         <div className={styles.headerActions}>
+          {showOld ? (
+            <Link href={`?${qs({ page: 1, old: undefined })}`} className={styles.actionLink}>
+              {t("showCurrentYearOnly", { year: yearName })}
+            </Link>
+          ) : (
+            <Link href={`?${qs({ page: 1, old: 1 })}`} className={styles.actionLink}>
+              {t("showOldYears")}
+            </Link>
+          )}
           <Link href={`/${locale}/dashboard/admin/subject-groups/new`} className={styles.actionLinkPrimary}>
             {t("subjectGroupCreate")}
           </Link>
@@ -111,6 +128,7 @@ export default async function AdminSubjectGroupsPage({ params, searchParams }: P
             ))}
           </select>
           <input type="hidden" name="page" value="1" />
+          {showOld ? <input type="hidden" name="old" value="1" /> : null}
           <button type="submit" className={styles.button}>
             {t("search")}
           </button>
