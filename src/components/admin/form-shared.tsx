@@ -145,6 +145,12 @@ export async function readDetail(res: Response, fallback: string) {
   try {
     const data = await res.json();
     if (typeof data?.detail === "string") return data.detail;
+    if (Array.isArray(data?.detail)) {
+      const parts = data.detail
+        .map((item: { msg?: string } | string) => (typeof item === "string" ? item : item?.msg))
+        .filter(Boolean);
+      if (parts.length) return parts.join(". ");
+    }
   } catch {
     /* ignore */
   }
@@ -205,6 +211,9 @@ export function useAdminSave(successHref: string) {
       router.push(successHref);
       router.refresh();
       return true;
+    } catch {
+      setError("Serverə qoşulmaq mümkün olmadı");
+      return false;
     } finally {
       setSaving(false);
     }
