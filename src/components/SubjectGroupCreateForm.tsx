@@ -526,6 +526,31 @@ export function SubjectGroupCreateForm({
     if (s.course_work != null) setCourseWork(String(s.course_work));
   }
 
+  function resetForNextCreate() {
+    const sem =
+      lookups?.lesson_types.find((x) => (x.name_az || "").toLowerCase().includes("seminar"))?.id ||
+      lookups?.lesson_types[0]?.id ||
+      "";
+    skipCascade.current = { students: true, startDate: true, evas: false };
+    setCreatedCourseId("");
+    setTab("general");
+    setPlanSemesterId("");
+    setSubjectId("");
+    setNote("");
+    setMHours("");
+    setSHours("");
+    setLHours("");
+    setFmHours("");
+    setMWeek("");
+    setSWeek("");
+    setLWeek("");
+    setFmWeek("");
+    setEvaluationType(lookups?.evaluation_types.some((x) => x.id === "MS") ? "MS" : evaluationType);
+    setEvas([]);
+    setTeacherPicks([{ teacher_id: "", lesson_type_id: sem }]);
+    setHalfPicks([]);
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -598,12 +623,14 @@ export function SubjectGroupCreateForm({
         return;
       }
       const saved = await res.json().catch(() => null);
-      const savedId = saved?.course_id ? String(saved.course_id) : createdCourseId;
-      if (savedId) setCreatedCourseId(savedId);
       if (updating) {
-        setInfo(initialCourseId ? "Məlumatlar yadda saxlanıldı." : "Məlumatlar yadda saxlanıldı. Davam edə və ya Geri ilə çıxa bilərsiniz.");
+        const savedId = saved?.course_id ? String(saved.course_id) : createdCourseId;
+        if (savedId) setCreatedCourseId(savedId);
+        setInfo("Məlumatlar yadda saxlanıldı.");
       } else {
-        setInfo("Fənn qrupu yaradıldı. Müəllimi sonra, jurnalı təsdiqləməzdən əvvəl əlavə edə bilərsiniz. Səhifə açıq qalır — Müəllim, Tələbələr və Yarımqruplar tablarını doldurun. Bitirdikdən sonra Geri ilə çıxın.");
+        resetForNextCreate();
+        setInfo("Fənn qrupu əlavə olundu. Növbəti fənn qrupunu əlavə edə bilərsiniz.");
+        window.setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 0);
       }
     } catch {
       setError("Serverə qoşulmaq mümkün olmadı.");
@@ -1032,7 +1059,7 @@ export function SubjectGroupCreateForm({
       <div className={tab === "teacher" ? undefined : styles.hidden}>
         <section className={styles.card}>
           <h2 className={styles.cardTitle}>Müəllim</h2>
-          <p className={styles.label}>Müəllim indi mütləq deyil. Jurnalı təsdiqləməzdən əvvəl əlavə edilə bilər.</p>
+          <p className={styles.label}>Müəllim mütləq deyil. Jurnalı təsdiqləməzdən əvvəl əlavə edilə bilər.</p>
           {!orgId ? <p className={styles.label}>Əvvəl ixtisas seçin. Yalnız həmin fakültənin kafedra müəllimləri görünür.</p> : null}
           {orgId && teachers.length === 0 ? (
             <p className={styles.label}>Bu ixtisasın kafedralarında təhkim olunmuş müəllim tapılmadı.</p>
