@@ -9,13 +9,14 @@ import {
   confirmTeacherCourseExercise,
   confirmTeacherJournalMeeting,
   createTeacherCourseExercise,
-  getTeacherCourseExercisePoints,
+  getTeacherCourseExerciseAllPoints,
   getTeacherCourseExercises,
   getTeacherJournalGrid,
   getTeacherJournalPointsGrid,
   getTeacherJournalResultSimple,
-  upsertTeacherCourseExercisePoint,
+  upsertTeacherCourseExercisePointsBulk,
   upsertTeacherJournalCell,
+  upsertTeacherJournalCellsBulk,
   upsertTeacherJournalPoint,
 } from "@/lib/api-client";
 
@@ -546,19 +547,21 @@ export function JournalClient({
 
   function loadExercises(type: "colloquium" | "referat") {
     startTransition(async () => {
-      const list = await getTeacherCourseExercises(courseId, type);
+      const [list, allPts] = await Promise.all([
+        getTeacherCourseExercises(courseId, type),
+        getTeacherCourseExerciseAllPoints(courseId, type),
+      ]);
       if (!list) return;
       setExerciseItemsByType((prev) => ({ ...prev, [type]: { items: list.items } }));
 
-      // Load points for each exercise (kept small: per exercise, per roster)
       const pointsMapByExerciseId: Record<string, Record<string, string>> = {};
-      for (const it of list.items) {
-        // eslint-disable-next-line no-await-in-loop
-        const pts = await getTeacherCourseExercisePoints(courseId, type, it.course_execises_id);
-        if (!pts) continue;
-        const m: Record<string, string> = {};
-        for (const c of pts.cells) m[String(c.student_id)] = exercisePointDisplay(c.value);
-        pointsMapByExerciseId[String(it.course_execises_id)] = m;
+      for (const it of list.items) pointsMapByExerciseId[String(it.course_execises_id)] = {};
+      if (allPts) {
+        for (const c of allPts.cells) {
+          const eid = String(c.course_execises_id);
+          if (!pointsMapByExerciseId[eid]) pointsMapByExerciseId[eid] = {};
+          pointsMapByExerciseId[eid][String(c.student_id)] = exercisePointDisplay(c.value);
+        }
       }
       setExercisePointsByExerciseId((prev) => ({ ...prev, ...pointsMapByExerciseId }));
       setExercisePendingByKey((prev) => {
@@ -788,7 +791,7 @@ export function JournalClient({
 
     setErr(null);
     startTransition(async () => {
-      const touchedMids = new Set<string>();
+      const byMeeting: Record<string, { student_id: string; course_eva_id: string; value: string | null }[]> = {};
       for (const [k, v] of Object.entries(meetingPendingByKey)) {
         const parts = k.split(":");
         const mid = parts[0];
@@ -796,25 +799,22 @@ export function JournalClient({
         const courseEvaId = parts[2];
         if (!mid || !studentId || !courseEvaId) continue;
         if (meetingLockedById[mid]) continue;
-        touchedMids.add(mid);
-        // eslint-disable-next-line no-await-in-loop
-        const res = await upsertTeacherJournalCell(courseId, {
+        (byMeeting[mid] ??= []).push({
           student_id: studentId,
           course_eva_id: courseEvaId,
-          course_meeting_id: mid,
           value: v.trim() || null,
+        });
+      }
+
+      for (const [mid, cells] of Object.entries(byMeeting)) {
+        const res = await upsertTeacherJournalCellsBulk(courseId, {
+          course_meeting_id: mid,
+          cells,
         });
         if (!res.ok) {
           setErr(res.error);
           return;
         }
-        const map: Record<string, JournalCell> = {};
-        for (const c of res.data.cells) map[key(c.student_id, c.course_eva_id)] = c;
-        setMeetingWindowCellsByMeetingId((prev) => ({ ...prev, [mid]: map }));
-      }
-
-      for (const mid of touchedMids) {
-        // eslint-disable-next-line no-await-in-loop
         const confirmed = await confirmTeacherJournalMeeting(courseId, { course_meeting_id: mid });
         if (!confirmed) {
           setErr("Təsdiq alınmadı");
@@ -839,27 +839,24 @@ export function JournalClient({
 
     setErr(null);
     startTransition(async () => {
-      const touchedExerciseIds = new Set<string>();
+      const byExercise: Record<string, { student_id: string; value: string | null }[]> = {};
       for (const [k, v] of entries) {
         const parts = k.split(":");
-        const type = parts[0] as "colloquium" | "referat";
         const exerciseId = parts[1];
         const studentId = parts[2];
-        if (!type || !exerciseId || !studentId) continue;
-        touchedExerciseIds.add(exerciseId);
-        // eslint-disable-next-line no-await-in-loop
-        const res = await upsertTeacherCourseExercisePoint(courseId, type, exerciseId, { student_id: studentId, value: v || null });
+        if (!exerciseId || !studentId) continue;
+        (byExercise[exerciseId] ??= []).push({ student_id: studentId, value: v || null });
+      }
+
+      const touchedExerciseIds = Object.keys(byExercise);
+      for (const exerciseId of touchedExerciseIds) {
+        const cells = byExercise[exerciseId];
+        if (!cells?.length) continue;
+        const res = await upsertTeacherCourseExercisePointsBulk(courseId, exType, exerciseId, { cells });
         if (!res) {
           setErr("Yadda saxlanmadı (1 həftə limiti bitmiş və ya təsdiqlənmiş ola bilər)");
           return;
         }
-        const m: Record<string, string> = {};
-        for (const c of res.cells) m[String(c.student_id)] = exercisePointDisplay(c.value);
-        setExercisePointsByExerciseId((prev) => ({ ...prev, [exerciseId]: m }));
-      }
-
-      for (const exerciseId of touchedExerciseIds) {
-        // eslint-disable-next-line no-await-in-loop
         const confirmed = await confirmTeacherCourseExercise(courseId, exType, exerciseId);
         if (!confirmed) {
           setErr("Təsdiq alınmadı");
@@ -877,7 +874,19 @@ export function JournalClient({
         }
         return next;
       });
-      loadExercises(exType);
+      const touched = new Set(touchedExerciseIds);
+      setExerciseItemsByType((prev) => {
+        const cur = prev[exType];
+        if (!cur) return prev;
+        return {
+          ...prev,
+          [exType]: {
+            items: cur.items.map((it) =>
+              touched.has(String(it.course_execises_id)) ? { ...it, confirmed: true, editable: false } : it,
+            ),
+          },
+        };
+      });
       loadResult();
     });
   }

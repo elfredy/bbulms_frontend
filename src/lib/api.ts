@@ -410,6 +410,17 @@ export type JournalUpsertRequest = {
   value: string | null;
 };
 
+export type JournalBulkCell = {
+  student_id: string;
+  course_eva_id: string;
+  value: string | null;
+};
+
+export type JournalBulkUpsertRequest = {
+  course_meeting_id: string;
+  cells: JournalBulkCell[];
+};
+
 export type JournalConfirmRequest = {
   course_meeting_id: string;
 };
@@ -482,6 +493,16 @@ export type CourseExercisePointsResponse = {
 export type CourseExercisePointUpsertRequest = {
   student_id: string;
   value: string | null;
+};
+
+export type CourseExercisePointBulkUpsertRequest = {
+  cells: CourseExercisePointUpsertRequest[];
+};
+
+export type CourseExerciseAllPointsResponse = {
+  course_id: string;
+  type: string;
+  cells: CourseExercisePointCell[];
 };
 
 /** Server komponentlər üçün — brauzer çərəzini Next SSR-ə ötürür */

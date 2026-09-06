@@ -1,9 +1,12 @@
 import type {
+  CourseExerciseAllPointsResponse,
   CourseExerciseCreateRequest,
   CourseExerciseItem,
   CourseExerciseListResponse,
   CourseExercisePointsResponse,
+  CourseExercisePointBulkUpsertRequest,
   CourseExercisePointUpsertRequest,
+  JournalBulkUpsertRequest,
   JournalConfirmRequest,
   JournalGridResponse,
   JournalPointsGridResponse,
@@ -41,6 +44,23 @@ export async function upsertTeacherJournalCell(
   body: JournalUpsertRequest
 ): Promise<{ ok: true; data: JournalGridResponse } | { ok: false; error: string }> {
   const res = await fetch(`/api/teacher/courses/${courseId}/journal`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    return { ok: false, error: (await readErrorDetail(res)) || "Yadda saxlanmadı" };
+  }
+  const data = (await res.json()) as JournalGridResponse;
+  return { ok: true, data };
+}
+
+export async function upsertTeacherJournalCellsBulk(
+  courseId: string,
+  body: JournalBulkUpsertRequest
+): Promise<{ ok: true; data: JournalGridResponse } | { ok: false; error: string }> {
+  const res = await fetch(`/api/teacher/courses/${courseId}/journal/bulk`, {
     method: "POST",
     credentials: "include",
     headers: { "content-type": "application/json" },
@@ -115,6 +135,17 @@ export async function createTeacherCourseExercise(courseId: string, body: Course
   return jsonOrNull(res);
 }
 
+export async function getTeacherCourseExerciseAllPoints(
+  courseId: string,
+  type: string
+): Promise<CourseExerciseAllPointsResponse | null> {
+  const res = await fetch(
+    `/api/teacher/courses/${courseId}/course-exercise-points?type=${encodeURIComponent(type)}`,
+    { credentials: "include", cache: "no-store" }
+  );
+  return jsonOrNull(res);
+}
+
 export async function getTeacherCourseExercisePoints(
   courseId: string,
   type: string,
@@ -135,6 +166,24 @@ export async function upsertTeacherCourseExercisePoint(
 ): Promise<CourseExercisePointsResponse | null> {
   const res = await fetch(
     `/api/teacher/courses/${courseId}/course-exercises/${courseExecisesId}/points?type=${encodeURIComponent(type)}`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    }
+  );
+  return jsonOrNull(res);
+}
+
+export async function upsertTeacherCourseExercisePointsBulk(
+  courseId: string,
+  type: string,
+  courseExecisesId: string,
+  body: CourseExercisePointBulkUpsertRequest
+): Promise<CourseExercisePointsResponse | null> {
+  const res = await fetch(
+    `/api/teacher/courses/${courseId}/course-exercises/${courseExecisesId}/points/bulk?type=${encodeURIComponent(type)}`,
     {
       method: "POST",
       credentials: "include",
