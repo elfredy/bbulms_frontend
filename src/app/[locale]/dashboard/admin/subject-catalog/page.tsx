@@ -124,6 +124,12 @@ export default async function SubjectCatalogPage({ params, searchParams }: Props
                         editHref={`/${locale}/dashboard/admin/subject-catalog/${row.id}`}
                         deleteUrl={`/api/admin/subject-catalog/${row.id}`}
                         deleteConfirm="Fənni kataloqdan çıxarmaq istəyirsiniz?"
+                        moreLinks={[
+                          {
+                            href: `/${locale}/dashboard/admin/subject-catalog/${row.id}/topics`,
+                            label: "Mövzu əlavə et",
+                          },
+                        ]}
                       />
                     </td>
                   </tr>

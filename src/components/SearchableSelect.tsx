@@ -47,9 +47,13 @@ export function SearchableSelect({
   const selected = options.find((o) => o.id === value);
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = query.trim().toLocaleLowerCase("az");
     if (!q) return options;
-    return options.filter((o) => o.label.toLowerCase().includes(q) || o.id.toLowerCase().includes(q));
+    return options.filter((o) => {
+      const label = o.label.toLocaleLowerCase("az");
+      const id = o.id.toLocaleLowerCase("az");
+      return label.includes(q) || id.includes(q);
+    });
   }, [options, query]);
 
   useEffect(() => {

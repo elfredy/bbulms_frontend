@@ -15,6 +15,17 @@
     "networkError": "Could not reach the server. Is the backend running?",
     "backHome": "Back to home"
   },
+  "changePassword": {
+    "title": "Change password",
+    "hint": "An admin reset your password to your FIN. Choose a new password of at least 8 characters that is not your FIN. Your username stays as the FIN.",
+    "password": "New password",
+    "confirm": "Confirm password",
+    "submit": "Save",
+    "submitting": "Saving…",
+    "mismatch": "Passwords do not match",
+    "error": "Could not save the password",
+    "networkError": "Could not reach the server"
+  },
   "dashboard": {
     "title": "Dashboard",
     "welcome": "Hello, {displayName}.",

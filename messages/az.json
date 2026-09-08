@@ -15,6 +15,17 @@
     "networkError": "Serverə qoşulmaq mümkün olmadı. Backend işləyir?",
     "backHome": "Ana səhifəyə qayıt"
   },
+  "changePassword": {
+    "title": "Şifrəni dəyiş",
+    "hint": "Admin şifrəni FİN-ə sıfırlayıb. Yeni şifrə ən azı 8 simvol olsun və FİN kodundan fərqlənsin. İstifadəçi adı FİN olaraq qalır.",
+    "password": "Yeni şifrə",
+    "confirm": "Şifrəni təkrar yazın",
+    "submit": "Yadda saxla",
+    "submitting": "Yadda saxlanılır…",
+    "mismatch": "Şifrələr eyni deyil",
+    "error": "Şifrə yadda saxlanılmadı",
+    "networkError": "Serverə qoşulmaq mümkün olmadı"
+  },
   "dashboard": {
     "title": "Şəxsi kabinet",
     "welcome": "Salam, {displayName}.",

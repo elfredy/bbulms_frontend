@@ -21,12 +21,14 @@ export function AdminRowMenu({
   deleteConfirm,
   extraHref,
   extraLabel,
+  moreLinks,
 }: {
   editHref?: string;
   deleteUrl?: string;
   deleteConfirm?: string;
   extraHref?: string;
   extraLabel?: string;
+  moreLinks?: { href: string; label: string }[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -120,6 +122,21 @@ export function AdminRowMenu({
               Sil
             </button>
           ) : null}
+          {(moreLinks ?? []).map((link) => (
+            <button
+              key={`${link.href}:${link.label}`}
+              type="button"
+              className={styles.item}
+              role="menuitem"
+              disabled={busy}
+              onClick={() => {
+                setOpen(false);
+                router.push(link.href);
+              }}
+            >
+              {link.label}
+            </button>
+          ))}
         </div>
       ) : null}
     </div>

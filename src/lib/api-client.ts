@@ -1,4 +1,5 @@
 import type {
+  CatalogTopicItem,
   CourseExerciseAllPointsResponse,
   CourseExerciseCreateRequest,
   CourseExerciseItem,
@@ -13,6 +14,8 @@ import type {
   JournalResultResponse,
   JournalUpsertRequest,
   JournalPointUpsertRequest,
+  LessonFileItem,
+  LessonMeetingItem,
 } from "./api";
 
 async function jsonOrNull<T>(res: Response): Promise<T | null> {
@@ -207,6 +210,102 @@ export async function confirmTeacherCourseExercise(
     }
   );
   return jsonOrNull(res);
+}
+
+export async function getTeacherCourseLessons(courseId: string): Promise<{ course_id: string; meetings: LessonMeetingItem[] } | null> {
+  const res = await fetch(`/api/teacher/courses/${encodeURIComponent(courseId)}/lessons`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  return jsonOrNull(res);
+}
+
+export async function getTeacherCatalogTopics(
+  courseId: string,
+  lessonTypeId?: string | null,
+  q?: string | null,
+): Promise<{ course_id: string; items: CatalogTopicItem[] } | null> {
+  const params = new URLSearchParams();
+  if (lessonTypeId) params.set("lesson_type_id", lessonTypeId);
+  if (q && q.trim()) params.set("q", q.trim());
+  const qs = params.toString() ? `?${params.toString()}` : "";
+  const res = await fetch(`/api/teacher/courses/${encodeURIComponent(courseId)}/catalog-topics${qs}`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  return jsonOrNull(res);
+}
+
+export async function assignTeacherLessonTopic(
+  courseId: string,
+  meetingId: string,
+  subjectTopicId: string,
+): Promise<{ ok: true; topic_name: string | null } | { ok: false; error: string }> {
+  const res = await fetch(
+    `/api/teacher/courses/${encodeURIComponent(courseId)}/meetings/${encodeURIComponent(meetingId)}/topic`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ subject_topic_id: subjectTopicId }),
+    },
+  );
+  if (!res.ok) return { ok: false, error: (await readErrorDetail(res)) || "Mövzu əlavə olunmadı" };
+  const data = (await res.json()) as { topic_name?: string | null };
+  return { ok: true, topic_name: data.topic_name ?? null };
+}
+
+export async function removeTeacherLessonTopic(
+  courseId: string,
+  meetingId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const res = await fetch(
+    `/api/teacher/courses/${encodeURIComponent(courseId)}/meetings/${encodeURIComponent(meetingId)}/topic`,
+    { method: "DELETE", credentials: "include" },
+  );
+  if (!res.ok) return { ok: false, error: (await readErrorDetail(res)) || "Mövzu silinmədi" };
+  return { ok: true };
+}
+
+export async function getTeacherLessonFiles(
+  courseId: string,
+  meetingId?: string | null,
+): Promise<{ course_id: string; items: LessonFileItem[] } | null> {
+  const qs = meetingId ? `?course_meeting_id=${encodeURIComponent(meetingId)}` : "";
+  const res = await fetch(`/api/teacher/courses/${encodeURIComponent(courseId)}/files${qs}`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  return jsonOrNull(res);
+}
+
+export async function uploadTeacherLessonPdf(
+  courseId: string,
+  meetingId: string,
+  file: File,
+  name?: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const fd = new FormData();
+  fd.append("file", file);
+  if (name && name.trim()) fd.append("name", name.trim());
+  const res = await fetch(
+    `/api/teacher/courses/${encodeURIComponent(courseId)}/meetings/${encodeURIComponent(meetingId)}/files`,
+    { method: "POST", credentials: "include", body: fd },
+  );
+  if (!res.ok) return { ok: false, error: (await readErrorDetail(res)) || "PDF yüklənmədi" };
+  return { ok: true };
+}
+
+export async function deleteTeacherLessonFile(
+  courseId: string,
+  fileRowId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const res = await fetch(
+    `/api/teacher/courses/${encodeURIComponent(courseId)}/files/${encodeURIComponent(fileRowId)}`,
+    { method: "DELETE", credentials: "include" },
+  );
+  if (!res.ok) return { ok: false, error: (await readErrorDetail(res)) || "Fayl silinmədi" };
+  return { ok: true };
 }
 
 export type TimetableLookups = {

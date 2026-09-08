@@ -171,6 +171,57 @@
   font: inherit;
 }
 
+.buttonPrimary {
+  composes: button;
+  border-color: #12b76a;
+  background: #12b76a;
+  color: #fff;
+  font-weight: 800;
+}
+
+.buttonPrimary:hover:not(:disabled) {
+  background: #099455;
+  border-color: #099455;
+}
+
+.buttonDanger {
+  composes: button;
+  border-color: #fda29b;
+  background: #fef3f2;
+  color: #b42318;
+  font-weight: 700;
+}
+
+.buttonDanger:hover:not(:disabled) {
+  background: #fee4e2;
+}
+
+.button:disabled,
+.buttonPrimary:disabled,
+.buttonDanger:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.inputInvalid {
+  border-color: #f04438 !important;
+  box-shadow: 0 0 0 3px rgba(240, 68, 56, 0.12);
+}
+
+.emptyState {
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  padding: 48px 16px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.emptyState p {
+  margin: 0;
+  font-size: 0.92rem;
+}
+
 .tableCard {
   margin-top: 12px;
   overflow: auto;

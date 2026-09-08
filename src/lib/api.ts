@@ -17,6 +17,7 @@ export type UserProfile = {
   faculty_name_az?: string | null;
   is_department_user?: boolean;
   is_superadmin?: boolean;
+  must_change_password?: boolean;
 };
 
 export type AdminGroupItem = {
@@ -344,6 +345,30 @@ export type StudentCoursesResponse = {
   practice: StudentCourseItem[];
 };
 
+export type StudentScheduleSlot = {
+  course_id: string;
+  course_meeting_id: string | null;
+  subject_name_az: string | null;
+  teacher_fullname: string | null;
+  lesson_type_az: string | null;
+  room_name: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  clock_id: string | null;
+  week_day: number;
+  week_type: number | null;
+  meeting_date: string | null;
+};
+
+export type StudentScheduleResponse = {
+  current_education_year_id: number | null;
+  current_education_year_name: string | null;
+  clocks: { id: string; start_time: string | null; end_time: string | null }[];
+  days: { week_day: number; label: string }[];
+  weekly: StudentScheduleSlot[];
+  upcoming: StudentScheduleSlot[];
+};
+
 export type CourseMeetingItem = {
   course_meeting_id: string;
   meeting_date: string | null;
@@ -362,6 +387,37 @@ export type CourseMeetingListResponse = {
   course_teacher_id: string;
   lesson_type_id: string | null;
   meetings: CourseMeetingItem[];
+};
+
+export type CatalogTopicItem = {
+  subject_topic_id: string;
+  topic: string | null;
+  lesson_type_id: string | null;
+  lesson_type_az: string | null;
+};
+
+export type LessonMeetingItem = CourseMeetingItem & {
+  course_meeting_topic_id: string | null;
+  subject_topic_id: string | null;
+  topic_name: string | null;
+  file_count: number;
+};
+
+export type LessonFileItem = {
+  file_row_id: string;
+  course_meeting_topic_id: string;
+  course_meeting_id: string;
+  file_id: string | null;
+  name: string | null;
+  author_name: string | null;
+  description: string | null;
+  url: string | null;
+  file_type: string | null;
+  create_date: string | null;
+  meeting_date: string | null;
+  topic_name: string | null;
+  lesson_type_az: string | null;
+  file_size: number | null;
 };
 
 export type StudentRosterItem = {
@@ -558,6 +614,23 @@ export async function getStudentCourses(): Promise<StudentCoursesResponse | null
     return null;
   }
   if (!res.ok) {
+    return null;
+  }
+  return res.json();
+}
+
+export async function getStudentSchedule(): Promise<StudentScheduleResponse | null> {
+  const cookieStore = await cookies();
+  const header = cookieStore.toString();
+  if (!header) {
+    return null;
+  }
+  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const res = await fetch(`${origin}/api/student/schedule`, {
+    headers: { cookie: header },
+    cache: "no-store",
+  });
+  if (res.status === 403 || !res.ok) {
     return null;
   }
   return res.json();

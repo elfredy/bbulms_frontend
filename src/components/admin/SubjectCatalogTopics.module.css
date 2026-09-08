@@ -1,0 +1,78 @@
+.addCard {
+  padding: 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 2px 8px rgba(26, 29, 38, 0.06);
+  display: grid;
+  gap: 12px;
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(240px, 1.4fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filterRow {
+  margin-top: 14px;
+  max-width: 360px;
+}
+
+.pagerBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+  font-weight: 650;
+  font-size: 0.84rem;
+  cursor: pointer;
+}
+
+.pagerBtnActive {
+  composes: pagerBtn;
+  background: rgba(11, 92, 171, 0.1);
+  border-color: rgba(11, 92, 171, 0.28);
+  color: var(--accent);
+}
+
+.rowBtn {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: #b42318;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.rowBtn:hover:not(:disabled) {
+  background: #fef3f2;
+}
+
+.rowBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+@media (max-width: 700px) {
+  .fields {
+    grid-template-columns: 1fr;
+  }
+}

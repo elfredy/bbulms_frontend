@@ -1,0 +1,280 @@
+.wrap {
+  padding: 1rem 1.15rem 1.25rem;
+  display: grid;
+  gap: 12px;
+}
+
+.hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.err {
+  margin: 0;
+  padding: 0.7rem 0.85rem;
+  border-radius: 10px;
+  color: #7a0a1a;
+  background: rgba(180, 18, 45, 0.06);
+  border: 1px solid rgba(180, 18, 45, 0.18);
+  font-size: 0.88rem;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.badge {
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  color: #0b5cab;
+  background: rgba(11, 92, 171, 0.12);
+  flex-shrink: 0;
+}
+
+.body {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.topic {
+  margin: 0;
+  font-weight: 700;
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.topicEmpty {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.meta {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.btn {
+  padding: 0.45rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid rgba(11, 92, 171, 0.22);
+  background: rgba(11, 92, 171, 0.08);
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.btn:hover {
+  background: rgba(11, 92, 171, 0.14);
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btnGhost {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.btnDanger {
+  border-color: rgba(244, 63, 94, 0.22);
+  background: rgba(244, 63, 94, 0.08);
+  color: rgba(136, 19, 55, 1);
+}
+
+.hiddenInput {
+  display: none;
+}
+
+.uploadBox {
+  display: grid;
+  gap: 10px;
+  padding: 0.95rem 1rem;
+  border: 1px dashed rgba(11, 92, 171, 0.28);
+  border-radius: 12px;
+  background: rgba(11, 92, 171, 0.04);
+}
+
+.uploadRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.label {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.select,
+.input {
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  font-family: inherit;
+}
+
+.fileTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.fileTable th,
+.fileTable td {
+  text-align: left;
+  padding: 0.65rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.86rem;
+  vertical-align: top;
+}
+
+.fileTable th {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.fileLink {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.fileLink:hover {
+  text-decoration: underline;
+}
+
+.empty {
+  margin: 0;
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--muted);
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+
+.modal {
+  width: min(520px, 100%);
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.22);
+  display: grid;
+  gap: 0;
+  overflow: hidden;
+}
+
+.modalHead {
+  padding: 1rem 1.1rem 0.7rem;
+  display: grid;
+  gap: 4px;
+}
+
+.modalTitle {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.modalSearch {
+  margin: 0 1.1rem 0.6rem;
+}
+
+.topicList {
+  max-height: 280px;
+  overflow: auto;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.topicOption {
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 0.7rem 1.1rem;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.topicOption:hover {
+  background: rgba(11, 92, 171, 0.06);
+}
+
+.topicOptionActive {
+  background: rgba(11, 92, 171, 0.12);
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.modalFoot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 0.85rem 1.1rem;
+}
+
+@media (max-width: 720px) {
+  .row {
+    grid-template-columns: auto 1fr;
+  }
+
+  .actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+
+  .uploadRow {
+    grid-template-columns: 1fr;
+  }
+}

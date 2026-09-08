@@ -76,6 +76,39 @@ export async function adminGetSubjectCatalog(id: string) {
   return adminGet<any>(`/api/admin/subject-catalog/${encodeURIComponent(id)}`);
 }
 
+export type SubjectCatalogTopic = {
+  id: string;
+  subject_catalog_id: string;
+  lesson_type_id: string | null;
+  lesson_type_az: string | null;
+  topic: string | null;
+};
+
+export type SubjectCatalogTopicsData = {
+  catalog: {
+    id: string;
+    subject_name_az?: string | null;
+    department_name_az?: string | null;
+    department_id?: string | null;
+  };
+  lesson_types: DictItem[];
+  items: SubjectCatalogTopic[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
+export async function adminListSubjectCatalogTopics(
+  catalogId: string,
+  opts?: { lesson_type_id?: string | null; limit?: number; offset?: number },
+) {
+  const params = new URLSearchParams();
+  if (opts?.lesson_type_id) params.set("lesson_type_id", opts.lesson_type_id);
+  params.set("limit", String(opts?.limit ?? 25));
+  params.set("offset", String(opts?.offset ?? 0));
+  return adminGet<SubjectCatalogTopicsData>(`/api/admin/subject-catalog/${encodeURIComponent(catalogId)}/topics?${params}`);
+}
+
 export function pageList(current: number, last: number) {
   const pages = new Set<number>([1, last, current, current - 1, current + 1]);
   return [...pages].filter((p) => p >= 1 && p <= last).sort((a, b) => a - b);
@@ -127,4 +160,56 @@ export async function adminListEvaluationTypes(q?: string | null) {
 
 export async function adminGetEvaluationType(id: string) {
   return adminGet<any>(`/api/admin/evaluation-types/${encodeURIComponent(id)}`);
+}
+
+export type UserRoleListItem = {
+  person_id: string;
+  fullname: string | null;
+  pincode: string | null;
+  username: string | null;
+  user_type: string | null;
+  user_type_label: string;
+  department_name_az: string | null;
+  has_student: boolean;
+  has_teacher: boolean;
+};
+
+export type UserRoleDetail = {
+  person_id: string;
+  fullname: string | null;
+  firstname?: string | null;
+  lastname?: string | null;
+  patronymic?: string | null;
+  pincode: string | null;
+  gender_name_az?: string | null;
+  account_id: string | null;
+  username: string | null;
+  user_id: string | null;
+  user_type: string | null;
+  user_type_label: string;
+  is_blocked?: number;
+  department_id: string | null;
+  department_name_az: string | null;
+  faculty_name_az: string | null;
+  student_id: string | null;
+  teacher_id: string | null;
+  staff_type_id?: string | null;
+  position_id?: string | null;
+  contract_type_id?: string | null;
+  in_action_id?: string | null;
+  has_login: boolean;
+  must_change_password?: boolean;
+  notes: string[];
+};
+
+export async function adminSearchUserRoles(opts?: { q?: string | null; limit?: number; offset?: number }) {
+  const params = new URLSearchParams();
+  if (opts?.q?.trim()) params.set("q", opts.q.trim());
+  params.set("limit", String(opts?.limit ?? 25));
+  params.set("offset", String(opts?.offset ?? 0));
+  return adminGet<{ items: UserRoleListItem[]; total: number; limit: number; offset: number }>(`/api/admin/user-roles?${params}`);
+}
+
+export async function adminGetUserRole(personId: string) {
+  return adminGet<UserRoleDetail>(`/api/admin/user-roles/${encodeURIComponent(personId)}`);
 }

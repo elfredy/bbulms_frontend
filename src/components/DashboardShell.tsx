@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 import { LocaleSwitcher } from "@/components/LocaleSwitcher";
 import { LogoutButton } from "@/components/LogoutButton";
@@ -22,6 +22,7 @@ export type DashboardMe = {
   username?: string | null;
   user_type?: string | null;
   is_superadmin?: boolean | null;
+  must_change_password?: boolean | null;
 };
 
 type Props = {
@@ -43,6 +44,14 @@ function isActive(pathname: string, href: string) {
 
 export function DashboardShell({ me, items, children }: Props) {
   const pathname = usePathname();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!me.must_change_password || !pathname) return;
+    if (pathname.includes("/change-password")) return;
+    const locale = pathname.split("/").filter(Boolean)[0] || "az";
+    router.replace(`/${locale}/dashboard/change-password`);
+  }, [me.must_change_password, pathname, router]);
 
   const grouped = items.reduce<Record<string, DashboardNavItem[]>>((acc, item) => {
     const key = item.section ?? "";

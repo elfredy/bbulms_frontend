@@ -1,0 +1,146 @@
+.wrap {
+  display: grid;
+  gap: 16px;
+}
+
+.filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filter {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--muted);
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.filterActive {
+  border-color: rgba(11, 92, 171, 0.35);
+  background: rgba(11, 92, 171, 0.1);
+  color: var(--accent);
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.84rem;
+  color: var(--muted);
+}
+
+.tableWrap {
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card);
+}
+
+.table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  border: 1px solid var(--border);
+  vertical-align: top;
+  padding: 8px;
+}
+
+.table thead th {
+  background: #f8fafc;
+  font-size: 0.82rem;
+  font-weight: 750;
+  text-align: left;
+  color: var(--text);
+}
+
+.thTime {
+  width: 88px;
+  white-space: nowrap;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--muted);
+  background: #f8fafc;
+}
+
+.cellStack {
+  display: grid;
+  gap: 8px;
+}
+
+.slot {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(11, 92, 171, 0.06);
+  border: 1px solid rgba(11, 92, 171, 0.12);
+}
+
+.slotTitle {
+  margin: 0;
+  font-size: 0.84rem;
+  font-weight: 750;
+  line-height: 1.35;
+  color: var(--text);
+}
+
+.slotMeta {
+  margin: 4px 0 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.badge {
+  display: inline-flex;
+  margin-top: 6px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: var(--accent);
+  background: #fff;
+  border: 1px solid rgba(11, 92, 171, 0.2);
+}
+
+.empty {
+  margin: 0;
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.92rem;
+  background: var(--card);
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+}
+
+.upcoming {
+  display: grid;
+  gap: 10px;
+}
+
+.upcomingTitle {
+  margin: 8px 0 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.upcomingList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.upcomingItem {
+  padding: 12px 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}

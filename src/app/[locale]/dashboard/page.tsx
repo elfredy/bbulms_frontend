@@ -1,4 +1,5 @@
 import { getTranslations } from "next-intl/server";
+import { redirect } from "next/navigation";
 
 import { StudentDashboardTabs } from "@/components/StudentDashboardTabs";
 import { TeacherDashboardTabs } from "@/components/TeacherDashboardTabs";
@@ -14,6 +15,7 @@ export default async function DashboardPage({ params }: Props) {
 
   const user = await getMe();
   if (!user) return null;
+  if (user.must_change_password) redirect(`/${locale}/dashboard/change-password`);
 
   const isTeacher = user.teacher_id != null;
   const isStudent = user.user_type === "STUDENT" && user.student_id != null;
@@ -121,6 +123,11 @@ export default async function DashboardPage({ params }: Props) {
           {isSuperadmin ? <p className={styles.meta}>Superadmin: aktiv</p> : null}
         </div>
         <div className={styles.headerActions}>
+          {isStudent ? (
+            <a className={styles.actionLinkPrimary} href={`/${locale}/dashboard/schedule`}>
+              Dərs cədvəli
+            </a>
+          ) : null}
           {isDepartmentUser ? (
             <a className={styles.actionLink} href={`/${locale}/dashboard/department`}>
               Kafedra paneli

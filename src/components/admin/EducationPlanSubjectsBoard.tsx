@@ -37,14 +37,14 @@ export function EducationPlanSubjectsBoard({
   const base = `/${locale}/dashboard/admin/education-plans/${planId}`;
 
   const filtered = useMemo(() => {
-    const needle = q.trim().toLowerCase();
+    const needle = q.trim().toLocaleLowerCase("az");
     return subjects.filter((s) => {
       if (semesterId && String(s.semester_id ?? "") !== semesterId) return false;
       if (!needle) return true;
       const blob = [s.subject_name_az, s.code, s.subject_block_name_az, s.semester_name_az]
         .filter(Boolean)
         .join(" ")
-        .toLowerCase();
+        .toLocaleLowerCase("az");
       return blob.includes(needle);
     });
   }, [subjects, q, semesterId]);

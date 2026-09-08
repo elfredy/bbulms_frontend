@@ -93,6 +93,12 @@ function CourseRows({
             <Link href={`/${locale}/dashboard/journal/${ctPrimary}?ct_ids=${encodeURIComponent(ctIds)}`} className={styles.linkButton}>
               E-jurnal
             </Link>
+            <Link href={`/${locale}/dashboard/journal/${ctPrimary}?ct_ids=${encodeURIComponent(ctIds)}&tab=lessons`} className={styles.linkButton}>
+              Dərslər
+            </Link>
+            <Link href={`/${locale}/dashboard/journal/${ctPrimary}?ct_ids=${encodeURIComponent(ctIds)}&tab=files`} className={styles.linkButton}>
+              Fayllar
+            </Link>
           </div>
         </li>
       )})}

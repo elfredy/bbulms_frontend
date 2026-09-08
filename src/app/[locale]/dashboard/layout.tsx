@@ -18,8 +18,14 @@ export default async function DashboardLayout({ children, params }: Props) {
     redirect(`/${locale}/login`);
   }
 
-  const items = [
+  const forcePassword = Boolean(me.must_change_password);
+  const items = forcePassword
+    ? [{ href: `/${locale}/dashboard/change-password`, label: "Şifrəni dəyiş" }]
+    : [
     { href: `/${locale}/dashboard`, label: "Şəxsi kabinet" },
+    ...(me.user_type === "STUDENT" && me.student_id
+      ? [{ href: `/${locale}/dashboard/schedule`, label: "Dərs cədvəli", section: "Tələbə" }]
+      : []),
     ...(me.is_superadmin
       ? [
           { href: `/${locale}/dashboard/admin/edu-years`, label: "Tədris illərinin qrafiki", section: "Planlama" },
@@ -28,6 +34,7 @@ export default async function DashboardLayout({ children, params }: Props) {
           { href: `/${locale}/dashboard/admin/orders`, label: "Tələbə əmrləri", section: "Müəssisə idarəsi" },
           { href: `/${locale}/dashboard/admin/students`, label: "Tələbələr", section: "Müəssisə idarəsi" },
           { href: `/${locale}/dashboard/admin/teachers`, label: "Pedaqoji heyət", section: "Müəssisə idarəsi" },
+          { href: `/${locale}/dashboard/admin/user-roles`, label: "İstifadəçi rolları", section: "Müəssisə idarəsi" },
           { href: `/${locale}/dashboard/admin/groups`, label: "Tələbə qrupları", section: "Müəssisə idarəsi" },
           { href: `/${locale}/dashboard/admin/subject-catalog`, label: "Kafedralar üzrə fənn kataloqu", section: "Təhsil proqramları" },
           { href: `/${locale}/dashboard/admin/subject-blocks`, label: "Fənn blokları", section: "Təhsil proqramları" },
@@ -48,6 +55,7 @@ export default async function DashboardLayout({ children, params }: Props) {
         username: me.username,
         user_type: me.user_type,
         is_superadmin: me.is_superadmin,
+        must_change_password: me.must_change_password,
       }}
       items={items}
     >

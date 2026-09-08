@@ -5,9 +5,11 @@ import { JournalClient } from "./ui";
 
 import { getMe, getTeacherCourseEvaluations, getTeacherCourseMeetings, getTeacherCourseRoster } from "@/lib/api";
 
+const JOURNAL_TABS = new Set(["summary", "lessons", "files", "attendance", "exam", "referat", "colloquium"]);
+
 type Props = {
   params: Promise<{ locale: string; courseTeacherId: string }>;
-  searchParams?: Promise<{ ct_ids?: string }>;
+  searchParams?: Promise<{ ct_ids?: string; tab?: string }>;
 };
 
 export default async function JournalPage({ params, searchParams }: Props) {
@@ -28,6 +30,8 @@ export default async function JournalPage({ params, searchParams }: Props) {
   }
 
   const sp = (await searchParams) ?? {};
+  const tabRaw = String(sp.tab ?? "").trim();
+  const initialTab = JOURNAL_TABS.has(tabRaw) ? (tabRaw as "summary" | "lessons" | "files" | "attendance" | "exam" | "referat" | "colloquium") : undefined;
   const ctIdsRaw = String(sp.ct_ids ?? "").trim();
   const ctIds = Array.from(
     new Set(
@@ -74,6 +78,7 @@ export default async function JournalPage({ params, searchParams }: Props) {
       meetings={meetings}
       roster={roster.students}
       evaluations={evals.evaluations}
+      initialTab={initialTab}
     />
   );
 }

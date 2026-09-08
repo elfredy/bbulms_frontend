@@ -38,6 +38,7 @@ export function SubjectGroupRowMenu({
   const [busy, setBusy] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [teachers, setTeachers] = useState<Opt[]>([]);
+  const [teacherQuery, setTeacherQuery] = useState("");
   const [lessonTypes, setLessonTypes] = useState<Opt[]>([]);
   const [teacherId, setTeacherId] = useState("");
   const [lessonTypeId, setLessonTypeId] = useState("");
@@ -73,6 +74,7 @@ export function SubjectGroupRowMenu({
     const params = new URLSearchParams({ limit: "200" });
     if (organizationId) params.set("organization_id", organizationId);
     if (educationPlanSubjectId) params.set("education_plan_subject_id", educationPlanSubjectId);
+    if (teacherQuery.trim().length >= 2) params.set("q", teacherQuery.trim());
     fetch(`/api/admin/education-plans/lookups/teachers?${params}`, { credentials: "include", cache: "no-store" })
       .then((r) => (r.ok ? r.json() : { items: [] }))
       .then((d) => {
@@ -81,6 +83,14 @@ export function SubjectGroupRowMenu({
       .catch(() => {
         if (!cancelled) setTeachers([]);
       });
+    return () => {
+      cancelled = true;
+    };
+  }, [addOpen, organizationId, educationPlanSubjectId, teacherQuery]);
+
+  useEffect(() => {
+    if (!addOpen) return;
+    let cancelled = false;
     fetch("/api/admin/subject-groups/lookups", { credentials: "include", cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
@@ -95,7 +105,7 @@ export function SubjectGroupRowMenu({
     return () => {
       cancelled = true;
     };
-  }, [addOpen, organizationId, educationPlanSubjectId]);
+  }, [addOpen]);
 
   async function onDelete() {
     if (!window.confirm("Fənn qrupunu silmək istəyirsiniz?")) return;
@@ -234,6 +244,7 @@ export function SubjectGroupRowMenu({
                 onChange={setTeacherId}
                 placeholder="— seç —"
                 searchPlaceholder="Axtar…"
+                onQueryChange={setTeacherQuery}
                 options={teachers.map((t) => ({
                   id: t.id,
                   label: teacherSearchLabel(t),

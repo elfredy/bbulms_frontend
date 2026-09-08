@@ -1,5 +1,7 @@
 .wrap {
   position: relative;
+  width: 100%;
+  min-width: 0;
 }
 
 .trigger {
@@ -25,6 +27,8 @@
 }
 
 .value {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

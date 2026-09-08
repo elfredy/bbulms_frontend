@@ -19,8 +19,9 @@ import {
   upsertTeacherJournalCellsBulk,
   upsertTeacherJournalPoint,
 } from "@/lib/api-client";
+import { TeacherCourseLessons } from "@/components/TeacherCourseLessons";
 
-type TabId = "summary" | "attendance" | "exam" | "referat" | "colloquium";
+type TabId = "summary" | "lessons" | "files" | "attendance" | "exam" | "referat" | "colloquium";
 
 const STATUS_CONFIRMED = "110000058";
 
@@ -30,6 +31,8 @@ function isConfirmedStatus(v: string | null | undefined): boolean {
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "summary", label: "Ümumi" },
+  { id: "lessons", label: "Dərslər" },
+  { id: "files", label: "Fayllar" },
   { id: "attendance", label: "Aktivlik/Davamiyyət" },
   { id: "exam", label: "İmtahan" },
   { id: "referat", label: "Referat" },
@@ -260,6 +263,7 @@ export function JournalClient({
   meetings,
   roster,
   evaluations,
+  initialTab,
 }: {
   locale: string;
   courseTeacherId: string;
@@ -268,6 +272,7 @@ export function JournalClient({
   meetings: CourseMeetingItem[];
   roster: StudentRosterItem[];
   evaluations: CourseEvaluationItem[];
+  initialTab?: TabId;
 }) {
   const visibleMeetings = useMemo(() => {
     return [...meetings]
@@ -281,7 +286,7 @@ export function JournalClient({
 
   const meetingPairs = useMemo(() => buildMeetingPairs(visibleMeetings), [visibleMeetings]);
 
-  const [tab, setTab] = useState<TabId>("attendance");
+  const [tab, setTab] = useState<TabId>(initialTab ?? "attendance");
   const [meetingId, setMeetingId] = useState<string>("");
   const [cells, setCells] = useState<Record<string, JournalCell>>({});
   const [pointCells, setPointCells] = useState<Record<string, JournalCell>>({});
@@ -903,6 +908,7 @@ export function JournalClient({
         </a>
       </div>
 
+      {tab !== "lessons" && tab !== "files" && tab !== "summary" ? (
       <div className={styles.controls}>
         <div className={styles.field}>
           <div className={styles.label}>Dərs tipi</div>
@@ -931,6 +937,7 @@ export function JournalClient({
           </select>
         </div>
       </div>
+      ) : null}
 
       <div className={styles.tabsWrap}>
         <div className={styles.tabsList} role="tablist" aria-label="Jurnal bölmələri">
@@ -948,7 +955,9 @@ export function JournalClient({
       </div>
 
       <div className={styles.panel}>
-        {tab === "exam" ? (
+        {tab === "lessons" || tab === "files" ? (
+          <TeacherCourseLessons courseId={courseId} mode={tab} />
+        ) : tab === "exam" ? (
           <div className={styles.muted} style={{ marginBottom: 12 }}>
             Qeyd: İmtahan balı digər şöbə tərəfindən daxil edilir. Bu bölmədə dəyişiklik etmək mümkün deyil.
           </div>
@@ -1136,7 +1145,7 @@ export function JournalClient({
           </div>
         ) : null}
 
-        {tab === "summary" ? (
+        {tab === "lessons" || tab === "files" ? null : tab === "summary" ? (
           <div className={styles.tableWrap}>
             <table className={styles.table}>
               <thead>

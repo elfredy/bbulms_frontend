@@ -4,39 +4,39 @@ import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { readDetail } from "@/components/admin/form-shared";
+
 import styles from "./LoginForm.module.css";
 
-export function LoginForm() {
-  const t = useTranslations("login");
+export function ChangePasswordForm() {
+  const t = useTranslations("changePassword");
   const router = useRouter();
-  const activeLocale = useLocale();
-
-  const [username, setUsername] = useState("");
+  const locale = useLocale();
   const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (password !== confirm) {
+      setError(t("mismatch"));
+      return;
+    }
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/login", {
+      const res = await fetch("/api/auth/change-password", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ username, password }),
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ password, confirm_password: confirm }),
       });
       if (!res.ok) {
-        setError(t("error"));
+        setError(await readDetail(res, t("error")));
         return;
       }
-      const data = await res.json().catch(() => null);
-      if (data?.must_change_password) {
-        router.push(`/${activeLocale}/dashboard/change-password`);
-      } else {
-        router.push(`/${activeLocale}/dashboard`);
-      }
+      router.push(`/${locale}/dashboard`);
       router.refresh();
     } catch {
       setError(t("networkError"));
@@ -46,33 +46,36 @@ export function LoginForm() {
   }
 
   return (
-    <form className={styles.form} onSubmit={onSubmit} noValidate>
+    <form className={styles.form} onSubmit={onSubmit}>
       <div className={styles.field}>
-        <label className={styles.label} htmlFor="login-username">
-          {t("username")}
+        <label className={styles.label} htmlFor="new-password">
+          {t("password")}
         </label>
         <input
-          id="login-username"
-          name="username"
+          id="new-password"
+          name="password"
+          type="password"
           className={styles.input}
-          autoComplete="username"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
+          autoComplete="new-password"
+          minLength={8}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
           required
         />
       </div>
       <div className={styles.field}>
-        <label className={styles.label} htmlFor="login-password">
-          {t("password")}
+        <label className={styles.label} htmlFor="confirm-password">
+          {t("confirm")}
         </label>
         <input
-          id="login-password"
-          name="password"
+          id="confirm-password"
+          name="confirm_password"
           type="password"
           className={styles.input}
-          autoComplete="current-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          autoComplete="new-password"
+          minLength={8}
+          value={confirm}
+          onChange={(e) => setConfirm(e.target.value)}
           required
         />
       </div>
