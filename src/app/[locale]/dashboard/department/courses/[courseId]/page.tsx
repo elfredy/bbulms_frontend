@@ -4,6 +4,7 @@ import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 
 import { getDepartmentCourseFiles, getMe } from "@/lib/api";
+import { serverApiBase } from "@/lib/server-api-base";
 
 import styles from "../../../dashboard.module.css";
 
@@ -49,7 +50,7 @@ export default async function DepartmentCourseMaterialsPage({ params, searchPara
     const description = String(formData.get("description") ?? "").trim() || null;
     if (!name || !url) redirect(`/${locale}/dashboard/department/courses/${courseId}?err=form`);
 
-    const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+    const origin = serverApiBase();
     const res = await fetch(`${origin}/api/department/courses/${encodeURIComponent(courseId)}/files`, {
       method: "POST",
       headers: { cookie: header, "content-type": "application/json" },

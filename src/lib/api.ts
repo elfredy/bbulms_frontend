@@ -1,4 +1,7 @@
 import { cookies } from "next/headers";
+import { cache } from "react";
+
+import { serverApiBase } from "./server-api-base";
 
 export type UserProfile = {
   account_id: number;
@@ -316,6 +319,7 @@ export type TeacherCourseItem = {
   lesson_type_id: string | null;
   subject_name_az: string | null;
   education_year_name: string | null;
+  education_group_name?: string | null;
   lesson_type_az: string | null;
 };
 
@@ -561,14 +565,14 @@ export type CourseExerciseAllPointsResponse = {
   cells: CourseExercisePointCell[];
 };
 
-/** Server komponentlər üçün — brauzer çərəzini Next SSR-ə ötürür */
-export async function getMe(): Promise<UserProfile | null> {
+/** Server komponentlər üçün — layout+page eyni request-də bir dəfə FastAPI-yə gedir */
+export const getMe = cache(async (): Promise<UserProfile | null> => {
   const cookieStore = await cookies();
   const header = cookieStore.toString();
   if (!header) {
     return null;
   }
-  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const origin = serverApiBase();
   const res = await fetch(`${origin}/api/auth/me`, {
     headers: { cookie: header },
     cache: "no-store",
@@ -577,15 +581,15 @@ export async function getMe(): Promise<UserProfile | null> {
     return null;
   }
   return res.json();
-}
+});
 
-export async function getTeacherCourses(): Promise<TeacherCoursesResponse | null> {
+export const getTeacherCourses = cache(async (): Promise<TeacherCoursesResponse | null> => {
   const cookieStore = await cookies();
   const header = cookieStore.toString();
   if (!header) {
     return null;
   }
-  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const origin = serverApiBase();
   const res = await fetch(`${origin}/api/teacher/courses`, {
     headers: { cookie: header },
     cache: "no-store",
@@ -597,15 +601,15 @@ export async function getTeacherCourses(): Promise<TeacherCoursesResponse | null
     return null;
   }
   return res.json();
-}
+});
 
-export async function getStudentCourses(): Promise<StudentCoursesResponse | null> {
+export const getStudentCourses = cache(async (): Promise<StudentCoursesResponse | null> => {
   const cookieStore = await cookies();
   const header = cookieStore.toString();
   if (!header) {
     return null;
   }
-  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const origin = serverApiBase();
   const res = await fetch(`${origin}/api/student/courses`, {
     headers: { cookie: header },
     cache: "no-store",
@@ -617,15 +621,15 @@ export async function getStudentCourses(): Promise<StudentCoursesResponse | null
     return null;
   }
   return res.json();
-}
+});
 
-export async function getStudentSchedule(): Promise<StudentScheduleResponse | null> {
+export const getStudentSchedule = cache(async (): Promise<StudentScheduleResponse | null> => {
   const cookieStore = await cookies();
   const header = cookieStore.toString();
   if (!header) {
     return null;
   }
-  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const origin = serverApiBase();
   const res = await fetch(`${origin}/api/student/schedule`, {
     headers: { cookie: header },
     cache: "no-store",
@@ -634,7 +638,7 @@ export async function getStudentSchedule(): Promise<StudentScheduleResponse | nu
     return null;
   }
   return res.json();
-}
+});
 
 export async function getTeacherCourseMeetings(
   courseTeacherId: string,
@@ -643,7 +647,7 @@ export async function getTeacherCourseMeetings(
   const cookieStore = await cookies();
   const header = cookieStore.toString();
   if (!header) return null;
-  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const origin = serverApiBase();
   const qs = lessonTypeId != null ? `?lesson_type_id=${encodeURIComponent(String(lessonTypeId))}` : "";
   const res = await fetch(`${origin}/api/teacher/courses/${courseTeacherId}/meetings${qs}`, {
     headers: { cookie: header },
@@ -658,7 +662,7 @@ export async function adminListGroups(q?: string | null, limit = 50, offset = 0)
   const cookieStore = await cookies();
   const header = cookieStore.toString();
   if (!header) return null;
-  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const origin = serverApiBase();
   const params = new URLSearchParams();
   if (q != null && String(q).trim()) params.set("q", String(q).trim());
   params.set("limit", String(limit));
@@ -676,7 +680,7 @@ export async function adminGetGroupDetail(educationGroupId: string): Promise<Adm
   const cookieStore = await cookies();
   const header = cookieStore.toString();
   if (!header) return null;
-  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const origin = serverApiBase();
   const res = await fetch(`${origin}/api/admin/groups/${encodeURIComponent(String(educationGroupId))}`, {
     headers: { cookie: header },
     cache: "no-store",
@@ -690,7 +694,7 @@ export async function adminListTeachers(q?: string | null, limit = 50, offset = 
   const cookieStore = await cookies();
   const header = cookieStore.toString();
   if (!header) return null;
-  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const origin = serverApiBase();
   const params = new URLSearchParams();
   if (q != null && String(q).trim()) params.set("q", String(q).trim());
   params.set("limit", String(limit));
@@ -708,7 +712,7 @@ export async function adminGetTeacherDetail(teacherId: string): Promise<AdminTea
   const cookieStore = await cookies();
   const header = cookieStore.toString();
   if (!header) return null;
-  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const origin = serverApiBase();
   const res = await fetch(`${origin}/api/admin/teachers/${encodeURIComponent(String(teacherId))}`, {
     headers: { cookie: header },
     cache: "no-store",
@@ -722,7 +726,7 @@ export async function adminListDepartments(q?: string | null, limit = 50, offset
   const cookieStore = await cookies();
   const header = cookieStore.toString();
   if (!header) return null;
-  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const origin = serverApiBase();
   const params = new URLSearchParams();
   if (q != null && String(q).trim()) params.set("q", String(q).trim());
   params.set("limit", String(limit));
@@ -740,7 +744,7 @@ export async function adminGetDepartmentDetail(departmentId: string): Promise<Ad
   const cookieStore = await cookies();
   const header = cookieStore.toString();
   if (!header) return null;
-  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const origin = serverApiBase();
   const res = await fetch(`${origin}/api/admin/departments/${encodeURIComponent(String(departmentId))}`, {
     headers: { cookie: header },
     cache: "no-store",
@@ -754,7 +758,7 @@ export async function getDepartmentOverview(): Promise<DepartmentOverviewRespons
   const cookieStore = await cookies();
   const header = cookieStore.toString();
   if (!header) return null;
-  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const origin = serverApiBase();
   const res = await fetch(`${origin}/api/department/overview`, {
     headers: { cookie: header },
     cache: "no-store",
@@ -768,7 +772,7 @@ export async function getDepartmentTeachers(q?: string | null, limit = 100, offs
   const cookieStore = await cookies();
   const header = cookieStore.toString();
   if (!header) return null;
-  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const origin = serverApiBase();
   const params = new URLSearchParams();
   if (q != null && String(q).trim()) params.set("q", String(q).trim());
   params.set("limit", String(limit));
@@ -786,7 +790,7 @@ export async function getDepartmentCourses(q?: string | null, limit = 100, offse
   const cookieStore = await cookies();
   const header = cookieStore.toString();
   if (!header) return null;
-  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const origin = serverApiBase();
   const params = new URLSearchParams();
   if (q != null && String(q).trim()) params.set("q", String(q).trim());
   params.set("limit", String(limit));
@@ -804,7 +808,7 @@ export async function getDepartmentCourseFiles(courseId: string) {
   const cookieStore = await cookies();
   const header = cookieStore.toString();
   if (!header) return null;
-  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const origin = serverApiBase();
   const res = await fetch(`${origin}/api/department/courses/${encodeURIComponent(courseId)}/files`, {
     headers: { cookie: header },
     cache: "no-store",
@@ -826,7 +830,7 @@ export async function adminListEducationPlans(opts?: {
   const cookieStore = await cookies();
   const header = cookieStore.toString();
   if (!header) return null;
-  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const origin = serverApiBase();
   const params = new URLSearchParams();
   const q = opts?.q;
   if (q != null && String(q).trim()) params.set("q", String(q).trim());
@@ -857,7 +861,7 @@ export async function adminListSubjectGroups(opts?: {
   const cookieStore = await cookies();
   const header = cookieStore.toString();
   if (!header) return null;
-  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const origin = serverApiBase();
   const params = new URLSearchParams();
   if (opts?.q != null && String(opts.q).trim()) params.set("q", String(opts.q).trim());
   if (opts?.education_plan_id) params.set("education_plan_id", String(opts.education_plan_id));
@@ -879,7 +883,7 @@ export async function adminGetEducationPlan(planId: string): Promise<AdminEducat
   const cookieStore = await cookies();
   const header = cookieStore.toString();
   if (!header) return null;
-  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const origin = serverApiBase();
   const res = await fetch(`${origin}/api/admin/education-plans/${encodeURIComponent(String(planId))}`, {
     headers: { cookie: header },
     cache: "no-store",
@@ -893,7 +897,7 @@ export async function adminEducationPlanLookups(): Promise<AdminEducationPlanLoo
   const cookieStore = await cookies();
   const header = cookieStore.toString();
   if (!header) return null;
-  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const origin = serverApiBase();
   const res = await fetch(`${origin}/api/admin/education-plans/lookups`, {
     headers: { cookie: header },
     cache: "no-store",
@@ -913,7 +917,7 @@ export async function adminListCourses(
   const cookieStore = await cookies();
   const header = cookieStore.toString();
   if (!header) return null;
-  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const origin = serverApiBase();
   const params = new URLSearchParams();
   if (q != null && String(q).trim()) params.set("q", String(q).trim());
   if (educationGroupId != null && String(educationGroupId).trim()) params.set("education_group_id", String(educationGroupId).trim());
@@ -937,7 +941,7 @@ export async function adminListCourseMeetings(
   const cookieStore = await cookies();
   const header = cookieStore.toString();
   if (!header) return null;
-  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const origin = serverApiBase();
   const params = new URLSearchParams();
   if (fromDate != null && String(fromDate).trim()) params.set("from_date", String(fromDate).trim());
   if (toDate != null && String(toDate).trim()) params.set("to_date", String(toDate).trim());
@@ -958,7 +962,7 @@ export async function adminBulkCreateCourseMeetings(
   const cookieStore = await cookies();
   const header = cookieStore.toString();
   if (!header) return null;
-  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const origin = serverApiBase();
   const res = await fetch(`${origin}/api/admin/courses/${encodeURIComponent(String(courseId))}/meetings/bulk`, {
     method: "POST",
     headers: { cookie: header, "content-type": "application/json" },
@@ -973,7 +977,7 @@ export async function getTeacherCourseRoster(courseId: string): Promise<StudentR
   const cookieStore = await cookies();
   const header = cookieStore.toString();
   if (!header) return null;
-  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const origin = serverApiBase();
   const res = await fetch(`${origin}/api/teacher/courses/${courseId}/roster`, {
     headers: { cookie: header },
     cache: "no-store",
@@ -987,7 +991,7 @@ export async function getTeacherCourseEvaluations(courseId: string): Promise<Cou
   const cookieStore = await cookies();
   const header = cookieStore.toString();
   if (!header) return null;
-  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const origin = serverApiBase();
   const res = await fetch(`${origin}/api/teacher/courses/${courseId}/evaluations`, {
     headers: { cookie: header },
     cache: "no-store",
@@ -1001,7 +1005,7 @@ export async function getTeacherJournalGrid(courseId: string, meetingId: string)
   const cookieStore = await cookies();
   const header = cookieStore.toString();
   if (!header) return null;
-  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const origin = serverApiBase();
   const res = await fetch(`${origin}/api/teacher/courses/${courseId}/journal?course_meeting_id=${meetingId}`, {
     headers: { cookie: header },
     cache: "no-store",
@@ -1015,7 +1019,7 @@ export async function upsertTeacherJournalCell(courseId: string, body: JournalUp
   const cookieStore = await cookies();
   const header = cookieStore.toString();
   if (!header) return null;
-  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const origin = serverApiBase();
   const res = await fetch(`${origin}/api/teacher/courses/${courseId}/journal`, {
     method: "POST",
     headers: { cookie: header, "content-type": "application/json" },
@@ -1030,7 +1034,7 @@ export async function getTeacherJournalPointsGrid(courseId: string): Promise<Jou
   const cookieStore = await cookies();
   const header = cookieStore.toString();
   if (!header) return null;
-  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const origin = serverApiBase();
   const res = await fetch(`${origin}/api/teacher/courses/${courseId}/journal-points`, {
     headers: { cookie: header },
     cache: "no-store",
@@ -1047,7 +1051,7 @@ export async function upsertTeacherJournalPoint(
   const cookieStore = await cookies();
   const header = cookieStore.toString();
   if (!header) return null;
-  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const origin = serverApiBase();
   const res = await fetch(`${origin}/api/teacher/courses/${courseId}/journal-points`, {
     method: "POST",
     headers: { cookie: header, "content-type": "application/json" },
@@ -1062,7 +1066,7 @@ export async function getTeacherJournalResult(courseId: string): Promise<Journal
   const cookieStore = await cookies();
   const header = cookieStore.toString();
   if (!header) return null;
-  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const origin = serverApiBase();
   const res = await fetch(`${origin}/api/teacher/courses/${courseId}/journal-result`, {
     headers: { cookie: header },
     cache: "no-store",
@@ -1076,7 +1080,7 @@ export async function getTeacherJournalResultSimple(courseId: string): Promise<J
   const cookieStore = await cookies();
   const header = cookieStore.toString();
   if (!header) return null;
-  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const origin = serverApiBase();
   const res = await fetch(`${origin}/api/teacher/courses/${courseId}/journal-result-simple`, {
     headers: { cookie: header },
     cache: "no-store",
@@ -1090,7 +1094,7 @@ export async function getTeacherCourseExercises(courseId: string, type: string):
   const cookieStore = await cookies();
   const header = cookieStore.toString();
   if (!header) return null;
-  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const origin = serverApiBase();
   const res = await fetch(`${origin}/api/teacher/courses/${courseId}/course-exercises?type=${encodeURIComponent(type)}`, {
     headers: { cookie: header },
     cache: "no-store",
@@ -1104,7 +1108,7 @@ export async function createTeacherCourseExercise(courseId: string, body: Course
   const cookieStore = await cookies();
   const header = cookieStore.toString();
   if (!header) return null;
-  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const origin = serverApiBase();
   const res = await fetch(`${origin}/api/teacher/courses/${courseId}/course-exercises`, {
     method: "POST",
     headers: { cookie: header, "content-type": "application/json" },
@@ -1123,7 +1127,7 @@ export async function getTeacherCourseExercisePoints(
   const cookieStore = await cookies();
   const header = cookieStore.toString();
   if (!header) return null;
-  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const origin = serverApiBase();
   const res = await fetch(
     `${origin}/api/teacher/courses/${courseId}/course-exercises/${courseExecisesId}/points?type=${encodeURIComponent(type)}`,
     { headers: { cookie: header }, cache: "no-store" }
@@ -1142,7 +1146,7 @@ export async function upsertTeacherCourseExercisePoint(
   const cookieStore = await cookies();
   const header = cookieStore.toString();
   if (!header) return null;
-  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const origin = serverApiBase();
   const res = await fetch(
     `${origin}/api/teacher/courses/${courseId}/course-exercises/${courseExecisesId}/points?type=${encodeURIComponent(type)}`,
     {

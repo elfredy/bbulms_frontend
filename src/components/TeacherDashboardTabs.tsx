@@ -51,6 +51,7 @@ function CourseRows({
         course_code: string | null | undefined;
         subject_name_az: string | null | undefined;
         education_year_name: string | null | undefined;
+        education_group_name_set: Set<string>;
         lesson_type_az_set: Set<string>;
         course_teacher_ids: string[];
       }
@@ -63,9 +64,16 @@ function CourseRows({
         course_code: c.course_code,
         subject_name_az: c.subject_name_az,
         education_year_name: c.education_year_name,
+        education_group_name_set: new Set<string>(),
         lesson_type_az_set: new Set<string>(),
         course_teacher_ids: [],
       };
+      if (c.education_group_name) {
+        for (const part of String(c.education_group_name).split(",")) {
+          const name = part.trim();
+          if (name) cur.education_group_name_set.add(name);
+        }
+      }
       if (c.lesson_type_az) cur.lesson_type_az_set.add(String(c.lesson_type_az));
       cur.course_teacher_ids.push(String(c.course_teacher_id));
       m.set(key, cur);
@@ -79,6 +87,7 @@ function CourseRows({
         const ctPrimary = g.course_teacher_ids[0];
         const ctIds = g.course_teacher_ids.join(",");
         const lessonTypes = Array.from(g.lesson_type_az_set.values()).filter(Boolean).join(" · ");
+        const groupNames = Array.from(g.education_group_name_set.values()).filter(Boolean).join(", ");
         const code = (g.course_code ?? "").trim();
         return (
         <li key={ctIds} className={styles.courseCard}>
@@ -87,7 +96,7 @@ function CourseRows({
           </h3>
           {!g.subject_name_az?.trim() && code ? <div className={styles.courseCodePill}>{code}</div> : null}
           <p className={styles.courseMeta}>
-            {[g.education_year_name, lessonTypes].filter(Boolean).join(" · ") || "\u00a0"}
+            {[g.education_year_name, groupNames, lessonTypes].filter(Boolean).join(" · ") || "\u00a0"}
           </p>
           <div className={styles.courseActions}>
             <Link href={`/${locale}/dashboard/journal/${ctPrimary}?ct_ids=${encodeURIComponent(ctIds)}`} className={styles.linkButton}>

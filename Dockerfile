@@ -22,9 +22,9 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
-# Runtime rewrite target (same Docker network service name)
-ENV BACKEND_URL=http://api:8000
-# SSR self-calls inside container
+# Runtime rewrite + SSR target (Windows host API)
+ENV BACKEND_URL=http://host.docker.internal:8000
+# Fallback if BACKEND_URL is unset
 ENV NEXT_INTERNAL_ORIGIN=http://127.0.0.1:3000
 
 RUN mkdir -p ./public

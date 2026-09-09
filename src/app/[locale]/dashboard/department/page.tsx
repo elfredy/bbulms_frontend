@@ -4,6 +4,7 @@ import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 
 import { getDepartmentCourses, getDepartmentOverview, getDepartmentTeachers, getMe } from "@/lib/api";
+import { serverApiBase } from "@/lib/server-api-base";
 
 import styles from "../dashboard.module.css";
 
@@ -51,7 +52,7 @@ export default async function DepartmentDashboardPage({ params, searchParams }: 
     const teacherId = String(formData.get("teacher_id") ?? "").trim();
     if (!teacherId) redirect(`/${locale}/dashboard/department?err=teacher`);
 
-    const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+    const origin = serverApiBase();
     const res = await fetch(`${origin}/api/department/teachers/link`, {
       method: "POST",
       headers: { cookie: header, "content-type": "application/json" },

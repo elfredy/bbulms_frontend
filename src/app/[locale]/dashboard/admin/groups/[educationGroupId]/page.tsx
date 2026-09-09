@@ -4,6 +4,7 @@ import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 
 import { adminListCourses, adminListTeachers, adminGetGroupDetail, getMe } from "@/lib/api";
+import { serverApiBase } from "@/lib/server-api-base";
 
 import styles from "../../../dashboard.module.css";
 
@@ -73,7 +74,7 @@ export default async function AdminGroupDetailPage({ params, searchParams }: Pro
     const courseId = String(formData.get("course_id") ?? "").trim();
     if (!courseId) redirect(`/${locale}/dashboard/admin/groups/${educationGroupId}?err=course`);
 
-    const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+    const origin = serverApiBase();
     const res = await fetch(`${origin}/api/admin/courses/${encodeURIComponent(courseId)}/assign-group`, {
       method: "POST",
       headers: { cookie: header, "content-type": "application/json" },
@@ -96,7 +97,7 @@ export default async function AdminGroupDetailPage({ params, searchParams }: Pro
       redirect(`/${locale}/dashboard/admin/groups/${educationGroupId}?course_id=${encodeURIComponent(courseId)}&teacher_id=${encodeURIComponent(teacherId)}&err=assign_teacher_missing`);
     }
 
-    const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+    const origin = serverApiBase();
     const res = await fetch(`${origin}/api/admin/courses/${encodeURIComponent(courseId)}/assign-teacher`, {
       method: "POST",
       headers: { cookie: header, "content-type": "application/json" },
@@ -144,7 +145,7 @@ export default async function AdminGroupDetailPage({ params, searchParams }: Pro
 
     const skip_existing = formData.get("skip_existing") === "on";
 
-    const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+    const origin = serverApiBase();
     const res = await fetch(`${origin}/api/admin/courses/${encodeURIComponent(courseId)}/meetings/bulk`, {
       method: "POST",
       headers: { cookie: header, "content-type": "application/json" },

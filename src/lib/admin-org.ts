@@ -1,5 +1,7 @@
 import { cookies } from "next/headers";
 
+import { serverApiBase } from "./server-api-base";
+
 export type DictItem = { id: string; name_az?: string | null; code?: string | null; name?: string | null };
 
 export type InstitutionLookups = {
@@ -28,7 +30,7 @@ async function adminGet<T>(path: string): Promise<T | null> {
   const cookieStore = await cookies();
   const header = cookieStore.toString();
   if (!header) return null;
-  const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+  const origin = serverApiBase();
   const res = await fetch(`${origin}${path}`, { headers: { cookie: header }, cache: "no-store" });
   if (res.status === 403 || !res.ok) return null;
   return res.json();

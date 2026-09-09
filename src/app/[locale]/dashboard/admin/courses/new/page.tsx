@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import formStyles from "@/components/admin/AdminForm.module.css";
 import { adminListCourses, getMe } from "@/lib/api";
+import { serverApiBase } from "@/lib/server-api-base";
 
 type Props = {
   params: Promise<{ locale: string }>;
@@ -35,7 +36,7 @@ export default async function AdminCourseCreatePage({ params, searchParams }: Pr
     const l_hours = String(formData.get("l_hours") ?? "").trim();
     const fm_hours = String(formData.get("fm_hours") ?? "").trim();
 
-    const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+    const origin = serverApiBase();
     const res = await fetch(`${origin}/api/admin/courses`, {
       method: "POST",
       headers: { cookie: header, "content-type": "application/json" },
@@ -68,7 +69,7 @@ export default async function AdminCourseCreatePage({ params, searchParams }: Pr
       redirect(`/${locale}/dashboard/admin/courses/new?err=missing`);
     }
 
-    const origin = process.env.NEXT_INTERNAL_ORIGIN ?? "http://localhost:3000";
+    const origin = serverApiBase();
     const res = await fetch(`${origin}/api/admin/courses/clone`, {
       method: "POST",
       headers: { cookie: header, "content-type": "application/json" },
