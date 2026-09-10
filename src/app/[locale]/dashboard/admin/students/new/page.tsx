@@ -1,7 +1,8 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { StudentForm } from "@/components/admin/StudentForm";
-import { AdminFormPage } from "@/components/admin/form-shared";
+import { AdminFormPage, FormHint } from "@/components/admin/form-shared";
 import { adminInstitutionLookups } from "@/lib/admin-org";
 import { getMe } from "@/lib/api";
 
@@ -22,6 +23,9 @@ export default async function NewStudentPage({ params }: Props) {
       hint="Tələbə mütləq mövcud qrupa və tələbə əmrinə bağlanır."
       backHref={`/${locale}/dashboard/admin/students`}
     >
+      <FormHint>
+        Bir neçə tələbə üçün <Link href={`/${locale}/dashboard/admin/students/import`}>Excel ilə çoxlu əlavə et</Link>.
+      </FormHint>
       <StudentForm lookups={lookups} locale={locale} />
     </AdminFormPage>
   );

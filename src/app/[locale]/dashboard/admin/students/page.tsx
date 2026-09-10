@@ -60,6 +60,9 @@ export default async function AdminStudentsPage({ params, searchParams }: Props)
           <p className={styles.meta}>Əlavə, silmə və yeniləmə. Yeni tələbə mütləq qrupa bağlanır.</p>
         </div>
         <div className={styles.headerActions}>
+          <Link href={`/${locale}/dashboard/admin/students/import`} className={styles.actionLink}>
+            Çoxlu əlavə et
+          </Link>
           <Link href={`/${locale}/dashboard/admin/students/new`} className={styles.actionLinkPrimary}>
             Tələbə əlavə et
           </Link>
