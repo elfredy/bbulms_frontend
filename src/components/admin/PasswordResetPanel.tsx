@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import type { UserRoleDetail } from "@/lib/admin-org";
+import type { UserRoleDetail } from "@/lib/admin-org-shared";
 
 import { Field, FieldGroup, FormHint, readDetail } from "./form-shared";
 import styles from "./AdminForm.module.css";

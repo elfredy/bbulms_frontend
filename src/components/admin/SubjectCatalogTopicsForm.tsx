@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 
 import { SearchableSelect } from "@/components/SearchableSelect";
-import type { DictItem, SubjectCatalogTopicsData } from "@/lib/admin-org";
-import { pageList } from "@/lib/admin-org";
+import type { DictItem, SubjectCatalogTopicsData } from "@/lib/admin-org-shared";
+import { pageList } from "@/lib/admin-org-shared";
 
 import dash from "@/app/[locale]/dashboard/dashboard.module.css";
 import { Field, readDetail } from "./form-shared";

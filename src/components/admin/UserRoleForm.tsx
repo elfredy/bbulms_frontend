@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 
-import type { InstitutionLookups, UserRoleDetail } from "@/lib/admin-org";
+import type { InstitutionLookups, UserRoleDetail } from "@/lib/admin-org-shared";
 
 import { AdminFormFrame, Field, FieldGroup, FormHint, SearchSelect, SelectInput, useAdminSave } from "./form-shared";
 

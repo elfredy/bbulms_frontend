@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import type { InstitutionLookups } from "@/lib/admin-org";
+import type { InstitutionLookups } from "@/lib/admin-org-shared";
 
 import { AdminFormFrame, Field, FieldGroup, SearchSelect, SelectInput, TextInput, toDateInput, useAdminSave } from "./form-shared";
 
