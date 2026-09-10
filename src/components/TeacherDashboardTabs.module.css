@@ -79,48 +79,80 @@
   max-width: 42rem;
 }
 
-.courseList {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+.semesterList {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 1.35rem;
 }
 
-.courseCard {
-  padding: 1rem 1.15rem;
+.semesterBlock {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 12px;
-  box-shadow:               0 1px 2px rgba(26, 29, 38, 0.04);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  overflow: hidden;
 }
 
-.courseCard:hover {
-  border-color: rgba(11, 92, 171, 0.25);
-  box-shadow: 0 4px 14px rgba(26, 29, 38, 0.06);
+.semesterTitle {
+  margin: 0;
+  padding: 0.85rem 1.15rem 0.7rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.panel > .courseList {
+  gap: 12px;
+}
+
+.panel > .courseList > .courseCard {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.courseCard {
+  padding: 0.85rem 1.15rem 1rem;
+  border-top: 1px solid var(--border);
+  background: var(--card);
+}
+
+.courseMain {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+}
+
+.lessonBadge {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  border-radius: 8px;
+  background: #f6e7b8;
+  color: #8a6a12;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.courseBody {
+  min-width: 0;
 }
 
 .courseName {
   margin: 0;
-  font-size: 1.02rem;
+  font-size: 0.98rem;
   font-weight: 600;
   line-height: 1.35;
   color: var(--text);
-  letter-spacing: -0.01em;
 }
 
-.courseCodePill {
-  display: inline-block;
-  margin-top: 0.35rem;
-  padding: 0.2rem 0.5rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--accent);
-  background: rgba(11, 92, 171, 0.09);
-  border-radius: 6px;
+.courseCode {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+  line-height: 1.4;
+  word-break: break-word;
 }
 
 .courseMeta {
@@ -131,7 +163,7 @@
 }
 
 .courseActions {
-  margin-top: 0.75rem;
+  margin: 0.7rem 0 0 3.2rem;
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;

@@ -318,9 +318,13 @@ export type TeacherCourseItem = {
   course_code?: string | null;
   lesson_type_id: string | null;
   subject_name_az: string | null;
+  education_year_id?: string | null;
   education_year_name: string | null;
   education_group_name?: string | null;
+  semester_id?: string | null;
+  semester_name_az?: string | null;
   lesson_type_az: string | null;
+  lesson_type_code?: string | null;
 };
 
 export type TeacherCoursesResponse = {
