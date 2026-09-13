@@ -21,8 +21,10 @@ export type DashboardMe = {
   display_name: string;
   username?: string | null;
   user_type?: string | null;
+  user_type_label?: string | null;
   is_superadmin?: boolean | null;
   must_change_password?: boolean | null;
+  available_roles?: { id: string; label: string }[];
 };
 
 type Props = {
@@ -100,8 +102,35 @@ export function DashboardShell({ me, items, children }: Props) {
         <div className={styles.userCard}>
           <p className={styles.userName}>{me.display_name}</p>
           <p className={styles.userMeta}>
-            {[me.username ? `@${me.username}` : null, me.user_type].filter(Boolean).join(" · ") || "\u00a0"}
+            {[me.username ? `@${me.username}` : null, me.user_type_label || me.user_type].filter(Boolean).join(" · ") || "\u00a0"}
           </p>
+          {me.available_roles && me.available_roles.length > 1 ? (
+            <label className={styles.roleSwitch}>
+              <span>Profil</span>
+              <select
+                className={styles.roleSelect}
+                value={me.user_type ?? ""}
+                onChange={async (e) => {
+                  const next = e.target.value;
+                  if (!next || next === me.user_type) return;
+                  await fetch("/api/auth/switch-role", {
+                    method: "POST",
+                    credentials: "include",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({ user_type: next }),
+                  });
+                  router.push(pathname?.replace(/\/dashboard.*/, "/dashboard") || "/dashboard");
+                  router.refresh();
+                }}
+              >
+                {me.available_roles.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           {me.is_superadmin ? <p className={styles.userMeta}>Superadmin · aktiv</p> : null}
         </div>
 

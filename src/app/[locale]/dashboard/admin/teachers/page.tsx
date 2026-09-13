@@ -10,7 +10,7 @@ import styles from "../../dashboard.module.css";
 
 type Props = {
   params: Promise<{ locale: string }>;
-  searchParams?: Promise<{ q?: string; page?: string; pageSize?: string }>;
+  searchParams?: Promise<{ q?: string; page?: string; pageSize?: string; staff_role?: string }>;
 };
 
 export default async function AdminTeachersPage({ params, searchParams }: Props) {
@@ -22,16 +22,24 @@ export default async function AdminTeachersPage({ params, searchParams }: Props)
   if (!me.is_superadmin) redirect(`/${locale}/dashboard`);
 
   const q = (sp.q ?? "").trim();
+  const staffRole = (sp.staff_role ?? "").trim().toUpperCase() || null;
   const pageSize = Math.min(200, Math.max(1, Number(sp.pageSize) || 25));
   const page = Math.max(1, Number(sp.page) || 1);
-  const data = await adminListTeachers(q || null, pageSize, (page - 1) * pageSize);
+  const data = await adminListTeachers(q || null, pageSize, (page - 1) * pageSize, staffRole);
+  const title = staffRole === "TYUTOR" ? "Tyutorlar" : staffRole === "LABORANT" ? "Laborantlar" : "Pedaqoji heyət";
+  const hint =
+    staffRole === "TYUTOR"
+      ? "Tyutorlar qruplara bağlanır. Rol İstifadəçi rolları səhifəsindən əlavə olunur."
+      : staffRole === "LABORANT"
+        ? "Laborantlar laboratoriya dərslərini aparır. Rol İstifadəçi rolları səhifəsindən əlavə olunur."
+        : "Müəllimlər kafedraya bağlıdır — sərbəst əlavə olunmur.";
 
   if (!data) {
     return (
       <div className={styles.page}>
         <header className={styles.headerCard}>
           <div>
-            <h1 className={styles.title}>Pedaqoji heyət</h1>
+            <h1 className={styles.title}>{title}</h1>
             <p className={styles.meta}>{t("loadError")}</p>
           </div>
         </header>
@@ -45,6 +53,7 @@ export default async function AdminTeachersPage({ params, searchParams }: Props)
   const qs = (extra: Record<string, string | number>) => {
     const params = new URLSearchParams();
     if (q) params.set("q", q);
+    if (staffRole) params.set("staff_role", staffRole);
     params.set("pageSize", String(pageSize));
     Object.entries(extra).forEach(([k, v]) => params.set(k, String(v)));
     return params.toString();
@@ -54,10 +63,19 @@ export default async function AdminTeachersPage({ params, searchParams }: Props)
     <div className={styles.pageWide}>
       <header className={styles.headerCard}>
         <div>
-          <h1 className={styles.title}>Pedaqoji heyət</h1>
-          <p className={styles.meta}>Müəllimlər kafedraya bağlıdır — sərbəst əlavə olunmur.</p>
+          <h1 className={styles.title}>{title}</h1>
+          <p className={styles.meta}>{hint}</p>
         </div>
         <div className={styles.headerActions}>
+          <Link href={`/${locale}/dashboard/admin/teachers`} className={!staffRole ? styles.actionLinkPrimary : styles.actionLink}>
+            Hamısı
+          </Link>
+          <Link href={`/${locale}/dashboard/admin/teachers?staff_role=TYUTOR`} className={staffRole === "TYUTOR" ? styles.actionLinkPrimary : styles.actionLink}>
+            Tyutorlar
+          </Link>
+          <Link href={`/${locale}/dashboard/admin/teachers?staff_role=LABORANT`} className={staffRole === "LABORANT" ? styles.actionLinkPrimary : styles.actionLink}>
+            Laborantlar
+          </Link>
           <Link href={`/${locale}/dashboard/admin/teachers/new`} className={styles.actionLinkPrimary}>
             Müəllim əlavə et
           </Link>

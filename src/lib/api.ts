@@ -12,8 +12,10 @@ export type UserProfile = {
   display_name: string;
   user_id: number | null;
   user_type: string | null;
+  user_type_label?: string | null;
   teacher_id: number | null;
   student_id: number | null;
+  available_roles?: { id: string; label: string }[];
   organization_id?: number | null;
   department_id?: number | null;
   department_name_az?: string | null;
@@ -694,13 +696,14 @@ export async function adminGetGroupDetail(educationGroupId: string): Promise<Adm
   return res.json();
 }
 
-export async function adminListTeachers(q?: string | null, limit = 50, offset = 0): Promise<AdminTeacherListResponse | null> {
+export async function adminListTeachers(q?: string | null, limit = 50, offset = 0, staffRole?: string | null): Promise<AdminTeacherListResponse | null> {
   const cookieStore = await cookies();
   const header = cookieStore.toString();
   if (!header) return null;
   const origin = serverApiBase();
   const params = new URLSearchParams();
   if (q != null && String(q).trim()) params.set("q", String(q).trim());
+  if (staffRole) params.set("staff_role", staffRole);
   params.set("limit", String(limit));
   params.set("offset", String(offset));
   const res = await fetch(`${origin}/api/admin/teachers?${params.toString()}`, {
@@ -1163,3 +1166,24 @@ export async function upsertTeacherCourseExercisePoint(
   if (!res.ok) return null;
   return res.json();
 }
+
+export const getTutorOverview = cache(async (): Promise<{
+  teacher_id?: string;
+  groups: {
+    education_group_id: string;
+    education_group_name: string | null;
+    education_year_name: string | null;
+    specialty_name_az: string | null;
+    student_count: number;
+  }[];
+  student_count: number;
+} | null> => {
+  const cookieStore = await cookies();
+  const header = cookieStore.toString();
+  if (!header) return null;
+  const origin = serverApiBase();
+  const res = await fetch(`${origin}/api/tutor/overview`, { headers: { cookie: header }, cache: "no-store" });
+  if (res.status === 403) return null;
+  if (!res.ok) return null;
+  return res.json();
+});

@@ -57,6 +57,24 @@
   line-height: 1.4;
 }
 
+.roleSwitch {
+  display: grid;
+  gap: 4px;
+  margin-top: 10px;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.roleSelect {
+  width: 100%;
+  padding: 7px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  font: inherit;
+}
+
 .nav {
   display: flex;
   flex-direction: column;

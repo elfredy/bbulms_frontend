@@ -47,7 +47,7 @@ export default async function AdminUserRoleDetailPage({ params, searchParams }: 
             <p className={styles.statLabel}>Giriş hesabı</p>
           </div>
         </div>
-        {saved ? <p className={styles.alertOk}>Rol yeniləndi.</p> : null}
+        {saved ? <p className={styles.alertOk}>Rol yeniləndi. İstifadəçi girişdə rollar arasında keçid edə bilər.</p> : null}
         {!person.has_login ? (
           <p className={styles.alertError}>Bu FİN üzrə giriş hesabı yoxdur. Rol dəyişmək üçün şəxsin sistemə giriş hesabı olmalıdır.</p>
         ) : null}

@@ -98,6 +98,7 @@ export default async function AdminGroupsPage({ params, searchParams }: Props) {
                   <th className={styles.th}>Təhsil səviyyəsi</th>
                   <th className={styles.th}>Təhsil forması</th>
                   <th className={styles.th}>Tədris ili</th>
+                  <th className={styles.th}>Tyutor</th>
                   <th className={styles.th} />
                 </tr>
               </thead>
@@ -117,6 +118,7 @@ export default async function AdminGroupsPage({ params, searchParams }: Props) {
                     <td className={styles.td}>{g.education_level_az ?? "—"}</td>
                     <td className={styles.td}>{g.education_type_az ?? "—"}</td>
                     <td className={styles.td}>{g.education_year_name ?? "—"}</td>
+                    <td className={styles.td}>{g.tyutor_fullname ?? "—"}</td>
                     <td className={styles.td}>
                       <AdminRowMenu
                         editHref={`/${locale}/dashboard/admin/groups/${g.education_group_id}/edit`}

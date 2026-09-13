@@ -50,7 +50,7 @@ export default async function AdminUserRolesPage({ params, searchParams }: Props
       <header className={styles.headerCard}>
         <div>
           <h1 className={styles.title}>İstifadəçi rolları</h1>
-          <p className={styles.meta}>FİN ilə tapın. Rolu dəyişin və ya parolu FİN-ə sıfırlayın.</p>
+          <p className={styles.meta}>FİN ilə tapın. Mövcud istifadəçiyə əlavə rol təyin edin (tələbə + müəllim/tyutor/laborant). Girişdə profil seçilir.</p>
         </div>
       </header>
       <div className={styles.content}>

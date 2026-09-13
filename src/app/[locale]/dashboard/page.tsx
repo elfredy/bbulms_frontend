@@ -17,10 +17,11 @@ export default async function DashboardPage({ params }: Props) {
   if (!user) return null;
   if (user.must_change_password) redirect(`/${locale}/dashboard/change-password`);
 
-  const isTeacher = user.teacher_id != null;
+  const isTeacher = (user.user_type === "TEACHER" || user.user_type === "LABORANT" || user.user_type === "OWNER" || user.user_type === "TYUTOR") && user.teacher_id != null;
   const isStudent = user.user_type === "STUDENT" && user.student_id != null;
   const isDepartmentUser = Boolean(user.is_department_user);
-  const isSuperadmin = Boolean(user.is_superadmin);
+  const isTutor = user.user_type === "TYUTOR";
+  const isSuperadmin = user.user_type === "ADMIN" || user.user_type === "SUPERADMIN";
 
   const teacherCourses = isTeacher ? await getTeacherCourses() : null;
   const studentCourses = isStudent ? await getStudentCourses() : null;
@@ -119,13 +120,18 @@ export default async function DashboardPage({ params }: Props) {
           <h1 className={styles.title}>{t("title")}</h1>
           <p className={styles.welcome}>{t("welcome", { displayName: user.display_name })}</p>
           {user.username ? <p className={styles.meta}>{t("loginId", { username: user.username })}</p> : null}
-          {user.user_type ? <p className={styles.meta}>{t("role", { role: user.user_type })}</p> : null}
+          {user.user_type ? <p className={styles.meta}>{t("role", { role: user.user_type_label || user.user_type })}</p> : null}
           {isSuperadmin ? <p className={styles.meta}>Superadmin: aktiv</p> : null}
         </div>
         <div className={styles.headerActions}>
           {isStudent ? (
             <a className={styles.actionLinkPrimary} href={`/${locale}/dashboard/schedule`}>
               Dərs cədvəli
+            </a>
+          ) : null}
+          {isTutor ? (
+            <a className={styles.actionLink} href={`/${locale}/dashboard/tutor`}>
+              Tyutor paneli
             </a>
           ) : null}
           {isDepartmentUser ? (

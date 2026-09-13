@@ -20,6 +20,7 @@ export type InstitutionLookups = {
   orders: { id: string; serial?: string | null; order_date?: string | null; type_name_az?: string | null }[];
   education_years: { id: string; name?: string | null }[];
   tutors: { id: string; name?: string | null }[];
+  laborants?: { id: string; name?: string | null }[];
 };
 
 export type SubjectCatalogTopic = {
@@ -51,6 +52,7 @@ export type UserRoleListItem = {
   username: string | null;
   user_type: string | null;
   user_type_label: string;
+  roles?: string[];
   department_name_az: string | null;
   has_student: boolean;
   has_teacher: boolean;
@@ -69,6 +71,8 @@ export type UserRoleDetail = {
   user_id: string | null;
   user_type: string | null;
   user_type_label: string;
+  roles?: Array<string | { user_type: string; user_type_label?: string; user_id?: string }>;
+  role_labels?: string[];
   is_blocked?: number;
   department_id: string | null;
   department_name_az: string | null;

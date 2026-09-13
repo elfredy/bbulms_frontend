@@ -1,10 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 import type { InstitutionLookups } from "@/lib/admin-org-shared";
 
-import { AdminFormFrame, Field, FieldGroup, SearchSelect, SelectInput, TextInput, toDateInput, useAdminSave } from "./form-shared";
+import { AdminFormFrame, Field, FieldGroup, FormHint, SearchSelect, SelectInput, TextInput, readDetail, toDateInput, useAdminSave } from "./form-shared";
 
 export function StudentForm({
   lookups,
@@ -16,7 +17,7 @@ export function StudentForm({
   locale: string;
 }) {
   const isEdit = Boolean(initial?.student_id);
-  const { error, saving, save } = useAdminSave(`/${locale}/dashboard/admin/students`);
+  const { error, saving, save, setError } = useAdminSave(`/${locale}/dashboard/admin/students`);
   const [lastname, setLastname] = useState(initial?.lastname ?? "");
   const [firstname, setFirstname] = useState(initial?.firstname ?? "");
   const [patronymic, setPatronymic] = useState(initial?.patronymic ?? "");
@@ -30,12 +31,29 @@ export function StudentForm({
   const [langId, setLangId] = useState(initial?.education_lang_id ?? "");
   const [statusId, setStatusId] = useState(initial?.status_id ?? "");
   const [cardNumber, setCardNumber] = useState(initial?.card_number ?? "");
+  const [existing, setExisting] = useState<{ person_id: string; fullname: string; message: string } | null>(null);
+
+  const payload = {
+    lastname,
+    firstname,
+    patronymic,
+    pincode,
+    gender_id: genderId,
+    birthdate: birthdate || null,
+    education_group_id: groupId,
+    in_order_id: orderId,
+    education_type_id: educationTypeId || null,
+    education_payment_type_id: paymentId || null,
+    education_lang_id: langId || null,
+    status_id: statusId || null,
+    card_number: cardNumber || null,
+  };
 
   return (
     <AdminFormFrame
       error={error}
       saving={saving}
-      submitLabel={isEdit ? "Yenilə" : "Əlavə et"}
+      submitLabel={isEdit ? "Yenilə" : existing ? "Mövcud şəxsi tələbə et" : "Əlavə et"}
       onSubmit={async () => {
         if (!groupId) {
           window.alert("Tələbə qrupu seçilməlidir.");
@@ -45,23 +63,38 @@ export function StudentForm({
           window.alert("Tələbə əmri seçilməlidir.");
           return;
         }
-        await save(isEdit ? `/api/admin/students/${initial?.student_id}` : "/api/admin/students", isEdit ? "PUT" : "POST", {
-          lastname,
-          firstname,
-          patronymic,
-          pincode,
-          gender_id: genderId,
-          birthdate: birthdate || null,
-          education_group_id: groupId,
-          in_order_id: orderId,
-          education_type_id: educationTypeId || null,
-          education_payment_type_id: paymentId || null,
-          education_lang_id: langId || null,
-          status_id: statusId || null,
-          card_number: cardNumber || null,
+        if (isEdit) {
+          await save(`/api/admin/students/${initial?.student_id}`, "PUT", payload);
+          return;
+        }
+        const res = await fetch("/api/admin/students", {
+          method: "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ ...payload, use_existing_person: Boolean(existing) }),
         });
+        if (res.status === 409) {
+          const data = await res.json().catch(() => null);
+          const detail = data?.detail;
+          if (detail?.person_id) {
+            setExisting({ person_id: String(detail.person_id), fullname: detail.fullname || "", message: detail.message || "" });
+            setError(detail.message || "Bu FİN artıq mövcuddur.");
+            return;
+          }
+        }
+        if (!res.ok) {
+          setError(await readDetail(res, "Tələbə əlavə olunmadı"));
+          return;
+        }
+        window.location.href = `/${locale}/dashboard/admin/students`;
       }}
     >
+      {existing ? (
+        <FormHint>
+          {existing.fullname} artıq bazadadır. «Mövcud şəxsi tələbə et» ilə tələbə qeydi yaradın və ya{" "}
+          <Link href={`/${locale}/dashboard/admin/user-roles/${existing.person_id}`}>yeni rol təyin edin</Link>.
+        </FormHint>
+      ) : null}
       <FieldGroup title="Şəxsi məlumat">
         <Field label="Soyad" required>
           <TextInput value={lastname} required onChange={(e) => setLastname(e.target.value)} />

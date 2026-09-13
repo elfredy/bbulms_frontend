@@ -158,6 +158,7 @@ export async function readDetail(res: Response, fallback: string) {
   try {
     const data = await res.json();
     if (typeof data?.detail === "string") return data.detail;
+    if (data?.detail && typeof data.detail === "object" && typeof data.detail.message === "string") return data.detail.message;
     if (Array.isArray(data?.detail)) {
       const parts = data.detail
         .map((item: { msg?: string } | string) => (typeof item === "string" ? item : item?.msg))
@@ -168,6 +169,14 @@ export async function readDetail(res: Response, fallback: string) {
     /* ignore */
   }
   return fallback;
+}
+
+export async function readErrorPayload(res: Response) {
+  try {
+    return await res.json();
+  } catch {
+    return null;
+  }
 }
 
 export function AdminFormFrame({

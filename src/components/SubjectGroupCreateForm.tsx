@@ -22,6 +22,7 @@ type Opt = {
   start_date?: string | null;
   org_name_az?: string | null;
   position_name_az?: string | null;
+  education_year_name?: string | null;
 };
 type SubjectOpt = Opt & {
   semester_id?: string | null;
@@ -177,6 +178,15 @@ export function SubjectGroupCreateForm({
   const [teacherPicks, setTeacherPicks] = useState<TeacherPick[]>([{ teacher_id: "", lesson_type_id: "" }]);
   const [students, setStudents] = useState<Opt[]>([]);
   const [studentIds, setStudentIds] = useState<string[]>([]);
+  const [studentSearch, setStudentSearch] = useState("");
+  const [extraOpen, setExtraOpen] = useState(false);
+  const [extraGroups, setExtraGroups] = useState<Opt[]>([]);
+  const [extraGroupId, setExtraGroupId] = useState("");
+  const [extraGroupQuery, setExtraGroupQuery] = useState("");
+  const [extraStudents, setExtraStudents] = useState<Opt[]>([]);
+  const [extraPicked, setExtraPicked] = useState<string[]>([]);
+  const [extraStudentQuery, setExtraStudentQuery] = useState("");
+  const [extraLoading, setExtraLoading] = useState(false);
   const [halfPicks, setHalfPicks] = useState<HalfPick[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -450,17 +460,23 @@ export function SubjectGroupCreateForm({
       .then((r) => (r.ok ? r.json() : { items: [] }))
       .then((d) => {
         const items = (d.items ?? []) as Opt[];
-        setStudents(items);
+        setStudents((prev) => {
+          const map = new Map(items.map((s) => [s.id, s]));
+          for (const s of prev) {
+            if (!map.has(s.id)) map.set(s.id, s);
+          }
+          return Array.from(map.values());
+        });
         if (skipCascade.current.students) {
           skipCascade.current.students = false;
-          setStudentIds((prev) => {
-            const allowed = new Set(items.map((s) => s.id));
-            const kept = prev.filter((id) => allowed.has(id));
-            return kept.length ? kept : prev;
-          });
+          setStudentIds((prev) => prev.filter(Boolean));
           return;
         }
-        setStudentIds(items.map((s) => s.id));
+        setStudentIds((prev) => {
+          const fromGroups = items.map((s) => s.id);
+          const extras = prev.filter((id) => !fromGroups.includes(id));
+          return [...fromGroups, ...extras];
+        });
       })
       .catch(() => {
         if (skipCascade.current.students) return;
@@ -468,6 +484,52 @@ export function SubjectGroupCreateForm({
         setStudentIds([]);
       });
   }, [groupIds]);
+
+  useEffect(() => {
+    if (!extraOpen) return;
+    const params = new URLSearchParams({ limit: "300" });
+    if (extraGroupQuery.trim().length >= 1) params.set("q", extraGroupQuery.trim());
+    fetch(`/api/admin/subject-groups/lookups/groups?${params}`, { credentials: "include", cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { items: [] }))
+      .then((d) => setExtraGroups(d.items ?? []))
+      .catch(() => setExtraGroups([]));
+  }, [extraOpen, extraGroupQuery]);
+
+  useEffect(() => {
+    if (!extraOpen || !extraGroupId) {
+      setExtraStudents([]);
+      setExtraPicked([]);
+      return;
+    }
+    setExtraLoading(true);
+    const params = new URLSearchParams({ education_group_ids: extraGroupId, limit: "800" });
+    if (extraStudentQuery.trim()) params.set("q", extraStudentQuery.trim());
+    fetch(`/api/admin/subject-groups/lookups/students?${params}`, { credentials: "include", cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { items: [] }))
+      .then((d) => {
+        setExtraStudents((d.items ?? []) as Opt[]);
+        setExtraPicked([]);
+      })
+      .catch(() => setExtraStudents([]))
+      .finally(() => setExtraLoading(false));
+  }, [extraOpen, extraGroupId]);
+
+  useEffect(() => {
+    if (!extraOpen) return;
+    if (extraGroupId) return;
+    const q = extraStudentQuery.trim();
+    if (q.length < 2) {
+      setExtraStudents([]);
+      return;
+    }
+    setExtraLoading(true);
+    const params = new URLSearchParams({ q, limit: "200" });
+    fetch(`/api/admin/subject-groups/lookups/students?${params}`, { credentials: "include", cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { items: [] }))
+      .then((d) => setExtraStudents((d.items ?? []) as Opt[]))
+      .catch(() => setExtraStudents([]))
+      .finally(() => setExtraLoading(false));
+  }, [extraOpen, extraGroupId, extraStudentQuery]);
 
   useEffect(() => {
     if (!yearId || !semesterId) return;
@@ -1132,25 +1194,45 @@ export function SubjectGroupCreateForm({
 
       <div className={tab === "students" ? undefined : styles.hidden}>
         <section className={styles.card}>
-          <h2 className={styles.cardTitle}>Tələbələr</h2>
+          <div className={styles.studentHead}>
+            <h2 className={styles.cardTitle}>Tələbələr</h2>
+            <button type="button" className={styles.buttonAdd} onClick={() => setExtraOpen(true)}>
+              Alt qrup tələbə
+            </button>
+          </div>
+          <input
+            className={styles.input}
+            value={studentSearch}
+            onChange={(e) => setStudentSearch(e.target.value)}
+            placeholder="Tələbə axtar…"
+          />
           <div className={styles.checkList} style={{ maxHeight: 360 }}>
             {students.length === 0 ? <span className={styles.label}>Əvvəl akademik qrup seçin</span> : null}
-            {students.map((s) => {
-              const checked = studentIds.includes(s.id);
-              return (
-                <label key={s.id} className={styles.checkItem}>
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => setStudentIds((prev) => (checked ? prev.filter((x) => x !== s.id) : [...prev, s.id]))}
-                  />
-                  <span>
-                    {s.name || s.id}
-                    {s.group_name ? ` · ${s.group_name}` : ""}
-                  </span>
-                </label>
-              );
-            })}
+            {students
+              .filter((s) => {
+                const q = studentSearch.trim().toLocaleLowerCase("az");
+                if (!q) return true;
+                return `${s.name || ""} ${s.group_name || ""} ${s.id}`.toLocaleLowerCase("az").includes(q);
+              })
+              .map((s) => {
+                const checked = studentIds.includes(s.id);
+                const selectedNames = new Set(groups.filter((g) => groupIds.includes(g.id)).map((g) => g.name || g.name_az));
+                const extra = Boolean(s.group_name) && selectedNames.size > 0 && !selectedNames.has(s.group_name || "");
+                return (
+                  <label key={s.id} className={styles.checkItem}>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => setStudentIds((prev) => (checked ? prev.filter((x) => x !== s.id) : [...prev, s.id]))}
+                    />
+                    <span>
+                      {s.name || s.id}
+                      {s.group_name ? ` · ${s.group_name}` : ""}
+                      {extra ? " · alt qrup" : ""}
+                    </span>
+                  </label>
+                );
+              })}
           </div>
         </section>
       </div>
@@ -1212,6 +1294,109 @@ export function SubjectGroupCreateForm({
 
       {info ? <p className={styles.ok}>{info}</p> : null}
       {error ? <p className={styles.error}>{error}</p> : null}
+      {extraOpen ? (
+        <div className={styles.modalOverlay} onClick={() => setExtraOpen(false)}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()} role="dialog" aria-labelledby="alt-group-title">
+            <div className={styles.modalHead}>
+              <h3 id="alt-group-title" className={styles.cardTitle}>
+                Alt qrup tələbə
+              </h3>
+              <button type="button" className={styles.buttonGhost} onClick={() => setExtraOpen(false)}>
+                Bağla
+              </button>
+            </div>
+            <label className={styles.field}>
+              <span className={styles.label}>Mövcud qrup</span>
+              <SearchableSelect
+                value={extraGroupId}
+                onChange={(id) => setExtraGroupId(id)}
+                placeholder="Qrup seçin"
+                searchPlaceholder="Qrup axtar…"
+                onQueryChange={setExtraGroupQuery}
+                options={extraGroups.map((g) => ({
+                  id: g.id,
+                  label: [g.name || g.name_az, g.education_year_name].filter(Boolean).join(" · ") || g.id,
+                }))}
+              />
+            </label>
+            <input
+              className={styles.input}
+              value={extraStudentQuery}
+              onChange={(e) => setExtraStudentQuery(e.target.value)}
+              placeholder="Tələbə axtar…"
+            />
+            <div className={styles.checkList} style={{ maxHeight: 280 }}>
+              {extraLoading ? <span className={styles.label}>Yüklənir…</span> : null}
+              {!extraLoading && extraGroupId && extraStudents.length === 0 ? <span className={styles.label}>Bu qrupda tələbə yoxdur</span> : null}
+              {!extraGroupId && extraStudentQuery.trim().length < 2 ? (
+                <span className={styles.label}>Qrup seçin və ya tələbə adını yazın — siyahı çıxacaq</span>
+              ) : null}
+              {extraStudents
+                .filter((s) => {
+                  const q = extraStudentQuery.trim().toLocaleLowerCase("az");
+                  if (!q) return true;
+                  return `${s.name || ""} ${s.group_name || ""}`.toLocaleLowerCase("az").includes(q);
+                })
+                .map((s) => {
+                  const checked = extraPicked.includes(s.id);
+                  return (
+                    <label key={s.id} className={styles.checkItem}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => setExtraPicked((prev) => (checked ? prev.filter((x) => x !== s.id) : [...prev, s.id]))}
+                      />
+                      <span>
+                        {s.name || s.id}
+                        {s.group_name ? ` · ${s.group_name}` : ""}
+                      </span>
+                    </label>
+                  );
+                })}
+            </div>
+            <div className={styles.modalActions}>
+              <button
+                type="button"
+                className={styles.buttonGhost}
+                disabled={!extraStudents.length}
+                onClick={() =>
+                  setExtraPicked(
+                    extraStudents
+                      .filter((s) => {
+                        const q = extraStudentQuery.trim().toLocaleLowerCase("az");
+                        if (!q) return true;
+                        return `${s.name || ""} ${s.group_name || ""}`.toLocaleLowerCase("az").includes(q);
+                      })
+                      .map((s) => s.id)
+                  )
+                }
+              >
+                Hamısını seç
+              </button>
+              <button
+                type="button"
+                className={styles.buttonAdd}
+                disabled={!extraPicked.length}
+                onClick={() => {
+                  const picked = extraStudents.filter((s) => extraPicked.includes(s.id));
+                  setStudents((prev) => {
+                    const map = new Map(prev.map((s) => [s.id, s]));
+                    for (const s of picked) map.set(s.id, s);
+                    return Array.from(map.values());
+                  });
+                  setStudentIds((prev) => [...new Set([...prev, ...extraPicked])]);
+                  setExtraOpen(false);
+                  setExtraGroupId("");
+                  setExtraPicked([]);
+                  setExtraStudentQuery("");
+                }}
+              >
+                Seçilənləri əlavə et ({extraPicked.length})
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <div className={styles.actions}>
         <button type="submit" className={styles.buttonAdd} disabled={saving}>
           {saving ? (initialCourseId ? "Yadda saxlanır…" : "Əlavə olunur…") : initialCourseId ? "Yadda saxla" : "Əlavə et"}
