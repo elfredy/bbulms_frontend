@@ -380,6 +380,7 @@ export type TimetableOccupiedRoom = {
   education_plan_subject_id?: string | null;
   subject_id?: string | null;
   lesson_letter?: string | null;
+  course_group_id?: string | null;
 };
 
 export type TimetableBoard = {

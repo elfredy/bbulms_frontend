@@ -117,10 +117,11 @@
 .slotStack {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
   min-height: 0;
   flex: 1 1 auto;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .slotItem {
@@ -128,6 +129,43 @@
   flex-direction: column;
   min-height: 0;
   flex: 1 1 auto;
+}
+
+.slotRoomRow {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  flex: 0 0 auto;
+}
+
+.slotHalfTag {
+  flex: 0 0 auto;
+  max-width: 42%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.58rem;
+  font-weight: 800;
+  line-height: 1;
+  color: #1d4ed8;
+}
+
+.slotRoom {
+  width: 100%;
+  min-width: 0;
+  flex: 1 1 auto;
+  height: 18px;
+  max-height: 18px;
+  border: none;
+  background: #fff;
+  border-radius: 2px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 18px;
+  padding: 0 3px;
+  color: #111827;
+  cursor: pointer;
 }
 
 .weekTag {
@@ -160,22 +198,6 @@
 .slotDisabled {
   cursor: default;
   opacity: 0.7;
-}
-
-.slotRoom {
-  width: 100%;
-  flex: 0 0 16px;
-  height: 16px;
-  max-height: 16px;
-  border: none;
-  background: #fff;
-  border-radius: 2px;
-  font-size: 0.62rem;
-  font-weight: 700;
-  line-height: 16px;
-  padding: 0 3px;
-  color: #111827;
-  cursor: pointer;
 }
 
 .slotRoom:disabled {

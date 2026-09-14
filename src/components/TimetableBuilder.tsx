@@ -72,7 +72,11 @@ function weekTypesOverlap(a: number, b: number) {
   return a === 3 || b === 3 || a === b;
 }
 
-function isStreamShare(a: { lesson_letter?: string | null; subject_id?: string | null; education_plan_subject_id?: string | null }, b: { lesson_letter?: string | null; subject_id?: string | null; education_plan_subject_id?: string | null }) {
+function isStreamShare(
+  a: { course_id?: string | null; lesson_letter?: string | null; subject_id?: string | null; education_plan_subject_id?: string | null },
+  b: { course_id?: string | null; lesson_letter?: string | null; subject_id?: string | null; education_plan_subject_id?: string | null }
+) {
+  if (a.course_id && b.course_id && a.course_id === b.course_id) return false;
   if (!a.lesson_letter || a.lesson_letter !== b.lesson_letter) return false;
   if (a.lesson_letter !== "M" && a.lesson_letter !== "S") return false;
   if (a.subject_id && b.subject_id) return a.subject_id === b.subject_id;
@@ -440,7 +444,12 @@ export function TimetableBuilder() {
             o.clock_id === clockId &&
             Number(o.week_day) === weekDay &&
             weekTypesOverlap(Number(o.week_type), weekType) &&
-            !(o.course_id === item.course_id && o.lesson_type_id === item.lesson_type_id && Number(o.week_type) === weekType) &&
+            !(
+              o.course_id === item.course_id &&
+              o.lesson_type_id === item.lesson_type_id &&
+              Number(o.week_type) === weekType &&
+              (o.course_group_id || "") === (item.course_group_id || "")
+            ) &&
             !isStreamShare(item, o),
         );
         return { ...r, occupied };
@@ -457,22 +466,25 @@ export function TimetableBuilder() {
           <div className={styles.slotStack}>
             {occList.map((item) => (
               <div key={lessonKey(item.course_id, item.lesson_type_id, item.course_group_id)} className={styles.slotItem}>
-                <SearchableSelect
-                  compact
-                  value={item.room_id ?? ""}
-                  disabled={busy}
-                  placeholder="Otaq"
-                  searchPlaceholder="Otaq axtar…"
-                  triggerClassName={styles.slotRoom}
-                  options={roomOptionsFor(item).map((r) => ({
-                    id: r.id,
-                    label: r.occupied ? `${r.name || r.id} · doludur` : r.name || r.id,
-                    disabled: Boolean(r.occupied),
-                  }))}
-                  onChange={(id) => {
-                    void setRoom(item, id || null);
-                  }}
-                />
+                <div className={styles.slotRoomRow} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+                  {item.half_group_az ? <span className={styles.slotHalfTag}>{item.half_group_az}</span> : null}
+                  <SearchableSelect
+                    compact
+                    value={item.room_id ?? ""}
+                    disabled={busy}
+                    placeholder="Otaq"
+                    searchPlaceholder="Otaq axtar…"
+                    triggerClassName={styles.slotRoom}
+                    options={roomOptionsFor(item).map((r) => ({
+                      id: r.id,
+                      label: r.occupied ? `${r.name || r.id} · doludur` : r.name || r.id,
+                      disabled: Boolean(r.occupied),
+                    }))}
+                    onChange={(id) => {
+                      void setRoom(item, id || null);
+                    }}
+                  />
+                </div>
                 <button
                   type="button"
                   className={styles.slotBody}
