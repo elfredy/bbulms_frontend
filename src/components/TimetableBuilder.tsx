@@ -546,7 +546,7 @@ export function TimetableBuilder() {
                     Boolean(selected) &&
                     ((full.length === 0 && !up.length && !down.length && rem >= 2) ||
                       canStack(full) ||
-                      ((up.length || down.length) && joinable));
+                      ((up.length > 0 || down.length > 0) && joinable));
                   return (
                     <td key={`${clock.id}-${d.week_day}`}>
                       <div className={styles.cell}>
