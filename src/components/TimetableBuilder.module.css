@@ -114,6 +114,22 @@
   font: inherit;
 }
 
+.slotStack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.slotItem {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
 .weekTag {
   position: absolute;
   left: 4px;

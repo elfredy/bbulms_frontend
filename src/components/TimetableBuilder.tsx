@@ -21,12 +21,13 @@ import {
 type SelectedLesson = {
   course_id: string;
   lesson_type_id: string;
+  course_group_id?: string | null;
 };
 
 type RoomOpt = { id: string; name: string | null; faculty_id?: string | null; occupied?: boolean };
 
-function lessonKey(courseId: string, lessonTypeId: string) {
-  return `${courseId}:${lessonTypeId}`;
+function lessonKey(courseId: string, lessonTypeId: string, courseGroupId?: string | null) {
+  return `${courseId}:${lessonTypeId}:${courseGroupId || ""}`;
 }
 
 function slotKey(weekDay: number, clockId: string, weekType: number) {
@@ -37,6 +38,34 @@ function remainingOf(lesson: TimetableAvailableLesson | null | undefined) {
   if (!lesson) return 0;
   if (typeof lesson.remaining === "number") return lesson.remaining;
   return Number(lesson.remaining_up || 0) + Number(lesson.remaining_down || 0);
+}
+
+function chipActive(lesson: TimetableAvailableLesson) {
+  return remainingOf(lesson) > 0 || Boolean(lesson.can_join);
+}
+
+function sameLesson(
+  a: { course_id: string; lesson_type_id: string; course_group_id?: string | null },
+  b: { course_id: string; lesson_type_id: string; course_group_id?: string | null }
+) {
+  return a.course_id === b.course_id && a.lesson_type_id === b.lesson_type_id && (a.course_group_id || "") === (b.course_group_id || "");
+}
+
+function isSiblingHalf(
+  a: { course_id: string; lesson_type_id: string; course_group_id?: string | null },
+  b: { course_id: string; lesson_type_id: string; course_group_id?: string | null }
+) {
+  return (
+    a.course_id === b.course_id &&
+    a.lesson_type_id === b.lesson_type_id &&
+    Boolean(a.course_group_id) &&
+    Boolean(b.course_group_id) &&
+    a.course_group_id !== b.course_group_id
+  );
+}
+
+function slotTooltip(occ: TimetableAssignedSlot) {
+  return [occ.teacher_fullname || occ.subject_name_az, occ.half_group_az, "silmək üçün klik"].filter(Boolean).join(" · ");
 }
 
 function weekTypesOverlap(a: number, b: number) {
@@ -148,8 +177,10 @@ export function TimetableBuilder() {
     });
     setSelected((cur) => {
       if (!cur) return cur;
-      const still = data.available.find((a) => a.course_id === cur.course_id && a.lesson_type_id === cur.lesson_type_id);
-      if (!still || remainingOf(still) <= 0) return null;
+      const still = data.available.find(
+        (a) => a.course_id === cur.course_id && a.lesson_type_id === cur.lesson_type_id && (a.course_group_id || "") === (cur.course_group_id || "")
+      );
+      if (!still || !chipActive(still)) return null;
       return cur;
     });
   }, [groupId, yearId, semesterId, subjectTypeId]);
@@ -171,7 +202,14 @@ export function TimetableBuilder() {
   }, [assigned]);
 
   const selectedLesson = useMemo(
-    () => available.find((a) => selected && a.course_id === selected.course_id && a.lesson_type_id === selected.lesson_type_id) ?? null,
+    () =>
+      available.find(
+        (a) =>
+          selected &&
+          a.course_id === selected.course_id &&
+          a.lesson_type_id === selected.lesson_type_id &&
+          (a.course_group_id || "") === (selected.course_group_id || "")
+      ) ?? null,
     [available, selected]
   );
 
@@ -184,7 +222,7 @@ export function TimetableBuilder() {
         subject_name_az: lesson.subject_name_az,
         items: [],
       };
-      if (!cur.items.some((x) => x.lesson_type_id === lesson.lesson_type_id)) {
+      if (!cur.items.some((x) => lessonKey(x.course_id, x.lesson_type_id, x.course_group_id) === lessonKey(lesson.course_id, lesson.lesson_type_id, lesson.course_group_id))) {
         cur.items.push(lesson);
       }
       map.set(key, cur);
@@ -242,6 +280,7 @@ export function TimetableBuilder() {
       clock_id: clockId,
       week_day: weekDay,
       week_type: weekType,
+      course_group_id: lesson.course_group_id || null,
     });
     setBusy(false);
     if (!res.ok) {
@@ -264,6 +303,7 @@ export function TimetableBuilder() {
       clock_id: slot.clock_id,
       week_day: Number(slot.week_day),
       week_type: Number(slot.week_type),
+      course_group_id: slot.course_group_id || null,
     });
     setBusy(false);
     if (!res.ok) {
@@ -285,6 +325,7 @@ export function TimetableBuilder() {
       week_day: Number(slot.week_day),
       week_type: Number(slot.week_type),
       room_id: roomId,
+      course_group_id: slot.course_group_id || null,
     });
     setBusy(false);
     if (!res.ok) {
@@ -294,36 +335,54 @@ export function TimetableBuilder() {
     await loadBoard();
   }
 
-  function onHalfClick(weekDay: number, clockId: string, weekType: 1 | 2 | 3, lessonOverride?: SelectedLesson) {
+  function onHalfClick(weekDay: number, clockId: string, weekType: 1 | 2 | 3, lessonOverride?: SelectedLesson, clicked?: TimetableAssignedSlot) {
     if (busy) return;
-    const occ = assignedMap.get(slotKey(weekDay, clockId, weekType))?.[0];
-    if (occ) {
-      void unplace(occ);
+    const list = assignedMap.get(slotKey(weekDay, clockId, weekType)) ?? [];
+    const lesson = lessonOverride ?? selected;
+    if (clicked && (!lesson || sameLesson(clicked, lesson) || !isSiblingHalf(clicked, lesson))) {
+      void unplace(clicked);
       return;
     }
-    const fullOcc = assignedMap.get(slotKey(weekDay, clockId, 3))?.[0];
-    const upOcc = assignedMap.get(slotKey(weekDay, clockId, 1))?.[0];
-    const downOcc = assignedMap.get(slotKey(weekDay, clockId, 2))?.[0];
-    if (weekType === 3 && (upOcc || downOcc)) {
+    if (lesson && list.some((x) => sameLesson(x, lesson))) {
+      return;
+    }
+    const fullList = assignedMap.get(slotKey(weekDay, clockId, 3)) ?? [];
+    const upList = assignedMap.get(slotKey(weekDay, clockId, 1)) ?? [];
+    const downList = assignedMap.get(slotKey(weekDay, clockId, 2)) ?? [];
+    if (weekType === 3 && (upList.length || downList.length)) {
+      if (lesson && [...upList, ...downList].some((x) => isSiblingHalf(x, lesson))) {
+        const target: 1 | 2 | null = upList.length && !downList.length ? 2 : downList.length && !upList.length ? 1 : null;
+        if (target) {
+          void place(weekDay, clockId, target, lesson);
+          return;
+        }
+      }
       setError("Bu xanada üst və ya alt həftə dərsi var. Əvvəl onları silin.");
       return;
     }
-    if (weekType !== 3 && fullOcc) {
-      setError("Bu xanada tam dərs var. Əvvəl onu silin.");
-      return;
+    if (weekType !== 3 && fullList.length) {
+      if (!(lesson && fullList.some((x) => isSiblingHalf(x, lesson)))) {
+        setError("Bu xanada tam dərs var. Əvvəl onu silin.");
+        return;
+      }
     }
-    const lesson = lessonOverride ?? selected;
     if (!lesson) {
       setError("Əvvəl sağdakı fənni seçin, sonra xanaya klikləyin");
       return;
     }
-    const info = available.find((a) => a.course_id === lesson.course_id && a.lesson_type_id === lesson.lesson_type_id);
+    const info = available.find(
+      (a) => a.course_id === lesson.course_id && a.lesson_type_id === lesson.lesson_type_id && (a.course_group_id || "") === (lesson.course_group_id || "")
+    );
     const rem = remainingOf(info);
-    if (weekType !== 3 && rem <= 0) {
+    const joining = Boolean(
+      info?.can_join &&
+        [...list, ...upList, ...downList, ...fullList].some((x) => isSiblingHalf(x, lesson))
+    );
+    if (weekType !== 3 && rem <= 0 && !joining && !list.some((x) => isSiblingHalf(x, lesson))) {
       setError("Bu fənn üçün boş saat qalmayıb");
       return;
     }
-    if (weekType === 3 && rem < 2) {
+    if (weekType === 3 && rem < 2 && !joining && !list.some((x) => isSiblingHalf(x, lesson))) {
       setError("Tam dərs üçün 2 saat lazımdır");
       return;
     }
@@ -335,8 +394,8 @@ export function TimetableBuilder() {
       e.preventDefault();
       return;
     }
-    setSelected({ course_id: lesson.course_id, lesson_type_id: lesson.lesson_type_id });
-    e.dataTransfer.setData("text/plain", lessonKey(lesson.course_id, lesson.lesson_type_id));
+    setSelected({ course_id: lesson.course_id, lesson_type_id: lesson.lesson_type_id, course_group_id: lesson.course_group_id || null });
+    e.dataTransfer.setData("text/plain", lessonKey(lesson.course_id, lesson.lesson_type_id, lesson.course_group_id));
     e.dataTransfer.effectAllowed = "copy";
   }
 
@@ -349,8 +408,11 @@ export function TimetableBuilder() {
     e.preventDefault();
     e.stopPropagation();
     const raw = e.dataTransfer.getData("text/plain");
-    const [courseId, lessonTypeId] = raw.split(":");
-    const lesson = courseId && lessonTypeId ? { course_id: courseId, lesson_type_id: lessonTypeId } : selected;
+    const [courseId, lessonTypeId, courseGroupId] = raw.split(":");
+    const lesson =
+      courseId && lessonTypeId
+        ? { course_id: courseId, lesson_type_id: lessonTypeId, course_group_id: courseGroupId || null }
+        : selected;
     if (lesson) setSelected(lesson);
     onHalfClick(weekDay, clockId, weekType, lesson ?? undefined);
   }
@@ -363,67 +425,69 @@ export function TimetableBuilder() {
     { week_day: 5, label: "V" },
   ];
 
-  function renderSlot(weekDay: number, clockId: string, weekType: 1 | 2 | 3, occ: TimetableAssignedSlot | undefined, canPlace: boolean) {
+  function renderSlot(weekDay: number, clockId: string, weekType: 1 | 2 | 3, occList: TimetableAssignedSlot[], canPlace: boolean) {
     const half = weekType !== 3;
     const title = weekType === 1 ? "Üst həftə" : weekType === 2 ? "Alt həftə" : "Tam dərs";
     const tag = weekType === 1 ? "Üst" : weekType === 2 ? "Alt" : "Tam";
-    const roomOptions: RoomOpt[] = (occ?.room_id && !rooms.some((r) => r.id === occ.room_id)
-      ? [{ id: occ.room_id, name: occ.room_name || occ.room_id }, ...rooms]
-      : rooms
-    ).map((r) => {
-      const occupied = occupiedRooms.some(
-        (o) =>
-          o.room_id === r.id &&
-          o.clock_id === clockId &&
-          Number(o.week_day) === weekDay &&
-          weekTypesOverlap(Number(o.week_type), weekType) &&
-          !(
-            occ &&
-            o.course_id === occ.course_id &&
-            o.lesson_type_id === occ.lesson_type_id &&
-            Number(o.week_type) === weekType
-          ) &&
-          !(occ && isLectureStreamShare(occ, o)),
-      );
-      return { ...r, occupied };
-    });
+    const occ = occList[0];
+    const canDrop = Boolean(groupId) && (occList.length === 0 || (selected && occList.some((x) => isSiblingHalf(x, selected)) && !occList.some((x) => sameLesson(x, selected))));
+    const roomOptionsFor = (item: TimetableAssignedSlot): RoomOpt[] =>
+      (item.room_id && !rooms.some((r) => r.id === item.room_id) ? [{ id: item.room_id, name: item.room_name || item.room_id }, ...rooms] : rooms).map((r) => {
+        const occupied = occupiedRooms.some(
+          (o) =>
+            o.room_id === r.id &&
+            o.clock_id === clockId &&
+            Number(o.week_day) === weekDay &&
+            weekTypesOverlap(Number(o.week_type), weekType) &&
+            !(o.course_id === item.course_id && o.lesson_type_id === item.lesson_type_id && Number(o.week_type) === weekType) &&
+            !isLectureStreamShare(item, o),
+        );
+        return { ...r, occupied };
+      });
 
     return (
       <div
         className={`${styles.slot} ${half ? styles.slotHalf : styles.slotFull} ${occ ? styles.slotFilled : ""} ${canPlace ? styles.slotActive : ""} ${!groupId ? styles.slotDisabled : ""}`}
-        onDragOver={occ || !groupId ? undefined : allowDrop}
-        onDrop={occ || !groupId ? undefined : (e) => onDrop(e, weekDay, clockId, weekType)}
+        onDragOver={canDrop ? allowDrop : undefined}
+        onDrop={canDrop ? (e) => onDrop(e, weekDay, clockId, weekType) : undefined}
       >
         <span className={styles.weekTag}>{tag}</span>
-        {occ ? (
-          <>
-            <SearchableSelect
-              compact
-              value={occ.room_id ?? ""}
-              disabled={busy}
-              placeholder="Otaq"
-              searchPlaceholder="Otaq axtar…"
-              triggerClassName={styles.slotRoom}
-              options={roomOptions.map((r) => ({
-                id: r.id,
-                label: r.occupied ? `${r.name || r.id} · doludur` : r.name || r.id,
-                disabled: Boolean(r.occupied),
-              }))}
-              onChange={(id) => {
-                void setRoom(occ, id || null);
-              }}
-            />
-            <button
-              type="button"
-              className={styles.slotBody}
-              disabled={busy}
-              title={`${title} · silmək üçün klik`}
-              onClick={() => onHalfClick(weekDay, clockId, weekType)}
-            >
-              <span className={styles.slotName}>{occ.subject_name_az}</span>
-              <span className={styles.letter}>{occ.lesson_letter}</span>
-            </button>
-          </>
+        {occList.length ? (
+          <div className={styles.slotStack}>
+            {occList.map((item) => (
+              <div key={lessonKey(item.course_id, item.lesson_type_id, item.course_group_id)} className={styles.slotItem}>
+                <SearchableSelect
+                  compact
+                  value={item.room_id ?? ""}
+                  disabled={busy}
+                  placeholder="Otaq"
+                  searchPlaceholder="Otaq axtar…"
+                  triggerClassName={styles.slotRoom}
+                  options={roomOptionsFor(item).map((r) => ({
+                    id: r.id,
+                    label: r.occupied ? `${r.name || r.id} · doludur` : r.name || r.id,
+                    disabled: Boolean(r.occupied),
+                  }))}
+                  onChange={(id) => {
+                    void setRoom(item, id || null);
+                  }}
+                />
+                <button
+                  type="button"
+                  className={styles.slotBody}
+                  disabled={busy}
+                  title={slotTooltip(item)}
+                  onClick={() => onHalfClick(weekDay, clockId, weekType, undefined, item)}
+                >
+                  <span className={styles.slotName}>
+                    {item.subject_name_az}
+                    {item.half_group_az ? ` · ${item.half_group_az}` : ""}
+                  </span>
+                  <span className={styles.letter}>{item.lesson_letter}</span>
+                </button>
+              </div>
+            ))}
+          </div>
         ) : (
           <button
             type="button"
@@ -460,13 +524,29 @@ export function TimetableBuilder() {
                   {clock.start_time} - {clock.end_time}
                 </td>
                 {days.map((d) => {
-                  const up = assignedMap.get(slotKey(d.week_day, clock.id, 1))?.[0];
-                  const down = assignedMap.get(slotKey(d.week_day, clock.id, 2))?.[0];
-                  const full = assignedMap.get(slotKey(d.week_day, clock.id, 3))?.[0];
+                  const up = assignedMap.get(slotKey(d.week_day, clock.id, 1)) ?? [];
+                  const down = assignedMap.get(slotKey(d.week_day, clock.id, 2)) ?? [];
+                  const full = assignedMap.get(slotKey(d.week_day, clock.id, 3)) ?? [];
                   const rem = remainingOf(selectedLesson);
-                  const canUp = Boolean(selected) && !up && !full && rem > 0;
-                  const canDown = Boolean(selected) && !down && !full && rem > 0;
-                  const canFull = Boolean(selected) && !full && !up && !down && rem >= 2;
+                  const joinable = Boolean(
+                    selected?.course_group_id &&
+                      [...up, ...down, ...full].some((x) => isSiblingHalf(x, selected))
+                  );
+                  const canStack = (list: TimetableAssignedSlot[]) =>
+                    Boolean(selected && list.some((x) => isSiblingHalf(x, selected)) && !list.some((x) => sameLesson(x, selected)));
+                  const canUp =
+                    Boolean(selected) &&
+                    !full.length &&
+                    ((up.length === 0 && (rem > 0 || joinable)) || canStack(up));
+                  const canDown =
+                    Boolean(selected) &&
+                    !full.length &&
+                    ((down.length === 0 && (rem > 0 || joinable)) || canStack(down));
+                  const canFull =
+                    Boolean(selected) &&
+                    ((full.length === 0 && !up.length && !down.length && rem >= 2) ||
+                      canStack(full) ||
+                      ((up.length || down.length) && joinable));
                   return (
                     <td key={`${clock.id}-${d.week_day}`}>
                       <div className={styles.cell}>
@@ -593,26 +673,34 @@ export function TimetableBuilder() {
               <div key={group.key} className={styles.subjectBlock}>
                 <div className={styles.subjectTitle}>{group.subject_name_az}</div>
                 {group.items.map((lesson) => {
-                  const isSel = selected?.course_id === lesson.course_id && selected?.lesson_type_id === lesson.lesson_type_id;
+                  const isSel =
+                    selected?.course_id === lesson.course_id &&
+                    selected?.lesson_type_id === lesson.lesson_type_id &&
+                    (selected?.course_group_id || "") === (lesson.course_group_id || "");
                   const rem = remainingOf(lesson);
-                  const done = rem <= 0;
+                  const done = !chipActive(lesson);
+                  const label = [lesson.lesson_type_az ?? lesson.lesson_letter, lesson.half_group_az].filter(Boolean).join(" · ");
                   return (
                     <button
-                      key={lessonKey(lesson.course_id, lesson.lesson_type_id)}
+                      key={lessonKey(lesson.course_id, lesson.lesson_type_id, lesson.course_group_id)}
                       type="button"
                       draggable={!done}
                       disabled={done}
                       className={`${styles.chip} ${isSel ? styles.chipSelected : ""} ${done ? styles.chipDone : ""}`}
                       onClick={() => {
                         if (done) return;
-                        setSelected({ course_id: lesson.course_id, lesson_type_id: lesson.lesson_type_id });
+                        setSelected({
+                          course_id: lesson.course_id,
+                          lesson_type_id: lesson.lesson_type_id,
+                          course_group_id: lesson.course_group_id || null,
+                        });
                       }}
                       onDragStart={(e) => onDragStart(e, lesson)}
-                      title={`${lesson.lesson_type_az ?? ""} · qalan ${rem} saat`}
+                      title={`${label}${lesson.teacher_fullname ? ` · ${lesson.teacher_fullname}` : ""} · qalan ${rem} saat`}
                     >
                       <span className={styles.chipName}>
                         <span className={styles.chipLetter}>{lesson.lesson_letter}</span>
-                        {lesson.lesson_type_az ?? lesson.lesson_letter}
+                        {label}
                       </span>
                       <span className={styles.chipHours}>{rem}</span>
                     </button>
