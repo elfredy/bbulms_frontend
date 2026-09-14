@@ -43,6 +43,12 @@ function weekTypesOverlap(a: number, b: number) {
   return a === 3 || b === 3 || a === b;
 }
 
+function isLectureStreamShare(a: { lesson_letter?: string | null; subject_id?: string | null; education_plan_subject_id?: string | null }, b: { lesson_letter?: string | null; subject_id?: string | null; education_plan_subject_id?: string | null }) {
+  if (a.lesson_letter !== "M" || b.lesson_letter !== "M") return false;
+  if (a.subject_id && b.subject_id) return a.subject_id === b.subject_id;
+  return Boolean(a.education_plan_subject_id) && a.education_plan_subject_id === b.education_plan_subject_id;
+}
+
 export function TimetableBuilder() {
   const [lookups, setLookups] = useState<TimetableLookups | null>(null);
   const [subjectTypeId, setSubjectTypeId] = useState("");
@@ -312,16 +318,13 @@ export function TimetableBuilder() {
       return;
     }
     const info = available.find((a) => a.course_id === lesson.course_id && a.lesson_type_id === lesson.lesson_type_id);
-    if (weekType === 1 && info && info.remaining_up <= 0) {
-      setError("Bu fənn üçün üst həftə saatı qalmayıb");
+    const rem = remainingOf(info);
+    if (weekType !== 3 && rem <= 0) {
+      setError("Bu fənn üçün boş saat qalmayıb");
       return;
     }
-    if (weekType === 2 && info && info.remaining_down <= 0) {
-      setError("Bu fənn üçün alt həftə saatı qalmayıb");
-      return;
-    }
-    if (weekType === 3 && info && (info.remaining_up <= 0 || info.remaining_down <= 0)) {
-      setError("Tam dərs üçün həm üst, həm alt həftə saatı lazımdır");
+    if (weekType === 3 && rem < 2) {
+      setError("Tam dərs üçün 2 saat lazımdır");
       return;
     }
     void place(weekDay, clockId, weekType, lesson);
@@ -337,8 +340,14 @@ export function TimetableBuilder() {
     e.dataTransfer.effectAllowed = "copy";
   }
 
+  function allowDrop(e: DragEvent<HTMLElement>) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  }
+
   function onDrop(e: DragEvent<HTMLElement>, weekDay: number, clockId: string, weekType: 1 | 2 | 3) {
     e.preventDefault();
+    e.stopPropagation();
     const raw = e.dataTransfer.getData("text/plain");
     const [courseId, lessonTypeId] = raw.split(":");
     const lesson = courseId && lessonTypeId ? { course_id: courseId, lesson_type_id: lessonTypeId } : selected;
@@ -357,6 +366,7 @@ export function TimetableBuilder() {
   function renderSlot(weekDay: number, clockId: string, weekType: 1 | 2 | 3, occ: TimetableAssignedSlot | undefined, canPlace: boolean) {
     const half = weekType !== 3;
     const title = weekType === 1 ? "Üst həftə" : weekType === 2 ? "Alt həftə" : "Tam dərs";
+    const tag = weekType === 1 ? "Üst" : weekType === 2 ? "Alt" : "Tam";
     const roomOptions: RoomOpt[] = (occ?.room_id && !rooms.some((r) => r.id === occ.room_id)
       ? [{ id: occ.room_id, name: occ.room_name || occ.room_id }, ...rooms]
       : rooms
@@ -372,7 +382,8 @@ export function TimetableBuilder() {
             o.course_id === occ.course_id &&
             o.lesson_type_id === occ.lesson_type_id &&
             Number(o.week_type) === weekType
-          ),
+          ) &&
+          !(occ && isLectureStreamShare(occ, o)),
       );
       return { ...r, occupied };
     });
@@ -380,7 +391,10 @@ export function TimetableBuilder() {
     return (
       <div
         className={`${styles.slot} ${half ? styles.slotHalf : styles.slotFull} ${occ ? styles.slotFilled : ""} ${canPlace ? styles.slotActive : ""} ${!groupId ? styles.slotDisabled : ""}`}
+        onDragOver={occ || !groupId ? undefined : allowDrop}
+        onDrop={occ || !groupId ? undefined : (e) => onDrop(e, weekDay, clockId, weekType)}
       >
+        <span className={styles.weekTag}>{tag}</span>
         {occ ? (
           <>
             <SearchableSelect
@@ -417,9 +431,7 @@ export function TimetableBuilder() {
             disabled={busy || !groupId}
             title={title}
             onClick={() => onHalfClick(weekDay, clockId, weekType)}
-            onDragOver={(e) => {
-              e.preventDefault();
-            }}
+            onDragOver={allowDrop}
             onDrop={(e) => onDrop(e, weekDay, clockId, weekType)}
           />
         )}
@@ -451,15 +463,10 @@ export function TimetableBuilder() {
                   const up = assignedMap.get(slotKey(d.week_day, clock.id, 1))?.[0];
                   const down = assignedMap.get(slotKey(d.week_day, clock.id, 2))?.[0];
                   const full = assignedMap.get(slotKey(d.week_day, clock.id, 3))?.[0];
-                  const canUp = Boolean(selected) && !up && !full && (selectedLesson?.remaining_up ?? 0) > 0;
-                  const canDown = Boolean(selected) && !down && !full && (selectedLesson?.remaining_down ?? 0) > 0;
-                  const canFull =
-                    Boolean(selected) &&
-                    !full &&
-                    !up &&
-                    !down &&
-                    (selectedLesson?.remaining_up ?? 0) > 0 &&
-                    (selectedLesson?.remaining_down ?? 0) > 0;
+                  const rem = remainingOf(selectedLesson);
+                  const canUp = Boolean(selected) && !up && !full && rem > 0;
+                  const canDown = Boolean(selected) && !down && !full && rem > 0;
+                  const canFull = Boolean(selected) && !full && !up && !down && rem >= 2;
                   return (
                     <td key={`${clock.id}-${d.week_day}`}>
                       <div className={styles.cell}>
@@ -557,7 +564,7 @@ export function TimetableBuilder() {
         {error ? <p className={styles.error}>{error}</p> : null}
         {okMsg ? <p className={styles.okMsg}>{okMsg}</p> : null}
         {!error && !okMsg ? (
-          <p className={styles.hint}>Fənni seçib üst/alt həftəyə və ya sağdakı tam dərs blokuna qoyun. Bitirdikdən sonra təsdiq edin.</p>
+          <p className={styles.hint}>Fənni seçib sol sütunda üst və ya alt həftəyə, sağda isə hər həftəki tam dərsə atın. Bitirdikdən sonra təsdiq edin.</p>
         ) : null}
 
         <button
@@ -601,7 +608,7 @@ export function TimetableBuilder() {
                         setSelected({ course_id: lesson.course_id, lesson_type_id: lesson.lesson_type_id });
                       }}
                       onDragStart={(e) => onDragStart(e, lesson)}
-                      title={`${lesson.lesson_type_az ?? ""} · qalan ${rem} saat (üst ${lesson.remaining_up} / alt ${lesson.remaining_down})`}
+                      title={`${lesson.lesson_type_az ?? ""} · qalan ${rem} saat`}
                     >
                       <span className={styles.chipName}>
                         <span className={styles.chipLetter}>{lesson.lesson_letter}</span>

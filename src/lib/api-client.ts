@@ -357,6 +357,8 @@ export type TimetableAssignedSlot = {
   lesson_letter: string;
   room_name: string | null;
   room_id: string | null;
+  education_plan_subject_id?: string | null;
+  subject_id?: string | null;
 };
 
 export type TimetableOccupiedRoom = {
@@ -366,6 +368,9 @@ export type TimetableOccupiedRoom = {
   room_id: string;
   course_id: string;
   lesson_type_id: string;
+  education_plan_subject_id?: string | null;
+  subject_id?: string | null;
+  lesson_letter?: string | null;
 };
 
 export type TimetableBoard = {

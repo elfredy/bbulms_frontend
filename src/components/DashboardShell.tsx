@@ -101,9 +101,7 @@ export function DashboardShell({ me, items, children }: Props) {
 
         <div className={styles.userCard}>
           <p className={styles.userName}>{me.display_name}</p>
-          <p className={styles.userMeta}>
-            {[me.username ? `@${me.username}` : null, me.user_type_label || me.user_type].filter(Boolean).join(" · ") || "\u00a0"}
-          </p>
+          <p className={styles.userMeta}>{me.user_type_label || me.user_type || "\u00a0"}</p>
           {me.available_roles && me.available_roles.length > 1 ? (
             <label className={styles.roleSwitch}>
               <span>Profil</span>

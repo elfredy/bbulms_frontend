@@ -119,7 +119,6 @@ export default async function DashboardPage({ params }: Props) {
         <div>
           <h1 className={styles.title}>{t("title")}</h1>
           <p className={styles.welcome}>{t("welcome", { displayName: user.display_name })}</p>
-          {user.username ? <p className={styles.meta}>{t("loginId", { username: user.username })}</p> : null}
           {user.user_type ? <p className={styles.meta}>{t("role", { role: user.user_type_label || user.user_type })}</p> : null}
           {isSuperadmin ? <p className={styles.meta}>Superadmin: aktiv</p> : null}
         </div>
