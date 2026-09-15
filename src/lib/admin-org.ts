@@ -125,7 +125,21 @@ export async function adminSearchUserRoles(opts?: { q?: string | null; limit?: n
   if (opts?.q?.trim()) params.set("q", opts.q.trim());
   params.set("limit", String(opts?.limit ?? 25));
   params.set("offset", String(opts?.offset ?? 0));
-  return adminGet<{ items: UserRoleListItem[]; total: number; limit: number; offset: number }>(`/api/admin/user-roles?${params}`);
+  const cookieStore = await cookies();
+  const header = cookieStore.toString();
+  if (!header) return null;
+  const origin = serverApiBase();
+  try {
+    const res = await fetch(`${origin}/api/admin/user-roles?${params}`, {
+      headers: { cookie: header },
+      cache: "no-store",
+      signal: AbortSignal.timeout(12000),
+    });
+    if (res.status === 403 || !res.ok) return null;
+    return (await res.json()) as { items: UserRoleListItem[]; total: number; limit: number; offset: number };
+  } catch {
+    return null;
+  }
 }
 
 export async function adminGetUserRole(personId: string) {

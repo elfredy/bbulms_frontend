@@ -25,13 +25,22 @@ export default async function AdminUserRolesPage({ params, searchParams }: Props
 
   if (!data) {
     return (
-      <div className={styles.page}>
+      <div className={styles.pageWide}>
         <header className={styles.headerCard}>
           <div>
             <h1 className={styles.title}>İstifadəçi rolları</h1>
-            <p className={styles.meta}>Məlumat yüklənmədi.</p>
+            <p className={styles.meta}>{q ? "Axtarış cavab vermədi. FİN-i tam yazıb yenidən yoxlayın." : "Məlumat yüklənmədi."}</p>
           </div>
         </header>
+        <div className={styles.content}>
+          <form className={styles.toolbar}>
+            <input name="q" defaultValue={q} placeholder="FİN kod, ad, istifadəçi adı…" className={styles.input} autoFocus />
+            <input type="hidden" name="page" value="1" />
+            <button type="submit" className={styles.button}>
+              Axtar
+            </button>
+          </form>
+        </div>
       </div>
     );
   }
