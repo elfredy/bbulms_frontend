@@ -21,6 +21,7 @@ import {
   upsertTeacherJournalCellsBulk,
   upsertTeacherJournalPoint,
 } from "@/lib/api-client";
+import { LogoutButton } from "@/components/LogoutButton";
 import { TeacherCourseLessons } from "@/components/TeacherCourseLessons";
 
 type TabId = "summary" | "lessons" | "files" | "attendance" | "exam" | "referat" | "colloquium";
@@ -1294,7 +1295,7 @@ export function JournalClient({
   return (
     <div className={styles.page}>
       <div className={styles.headerCard}>
-        <div>
+        <div className={styles.headerMain}>
           <h1 className={styles.title}>E-jurnal{subjectName ? ` · ${subjectName}` : ""}</h1>
           <p className={styles.meta}>
             {educationGroupName ? (
@@ -1306,44 +1307,45 @@ export function JournalClient({
             CourseTeacherId: {courseTeacherId} · CourseId: {courseId}
           </p>
         </div>
-        <a className={styles.backButton} href={`/${locale}/dashboard`}>
-          Geri
-        </a>
-      </div>
-
-      {tab !== "lessons" && tab !== "files" && tab !== "summary" ? (
-      <div className={styles.controls}>
-        <div className={styles.field}>
-          <div className={styles.label}>Dərs tipi</div>
-          <select className={styles.select} value={lessonTypeId ?? ""} disabled>
-            <option value={lessonTypeId ?? ""}>
-              {liveMeetings.find((m) => m.lesson_type_az)?.lesson_type_az || lessonTypeId || "—"}
-            </option>
-          </select>
+        {tab !== "lessons" && tab !== "files" && tab !== "summary" ? (
+          <div className={styles.headerFilters}>
+            <div className={styles.field}>
+              <div className={styles.label}>Dərs tipi</div>
+              <select className={styles.select} value={lessonTypeId ?? ""} disabled>
+                <option value={lessonTypeId ?? ""}>
+                  {liveMeetings.find((m) => m.lesson_type_az)?.lesson_type_az || lessonTypeId || "—"}
+                </option>
+              </select>
+            </div>
+            <div className={styles.field}>
+              <div className={styles.label}>Dərs tarixi</div>
+              <select
+                className={styles.select}
+                value={meetingId}
+                onChange={(e) => {
+                  const mid = String(e.target.value);
+                  setMeetingId(mid);
+                  if (mid) loadMeetingGrid(mid);
+                }}
+                disabled={visibleMeetings.length === 0}
+              >
+                {visibleMeetings.length === 0 ? <option value="">Tarix yoxdur</option> : null}
+                {visibleMeetings.map((m) => (
+                  <option key={m.course_meeting_id} value={m.course_meeting_id}>
+                    {fmtMeeting(m)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        ) : null}
+        <div className={styles.headerActions}>
+          <a className={styles.backButton} href={`/${locale}/dashboard`}>
+            Geri
+          </a>
+          <LogoutButton className={styles.logoutButton} />
         </div>
-
-        <div className={styles.field}>
-          <div className={styles.label}>Dərs tarixi</div>
-          <select
-            className={styles.select}
-            value={meetingId}
-            onChange={(e) => {
-              const mid = String(e.target.value);
-              setMeetingId(mid);
-              if (mid) loadMeetingGrid(mid);
-            }}
-            disabled={visibleMeetings.length === 0}
-          >
-            {visibleMeetings.length === 0 ? <option value="">Tarix yoxdur</option> : null}
-            {visibleMeetings.map((m) => (
-              <option key={m.course_meeting_id} value={m.course_meeting_id}>
-                {fmtMeeting(m)}
-              </option>
-            ))}
-          </select>
-        </div>
       </div>
-      ) : null}
 
       <div className={styles.tabsWrap}>
         <div className={styles.tabsList} role="tablist" aria-label="Jurnal bölmələri">
@@ -1374,30 +1376,24 @@ export function JournalClient({
         ) : null}
 
         {tab === "attendance" ? (
-          <div className={styles.controls} style={{ marginBottom: 12 }}>
-            <div className={styles.field}>
-              <div className={styles.label}>&nbsp;</div>
-              <button
-                type="button"
-                className={`${styles.btn} ${styles.btnPrimary}`}
-                onClick={() => confirmSaveAttendance()}
-                disabled={isPending || !attendanceCanConfirm}
-              >
-                Təsdiq et
-              </button>
-            </div>
-            <div className={styles.field}>
-              <div className={styles.label}>&nbsp;</div>
-              <button
-                type="button"
-                className={`${styles.btn} ${styles.btnDanger}`}
-                onClick={() => cancelPendingForAttendance()}
-                disabled={isPending || meetingPendingCount === 0}
-              >
-                Ləğv et
-              </button>
-            </div>
-            <div className={styles.muted} style={{ alignSelf: "end" }}>
+          <div className={styles.actionBar}>
+            <button
+              type="button"
+              className={`${styles.btn} ${styles.btnPrimary}`}
+              onClick={() => confirmSaveAttendance()}
+              disabled={isPending || !attendanceCanConfirm}
+            >
+              Təsdiq et
+            </button>
+            <button
+              type="button"
+              className={`${styles.btn} ${styles.btnDanger}`}
+              onClick={() => cancelPendingForAttendance()}
+              disabled={isPending || meetingPendingCount === 0}
+            >
+              Ləğv et
+            </button>
+            <div className={styles.actionHint}>
               {savingHint
                 ? savingHint
                 : meetingPendingCount
@@ -1406,11 +1402,11 @@ export function JournalClient({
                     ? "Qiymətlər yadda saxlanılıb. Ümumi hesablama üçün təsdiq edin."
                     : "Dəyişiklik yoxdur"}
             </div>
-            <div className={styles.muted} style={{ alignSelf: "end", padding: 0 }}>
+            <div className={styles.actionHint}>
               Üst və alt həftə eyni xanada düzəldilir (sol — üst, sağ — alt).
             </div>
             {!evalAttendance[0] && !evalSeminar[0] ? (
-              <div className={styles.muted} style={{ alignSelf: "end", color: "rgba(136, 19, 55, 1)" }}>
+              <div className={`${styles.actionHint} ${styles.actionHintWarn}`}>
                 Qiymətləndirmə (davamiyyət/aktivlik) tapılmadı. Səhifəni yeniləyin; yoxdursa fənn qrupuna EVA_01 və EVA_02 əlavə edin.
               </div>
             ) : null}
@@ -1484,7 +1480,9 @@ export function JournalClient({
                       </th>
                     );
                   })}
-                  <th className={`${styles.th} ${styles.qbCol}`}>q.b</th>
+                  <th className={`${styles.th} ${styles.qbCol}`}>
+                    <span className={styles.qbHead}>q.b</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -1636,30 +1634,24 @@ export function JournalClient({
                 const max = exType === "referat" ? 15 : 15;
                 return (
                   <>
-                    <div className={styles.controls} style={{ marginBottom: 12 }}>
-                      <div className={styles.field}>
-                        <div className={styles.label}>&nbsp;</div>
-                        <button
-                          type="button"
-                          className={`${styles.btn} ${styles.btnPrimary}`}
-                          onClick={() => confirmSaveExercises(exType as any)}
-                          disabled={isPending || !exerciseCanConfirm}
-                        >
-                          Təsdiq et
-                        </button>
-                      </div>
-                      <div className={styles.field}>
-                        <div className={styles.label}>&nbsp;</div>
-                        <button
-                          type="button"
-                          className={`${styles.btn} ${styles.btnDanger}`}
-                          onClick={() => cancelPendingForExercises(exType as any)}
-                          disabled={isPending || exercisePendingCount === 0}
-                        >
-                          Ləğv et
-                        </button>
-                      </div>
-                      <div className={styles.muted} style={{ alignSelf: "end" }}>
+                    <div className={styles.actionBar}>
+                      <button
+                        type="button"
+                        className={`${styles.btn} ${styles.btnPrimary}`}
+                        onClick={() => confirmSaveExercises(exType as any)}
+                        disabled={isPending || !exerciseCanConfirm}
+                      >
+                        Təsdiq et
+                      </button>
+                      <button
+                        type="button"
+                        className={`${styles.btn} ${styles.btnDanger}`}
+                        onClick={() => cancelPendingForExercises(exType as any)}
+                        disabled={isPending || exercisePendingCount === 0}
+                      >
+                        Ləğv et
+                      </button>
+                      <div className={styles.actionHint}>
                         {savingHint
                           ? savingHint
                           : exercisePendingCount

@@ -197,10 +197,12 @@ export function DashboardShell({ me, items, children }: Props) {
       </aside>
 
       <div className={styles.content}>
-        <div className={styles.topbar}>
-          <div className={styles.spacer} />
-          <LogoutButton className={`${styles.btn} ${styles.btnPrimary}`} />
-        </div>
+        {pathname?.includes("/dashboard/journal/") ? null : (
+          <div className={styles.topbar}>
+            <div className={styles.spacer} />
+            <LogoutButton className={`${styles.btn} ${styles.btnPrimary}`} />
+          </div>
+        )}
         {children}
       </div>
     </div>
