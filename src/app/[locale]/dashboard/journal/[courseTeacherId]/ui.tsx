@@ -284,15 +284,16 @@ export function JournalClient({
   evaluations: CourseEvaluationItem[];
   initialTab?: TabId;
 }) {
+  const [liveMeetings, setLiveMeetings] = useState(meetings);
   const visibleMeetings = useMemo(() => {
-    return [...meetings]
+    return [...liveMeetings]
       .filter((m) => Boolean(dateOnly(m.meeting_date)))
       .sort((a, b) => {
         const da = dateOnly(a.meeting_date);
         const db = dateOnly(b.meeting_date);
         return da.localeCompare(db);
       });
-  }, [meetings]);
+  }, [liveMeetings]);
 
   const meetingPairs = useMemo(() => buildMeetingPairs(visibleMeetings), [visibleMeetings]);
 
@@ -494,7 +495,7 @@ export function JournalClient({
         for (const c of res.cells) map[key(c.student_id, c.course_eva_id)] = c;
         next[mid] = map;
         locked[mid] = Boolean(res.meeting_confirmed) || res.editable === false || isConfirmedStatus(
-          meetings.find((m) => String(m.course_meeting_id) === mid)?.point_status
+          liveMeetings.find((m) => String(m.course_meeting_id) === mid)?.point_status
         );
       }
       setMeetingWindowCellsByMeetingId((prev) => ({ ...prev, ...next }));
@@ -662,11 +663,54 @@ export function JournalClient({
   }, []);
 
   useEffect(() => {
+    setLiveMeetings(meetings);
+  }, [meetings]);
+
+  useEffect(() => {
+    if (meetings.length > 0) return;
+    let cancelled = false;
+    fetch(`/api/teacher/courses/${encodeURIComponent(courseTeacherId)}/meetings`, {
+      credentials: "include",
+      cache: "no-store",
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        const items = Array.isArray(data?.meetings) ? data.meetings : [];
+        if (!cancelled && items.length) setLiveMeetings(items);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [courseTeacherId, meetings.length]);
+
+  useEffect(() => {
+    if (!visibleMeetings.length) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const idxToday = meetingPairs.findIndex((p) => {
+      const du = dateOnly(p.upper?.meeting_date);
+      const dl = dateOnly(p.lower?.meeting_date);
+      return du === today || dl === today;
+    });
+    setMeetingId((prev) => {
+      if (prev && visibleMeetings.some((m) => String(m.course_meeting_id) === prev)) return prev;
+      const fromToday = idxToday >= 0 ? meetingPairs[idxToday]?.upper ?? meetingPairs[idxToday]?.lower : null;
+      return String(fromToday?.course_meeting_id ?? visibleMeetings[0]?.course_meeting_id ?? "");
+    });
+    setMeetingWindowStart((prev) => {
+      if (prev !== 0) return prev;
+      const maxStart = Math.max(0, meetingPairs.length - PAIR_WINDOW_SIZE);
+      const idx = idxToday >= 0 ? idxToday : 0;
+      return Math.min(maxStart, Math.max(0, idx - 2));
+    });
+  }, [meetingPairs, visibleMeetings]);
+
+  useEffect(() => {
     if (tab !== "attendance") return;
     const mids = meetingWindow.map((m) => String(m.course_meeting_id));
     loadMeetingWindowGrids(mids);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, meetingWindowStart]);
+  }, [tab, meetingWindowStart, meetingPairs.length]);
 
   function isMeetingEval(courseEvaId: string): boolean {
     return (evaById.get(courseEvaId)?.evaluation_code ?? "").trim() === "EVA_01";
@@ -923,7 +967,9 @@ export function JournalClient({
         <div className={styles.field}>
           <div className={styles.label}>Dərs tipi</div>
           <select className={styles.select} value={lessonTypeId ?? ""} disabled>
-            <option value="">{lessonTypeId ?? "—"}</option>
+            <option value={lessonTypeId ?? ""}>
+              {liveMeetings.find((m) => m.lesson_type_az)?.lesson_type_az || lessonTypeId || "—"}
+            </option>
           </select>
         </div>
 
@@ -937,9 +983,10 @@ export function JournalClient({
               setMeetingId(mid);
               if (mid) loadMeetingGrid(mid);
             }}
-            disabled={meetings.length === 0}
+            disabled={visibleMeetings.length === 0}
           >
-            {meetings.map((m) => (
+            {visibleMeetings.length === 0 ? <option value="">Tarix yoxdur</option> : null}
+            {visibleMeetings.map((m) => (
               <option key={m.course_meeting_id} value={m.course_meeting_id}>
                 {fmtMeeting(m)}
               </option>
