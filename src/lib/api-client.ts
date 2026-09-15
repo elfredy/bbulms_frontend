@@ -316,7 +316,7 @@ export type TimetableLookups = {
   clocks: { id: string; start_time: string | null; end_time: string | null }[];
   rooms: { id: string; name: string | null; faculty_id: string | null; parent_id?: string | null }[];
   kurs_options: number[];
-  days: { week_day: number; label: string }[];
+  days: { week_day: number; label: string; name_az?: string | null }[];
 };
 
 export type TimetableGroupItem = {
@@ -394,6 +394,7 @@ export type TimetableBoard = {
   confirmed_count?: number;
   teacher_count?: number;
   confirmed?: boolean;
+  column_dates?: Record<string, string>;
 };
 
 export async function adminTimetableLookups(): Promise<TimetableLookups | null> {

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import type { CatalogTopicItem, LessonFileItem, LessonMeetingItem } from "@/lib/api";
+import { fmtClockRange } from "@/lib/clock-time";
 import {
   assignTeacherLessonTopic,
   deleteTeacherLessonFile,
@@ -27,7 +28,7 @@ function fmtDate(d: string | null | undefined): string {
 }
 
 function fmtTime(start: string | null | undefined, end: string | null | undefined): string {
-  return [start, end].filter(Boolean).join(" - ");
+  return fmtClockRange(start, end);
 }
 
 function lessonLetter(m: Pick<LessonMeetingItem, "lesson_type_id" | "lesson_type_az">): string {

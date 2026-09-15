@@ -42,6 +42,24 @@
   padding: 4px;
 }
 
+.thDayName {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #6b7280;
+  line-height: 1.2;
+  margin-top: 2px;
+}
+
+.thDayDate {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #1d4ed8;
+  font-variant-numeric: tabular-nums;
+  margin-top: 1px;
+}
+
 .thTime,
 .timeCell {
   width: 118px;

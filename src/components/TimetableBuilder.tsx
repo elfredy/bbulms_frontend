@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type DragEvent } from "react";
 
 import styles from "./TimetableBuilder.module.css";
-import { SearchableSelect } from "./SearchableSelect";
+import { fmtClockRange } from "@/lib/clock-time";
 import {
   adminTimetableBoard,
   adminTimetableConfirm,
@@ -30,8 +30,9 @@ function lessonKey(courseId: string, lessonTypeId: string, courseGroupId?: strin
   return `${courseId}:${lessonTypeId}:${courseGroupId || ""}`;
 }
 
-function slotKey(weekDay: number, clockId: string, weekType: number) {
-  return `${weekDay}:${clockId}:${weekType}`;
+function fmtColumnDate(iso?: string | null) {
+  if (!iso || iso.length < 10) return "";
+  return `${iso.slice(8, 10)}.${iso.slice(5, 7)}`;
 }
 
 function remainingOf(lesson: TimetableAvailableLesson | null | undefined) {
@@ -98,6 +99,7 @@ export function TimetableBuilder() {
   const [available, setAvailable] = useState<TimetableAvailableLesson[]>([]);
   const [assigned, setAssigned] = useState<TimetableAssignedSlot[]>([]);
   const [occupiedRooms, setOccupiedRooms] = useState<TimetableOccupiedRoom[]>([]);
+  const [columnDates, setColumnDates] = useState<Record<string, string>>({});
   const [hoursRemaining, setHoursRemaining] = useState(0);
   const [selected, setSelected] = useState<SelectedLesson | null>(null);
   const [busy, setBusy] = useState(false);
@@ -154,6 +156,7 @@ export function TimetableBuilder() {
       setAssigned([]);
       setAvailable([]);
       setOccupiedRooms([]);
+      setColumnDates({});
       setHoursRemaining(0);
       setConfirmInfo({ meeting_count: 0, pending_count: 0, confirmed_count: 0, teacher_count: 0, confirmed: false });
       return;
@@ -172,6 +175,7 @@ export function TimetableBuilder() {
     setAssigned(data.assigned);
     setAvailable(data.available);
     setOccupiedRooms(data.occupied_rooms ?? []);
+    setColumnDates(data.column_dates ?? {});
     setHoursRemaining(Number(data.hours_remaining ?? 0));
     setConfirmInfo({
       meeting_count: Number(data.meeting_count ?? 0),
@@ -423,11 +427,11 @@ export function TimetableBuilder() {
   }
 
   const days = lookups?.days ?? [
-    { week_day: 1, label: "I" },
-    { week_day: 2, label: "II" },
-    { week_day: 3, label: "III" },
-    { week_day: 4, label: "IV" },
-    { week_day: 5, label: "V" },
+    { week_day: 1, label: "I", name_az: "Bazar ertəsi" },
+    { week_day: 2, label: "II", name_az: "Çərşənbə axşamı" },
+    { week_day: 3, label: "III", name_az: "Çərşənbə" },
+    { week_day: 4, label: "IV", name_az: "Cümə axşamı" },
+    { week_day: 5, label: "V", name_az: "Cümə" },
   ];
 
   function renderSlot(weekDay: number, clockId: string, weekType: 1 | 2 | 3, occList: TimetableAssignedSlot[], canPlace: boolean) {
@@ -525,7 +529,11 @@ export function TimetableBuilder() {
               <th className={styles.thTime} />
               {days.map((d) => (
                 <th key={d.week_day} className={styles.thDay}>
-                  {d.label}
+                  <div>{d.label}</div>
+                  {d.name_az ? <div className={styles.thDayName}>{d.name_az}</div> : null}
+                  {columnDates[String(d.week_day)] ? (
+                    <div className={styles.thDayDate}>{fmtColumnDate(columnDates[String(d.week_day)])}</div>
+                  ) : null}
                 </th>
               ))}
             </tr>
@@ -534,7 +542,7 @@ export function TimetableBuilder() {
             {clocks.map((clock) => (
               <tr key={clock.id}>
                 <td className={styles.timeCell}>
-                  {clock.start_time} - {clock.end_time}
+                  {fmtClockRange(clock.start_time, clock.end_time) || "—"}
                 </td>
                 {days.map((d) => {
                   const up = assignedMap.get(slotKey(d.week_day, clock.id, 1)) ?? [];

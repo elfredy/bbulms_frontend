@@ -3,6 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 
 import { adminListCourseMeetings, getMe } from "@/lib/api";
+import { fmtClockRange } from "@/lib/clock-time";
 
 import styles from "../../../dashboard.module.css";
 import tableStyles from "./meetings-table.module.css";
@@ -13,10 +14,7 @@ type Props = {
 };
 
 function fmtTimeRange(start: string | null | undefined, end: string | null | undefined): string {
-  const s = (start ?? "").trim();
-  const e = (end ?? "").trim();
-  if (s && e) return `${s} – ${e}`;
-  return s || e || "—";
+  return fmtClockRange(start, end) || "—";
 }
 
 export default async function AdminCourseMeetingsPage({ params, searchParams }: Props) {

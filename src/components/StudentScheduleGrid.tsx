@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 
 import type { StudentScheduleResponse, StudentScheduleSlot } from "@/lib/api";
+import { fmtClockRange } from "@/lib/clock-time";
 
 import styles from "./StudentScheduleGrid.module.css";
 
@@ -97,7 +98,7 @@ export function StudentScheduleGrid({ data }: { data: StudentScheduleResponse })
                 {data.clocks.map((clock) => (
                   <tr key={clock.id}>
                     <th className={styles.thTime}>
-                      {[clock.start_time, clock.end_time].filter(Boolean).join("–") || "—"}
+                      {fmtClockRange(clock.start_time, clock.end_time) || "—"}
                     </th>
                     {data.days.map((day) => {
                       const slots = byCell.get(`${day.week_day}:${clock.id}`) ?? [];
@@ -134,7 +135,7 @@ export function StudentScheduleGrid({ data }: { data: StudentScheduleResponse })
                   <p className={styles.slotMeta}>
                     {[
                       formatDate(slot.meeting_date),
-                      [slot.start_time, slot.end_time].filter(Boolean).join("–"),
+                      fmtClockRange(slot.start_time, slot.end_time),
                       slot.lesson_type_az,
                       slot.room_name,
                       slot.teacher_fullname,

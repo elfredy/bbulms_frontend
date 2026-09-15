@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import styles from "./journal.module.css";
 
 import type { CourseEvaluationItem, CourseMeetingItem, JournalCell, StudentRosterItem } from "@/lib/api";
+import { fmtClockRange } from "@/lib/clock-time";
 import {
   confirmTeacherCourseExercise,
   confirmTeacherJournalMeeting,
@@ -139,8 +140,15 @@ function exercisePointDisplay(v: string | null | undefined): string {
   return "";
 }
 
+function fmtDateShort(d: string | null | undefined): string {
+  const s = fmtDateLabel(d);
+  const m = s.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if (m) return `${m[1]}.${m[2]}`;
+  return s;
+}
+
 function fmtTimeRange(start: string | null | undefined, end: string | null | undefined): string {
-  return [start, end].filter(Boolean).join(" - ");
+  return fmtClockRange(start, end);
 }
 
 /** Mühazirə → M, Seminar → S, Laboratoriya → L */
@@ -1072,7 +1080,13 @@ export function JournalClient({
                     return (
                       <th key={p.key} className={`${styles.th} ${styles.thCell} ${split ? styles.thPair : ""}`}>
                         <div className={styles.pairTitle}>
-                          {[dayLabel, fmtTimeRange(p.start_time, p.end_time), lt].filter(Boolean).join(" · ")}
+                          <div className={styles.pairKicker}>
+                            <span>{dayLabel}</span>
+                            {lt ? <span className={styles.pairType}>{lt}</span> : null}
+                          </div>
+                          {fmtTimeRange(p.start_time, p.end_time) ? (
+                            <div className={styles.pairTime}>{fmtTimeRange(p.start_time, p.end_time)}</div>
+                          ) : null}
                         </div>
                         <div className={split ? styles.splitHead : undefined}>
                           {halves.map(({ tag, m }) => {
@@ -1080,12 +1094,12 @@ export function JournalClient({
                             const locked = Boolean(meetingLockedById[mid]);
                             return (
                               <div key={mid} className={styles.halfHead}>
-                                <div className={tag === "Üst" ? styles.weekTagUp : styles.weekTagDown}>{tag}</div>
-                                <div>{fmtDateLabel(m.meeting_date)}</div>
+                                <div className={styles.halfMeta}>
+                                  <span className={tag === "Üst" ? styles.weekTagUp : styles.weekTagDown}>{tag}</span>
+                                  <span className={styles.halfDate}>{fmtDateShort(m.meeting_date)}</span>
+                                </div>
                                 {locked ? (
-                                  <div className={styles.muted} style={{ fontSize: 12, fontWeight: 700, padding: "0.35rem 0 0", color: "rgba(20, 83, 45, 1)" }}>
-                                    Təsdiqlənib
-                                  </div>
+                                  <div className={styles.lockedNote}>Təsdiqlənib</div>
                                 ) : (
                                   <div className={styles.bulkRowStack}>
                                     <select
@@ -1108,7 +1122,7 @@ export function JournalClient({
                                       onClick={() => bulkApplyMeeting(mid)}
                                       disabled={isPending}
                                     >
-                                      Hamıya eyni
+                                      Hamısına
                                     </button>
                                   </div>
                                 )}
