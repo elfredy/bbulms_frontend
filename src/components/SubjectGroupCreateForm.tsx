@@ -241,6 +241,7 @@ export function SubjectGroupCreateForm({
   const [extraStudentQuery, setExtraStudentQuery] = useState("");
   const [extraLoading, setExtraLoading] = useState(false);
   const [halfPicks, setHalfPicks] = useState<HalfPick[]>([]);
+  const [openHalfId, setOpenHalfId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -681,6 +682,7 @@ export function SubjectGroupCreateForm({
     setEvas([]);
     setTeacherPicks([{ teacher_id: "", lesson_type_id: sem }]);
     setHalfPicks([]);
+    setOpenHalfId(null);
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -859,7 +861,21 @@ export function SubjectGroupCreateForm({
     if (k === "fm") return hoursVis.fm;
     return true;
   });
+  const halfLessonTypes = (() => {
+    const byId = new Map<string, Opt>();
+    for (const o of lookups.lesson_types) {
+      const k = lessonKind(o);
+      if (k === "s" || k === "l") byId.set(o.id, o);
+    }
+    for (const o of visibleLessonTypes) {
+      if (lessonKind(o) !== "m") byId.set(o.id, o);
+    }
+    const order = { s: 0, l: 1, fm: 2, other: 3, m: 4 } as const;
+    return Array.from(byId.values()).sort((a, b) => order[lessonKind(a)] - order[lessonKind(b)]);
+  })();
   const seminarId =
+    halfLessonTypes.find((x) => lessonKind(x) === "s")?.id ||
+    halfLessonTypes.find((x) => lessonKind(x) === "l")?.id ||
     visibleLessonTypes.find((x) => lessonKind(x) === "s")?.id ||
     visibleLessonTypes[0]?.id ||
     lookups.lesson_types[0]?.id ||
@@ -872,6 +888,28 @@ export function SubjectGroupCreateForm({
     }
     return Array.from(map.values());
   })();
+
+  function studentLabel(sid: string) {
+    const st = students.find((s) => s.id === sid);
+    return st ? `${st.name || sid}${st.group_name ? ` · ${st.group_name}` : ""}` : sid;
+  }
+
+  function showHalfStudents(halfGroupId: string) {
+    if (openHalfId === halfGroupId) {
+      setOpenHalfId(null);
+      return;
+    }
+    setHalfPicks((prev) => {
+      const picked = prev.find((h) => h.half_group_id === halfGroupId);
+      if (!picked || studentIds.length === 0) return prev;
+      const sameTypeHasStudents = prev.some(
+        (h) => h.lesson_type_id === picked.lesson_type_id && (h.student_ids ?? []).length > 0,
+      );
+      if (sameTypeHasStudents) return prev;
+      return autoSplitHalves(studentIds, prev, students, picked.lesson_type_id);
+    });
+    setOpenHalfId(halfGroupId);
+  }
 
   return (
     <form className={styles.form} onSubmit={onSubmit} noValidate>
@@ -1299,116 +1337,106 @@ export function SubjectGroupCreateForm({
 
       <div className={tab === "half" ? undefined : styles.hidden}>
         <section className={styles.card}>
-          <h2 className={styles.cardTitle}>Yarımqruplar</h2>
+          <div className={styles.studentHead}>
+            <h2 className={styles.cardTitle}>Yarımqruplar</h2>
+            {halfPicks.length > 0 ? (
+              <button
+                type="button"
+                className={styles.buttonAdd}
+                onClick={() => setHalfPicks((prev) => autoSplitHalves(studentIds, prev, students))}
+                disabled={studentIds.length === 0}
+              >
+                Avtomatik böl
+              </button>
+            ) : null}
+          </div>
           {lookups.half_groups.length === 0 ? <p className={styles.label}>Yarımqrup tapılmadı.</p> : null}
           {lookups.half_groups.map((hg) => {
             const picked = halfPicks.find((x) => x.half_group_id === hg.id);
+            const halfStudents = (picked?.student_ids ?? [])
+              .filter((id) => studentIds.includes(id))
+              .sort((a, b) => studentLabel(a).localeCompare(studentLabel(b), "az"));
+            const open = openHalfId === hg.id;
             return (
-              <div key={hg.id} className={styles.halfRow}>
-                <label className={styles.checkItem}>
-                  <input
-                    type="checkbox"
-                    checked={Boolean(picked)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setHalfPicks((prev) => [...prev, { half_group_id: hg.id, lesson_type_id: seminarId, teacher_id: "", student_ids: [] }]);
-                      } else {
-                        setHalfPicks((prev) => prev.filter((x) => x.half_group_id !== hg.id));
-                      }
-                    }}
+              <div key={hg.id} className={styles.halfBlock}>
+                <div className={styles.halfRow}>
+                  <label className={styles.checkItem}>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(picked)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setHalfPicks((prev) => [
+                            ...prev,
+                            { half_group_id: hg.id, lesson_type_id: seminarId, teacher_id: "", student_ids: [] },
+                          ]);
+                        } else {
+                          setHalfPicks((prev) => prev.filter((x) => x.half_group_id !== hg.id));
+                          setOpenHalfId((cur) => (cur === hg.id ? null : cur));
+                        }
+                      }}
+                    />
+                    <span>{labelOf(hg)}</span>
+                  </label>
+                  <select
+                    className={styles.select}
+                    disabled={!picked}
+                    value={picked?.lesson_type_id ?? ""}
+                    onChange={(e) =>
+                      setHalfPicks((prev) => prev.map((x) => (x.half_group_id === hg.id ? { ...x, lesson_type_id: e.target.value } : x)))
+                    }
+                  >
+                    <option value="">Dərs növü</option>
+                    {halfLessonTypes.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {labelOf(o)}
+                      </option>
+                    ))}
+                  </select>
+                  <SearchableSelect
+                    disabled={!picked}
+                    value={picked?.teacher_id ?? ""}
+                    onChange={(id) => setHalfPicks((prev) => prev.map((x) => (x.half_group_id === hg.id ? { ...x, teacher_id: id } : x)))}
+                    placeholder="Müəllim (istəyə bağlı)"
+                    searchPlaceholder="Axtar…"
+                    onQueryChange={setTeacherQuery}
+                    options={teacherOptions.map((t) => ({
+                      id: t.id,
+                      label: teacherSearchLabel(t),
+                    }))}
                   />
-                  <span>{labelOf(hg)}</span>
-                </label>
-                <select
-                  className={styles.select}
-                  disabled={!picked}
-                  value={picked?.lesson_type_id ?? ""}
-                  onChange={(e) =>
-                    setHalfPicks((prev) => prev.map((x) => (x.half_group_id === hg.id ? { ...x, lesson_type_id: e.target.value } : x)))
-                  }
-                >
-                  <option value="">Dərs növü</option>
-                  {visibleLessonTypes.map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {labelOf(o)}
-                    </option>
-                  ))}
-                </select>
-                <SearchableSelect
-                  disabled={!picked}
-                  value={picked?.teacher_id ?? ""}
-                  onChange={(id) => setHalfPicks((prev) => prev.map((x) => (x.half_group_id === hg.id ? { ...x, teacher_id: id } : x)))}
-                  placeholder="Müəllim (istəyə bağlı)"
-                  searchPlaceholder="Axtar…"
-                  onQueryChange={setTeacherQuery}
-                  options={teacherOptions.map((t) => ({
-                    id: t.id,
-                    label: teacherSearchLabel(t),
-                  }))}
-                />
+                  <button
+                    type="button"
+                    className={styles.buttonGhost}
+                    disabled={!picked}
+                    onClick={() => showHalfStudents(hg.id)}
+                  >
+                    {open ? "Gizlət" : "Tələbələri göstər"}
+                  </button>
+                </div>
+                {picked && open ? (
+                  <div className={styles.halfStudentPanel}>
+                    {studentIds.length === 0 ? (
+                      <p className={styles.label}>Əvvəl Tələbələr tabında tələbə seçin.</p>
+                    ) : halfStudents.length === 0 ? (
+                      <p className={styles.label}>Bu yarımqrupda tələbə yoxdur. Əvvəl «Avtomatik böl» düyməsini basın.</p>
+                    ) : (
+                      <>
+                        <p className={styles.label}>
+                          {labelOf(hg)} · {halfStudents.length} tələbə
+                        </p>
+                        <ol className={styles.halfStudentList}>
+                          {halfStudents.map((sid) => (
+                            <li key={sid}>{studentLabel(sid)}</li>
+                          ))}
+                        </ol>
+                      </>
+                    )}
+                  </div>
+                ) : null}
               </div>
             );
           })}
-          {halfPicks.length > 0 ? (
-            <div className={styles.halfStudents}>
-              <div className={styles.studentHead}>
-                <h3 className={styles.cardTitle}>Tələbə bölgüsü</h3>
-                <button
-                  type="button"
-                  className={styles.buttonAdd}
-                  onClick={() => setHalfPicks((prev) => autoSplitHalves(studentIds, prev, students))}
-                  disabled={studentIds.length === 0}
-                >
-                  Avtomatik böl
-                </button>
-              </div>
-              {studentIds.length === 0 ? (
-                <p className={styles.label}>Əvvəl Tələbələr tabında tələbə seçin.</p>
-              ) : (
-                <div className={styles.halfStudentList}>
-                  {studentIds.map((sid) => {
-                    const st = students.find((s) => s.id === sid);
-                    const current = halfPicks.find((h) => (h.student_ids ?? []).includes(sid));
-                    return (
-                      <label key={sid} className={styles.halfStudentRow}>
-                        <span>{st?.name || sid}{st?.group_name ? ` · ${st.group_name}` : ""}</span>
-                        <select
-                          className={styles.select}
-                          value={current ? `${current.lesson_type_id}:${current.half_group_id}` : ""}
-                          onChange={(e) => {
-                            const [lt, hid] = e.target.value.split(":");
-                            setHalfPicks((prev) =>
-                              prev.map((h) => {
-                                const without = (h.student_ids ?? []).filter((id) => id !== sid);
-                                if (h.lesson_type_id === lt && h.half_group_id === hid) {
-                                  return { ...h, student_ids: [...without, sid] };
-                                }
-                                if (h.lesson_type_id === lt) {
-                                  return { ...h, student_ids: without };
-                                }
-                                return h;
-                              }),
-                            );
-                          }}
-                        >
-                          <option value="">— yarımqrup —</option>
-                          {halfPicks.map((h) => {
-                            const hg = lookups.half_groups.find((x) => x.id === h.half_group_id);
-                            const lt = visibleLessonTypes.find((x) => x.id === h.lesson_type_id);
-                            return (
-                              <option key={`${h.lesson_type_id}:${h.half_group_id}`} value={`${h.lesson_type_id}:${h.half_group_id}`}>
-                                {[labelOf(hg || { id: h.half_group_id }), lt ? labelOf(lt) : ""].filter(Boolean).join(" · ")}
-                              </option>
-                            );
-                          })}
-                        </select>
-                      </label>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          ) : null}
         </section>
       </div>
 

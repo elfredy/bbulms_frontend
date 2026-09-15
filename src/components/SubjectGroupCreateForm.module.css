@@ -285,14 +285,29 @@
   align-items: end;
 }
 
+.halfBlock {
+  display: grid;
+  gap: 8px;
+}
+
 .halfRow {
   display: grid;
-  grid-template-columns: auto 1fr 1fr 1fr;
+  grid-template-columns: auto minmax(140px, 1fr) minmax(180px, 1.2fr) auto;
   gap: 8px;
   align-items: center;
 }
 
-.halfStudents .buttonAdd {
+.halfStudentPanel {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.halfStudents .buttonAdd,
+.studentHead .buttonAdd {
   width: auto;
   padding: 8px 14px;
   font-size: 0.88rem;
@@ -300,9 +315,15 @@
 
 .halfStudentList {
   display: grid;
-  gap: 6px;
+  gap: 4px;
   max-height: 360px;
   overflow: auto;
+  margin: 0;
+  padding-left: 22px;
+}
+
+.halfRow .buttonGhost {
+  white-space: nowrap;
 }
 
 .halfStudentRow {
