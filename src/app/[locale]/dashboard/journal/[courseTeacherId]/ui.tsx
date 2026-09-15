@@ -99,7 +99,17 @@ function key(studentId: string, courseEvaId: string): string {
 }
 
 function byCode(evals: CourseEvaluationItem[], code: string) {
-  return evals.filter((e) => (e.evaluation_code ?? "").trim() === code);
+  const needle = code.trim().toUpperCase();
+  const exact = evals.filter((e) => (e.evaluation_code ?? "").trim().toUpperCase() === needle);
+  if (exact.length) return exact;
+  const nameOf = (e: CourseEvaluationItem) => (e.evaluation_name_az ?? "").trim().toLowerCase();
+  if (needle === "EVA_01") {
+    return evals.filter((e) => /davamiyy|mühazirə bal|muhazire bal/.test(nameOf(e)));
+  }
+  if (needle === "EVA_02") {
+    return evals.filter((e) => /aktivlik|dərs aktiv|ders aktiv/.test(nameOf(e)));
+  }
+  return [];
 }
 
 function parseNum(v: string | null | undefined): number | null {
@@ -993,6 +1003,11 @@ export function JournalClient({
             <div className={styles.muted} style={{ alignSelf: "end", padding: 0 }}>
               Üst və alt həftə eyni xanada düzəldilir (sol — üst, sağ — alt).
             </div>
+            {!evalAttendance[0] && !evalSeminar[0] ? (
+              <div className={styles.muted} style={{ alignSelf: "end", color: "rgba(136, 19, 55, 1)" }}>
+                Qiymətləndirmə (davamiyyət/aktivlik) tapılmadı. Səhifəni yeniləyin; yoxdursa fənn qrupuna EVA_01 və EVA_02 əlavə edin.
+              </div>
+            ) : null}
           </div>
         ) : null}
 
@@ -1126,7 +1141,9 @@ export function JournalClient({
                       </button>
                     </div>
                     {pairWindow.length === 0 ? (
-                      <div className={styles.pagerMeta}>Dərs tarixi yoxdur</div>
+                      <div className={styles.pagerMeta}>
+                        Dərs tarixi yoxdur. Cədvəl təsdiqlənəndən sonra burda tələbə və dərs sütunları görünəcək; qiyməti siyahıdan seçib yazmaq olar.
+                      </div>
                     ) : null}
                   </td>
                   {pairWindow.length > 0 ? (
