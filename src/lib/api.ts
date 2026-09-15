@@ -327,6 +327,7 @@ export type TeacherCourseItem = {
   semester_name_az?: string | null;
   lesson_type_az: string | null;
   lesson_type_code?: string | null;
+  half_group_az?: string | null;
 };
 
 export type TeacherCoursesResponse = {
@@ -980,12 +981,15 @@ export async function adminBulkCreateCourseMeetings(
   return res.json();
 }
 
-export async function getTeacherCourseRoster(courseId: string): Promise<StudentRosterResponse | null> {
+export async function getTeacherCourseRoster(courseId: string, courseTeacherIds?: string[]): Promise<StudentRosterResponse | null> {
   const cookieStore = await cookies();
   const header = cookieStore.toString();
   if (!header) return null;
   const origin = serverApiBase();
-  const res = await fetch(`${origin}/api/teacher/courses/${courseId}/roster`, {
+  const qs = courseTeacherIds?.length
+    ? `?course_teacher_ids=${encodeURIComponent(courseTeacherIds.join(","))}`
+    : "";
+  const res = await fetch(`${origin}/api/teacher/courses/${courseId}/roster${qs}`, {
     headers: { cookie: header },
     cache: "no-store",
   });

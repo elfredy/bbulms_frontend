@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import styles from "./journal.module.css";
 
 import type { CourseEvaluationItem, CourseMeetingItem, JournalCell, StudentRosterItem } from "@/lib/api";
-import { fmtClockRange } from "@/lib/clock-time";
+import { fmtClockRange, fmtClockTime } from "@/lib/clock-time";
 import {
   confirmTeacherCourseExercise,
   confirmTeacherJournalMeeting,
@@ -58,6 +58,27 @@ const WEEK_DAY_LABELS = ["", "I", "II", "III", "IV", "V", "VI", "VII"];
 
 function isAttendanceValue(rawValue: string | null | undefined): boolean {
   return ATTENDANCE_CODE_SET.has(String(rawValue ?? "").trim().toLowerCase());
+}
+
+function isQbText(rawValue: string | null | undefined): boolean {
+  const s = String(rawValue ?? "").trim().toLowerCase().replace(/\s+/g, "");
+  return s === "q.b" || s === "qb";
+}
+
+function meetingStartMs(m: CourseMeetingItem): number | null {
+  const d = dateOnly(m.meeting_date);
+  if (!d) return null;
+  const t = fmtClockTime(m.start_time);
+  if (!t || !/^\d{2}:\d{2}$/.test(t)) return null;
+  const ms = Date.parse(`${d}T${t}:00+04:00`);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function isQbLocked(m: CourseMeetingItem, display: string, now: number): boolean {
+  if (!isQbText(display)) return false;
+  const start = meetingStartMs(m);
+  if (start == null) return false;
+  return now >= start + 15 * 60 * 1000;
 }
 
 /** Qiymət (0–max) + davamiyyət kodları (10-dan sonra). */
@@ -277,6 +298,9 @@ export function JournalClient({
   locale,
   courseTeacherId,
   courseId,
+  educationGroupName,
+  halfGroupName,
+  subjectName,
   lessonTypeId,
   meetings,
   roster,
@@ -286,6 +310,9 @@ export function JournalClient({
   locale: string;
   courseTeacherId: string;
   courseId: string;
+  educationGroupName?: string | null;
+  halfGroupName?: string | null;
+  subjectName?: string | null;
   lessonTypeId: string | null;
   meetings: CourseMeetingItem[];
   roster: StudentRosterItem[];
@@ -332,6 +359,14 @@ export function JournalClient({
   >({});
   const [err, setErr] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [savingHint, setSavingHint] = useState<string | null>(null);
+  const meetingSaveQueueRef = useRef<Record<string, { student_id: string; course_eva_id: string; value: string | null }[]>>({});
+  const meetingSavingRef = useRef<Record<string, boolean>>({});
+  const exerciseSaveQueueRef = useRef<Record<string, { type: "colloquium" | "referat"; cells: { student_id: string; value: string | null }[] }>>({});
+  const exerciseSavingRef = useRef<Record<string, boolean>>({});
+  const meetingPendingRef = useRef<Record<string, string>>({});
+  const exercisePendingRef = useRef<Record<string, string>>({});
 
   const [exerciseItemsByType, setExerciseItemsByType] = useState<Record<string, { items: any[] }>>({});
   const [exercisePointsByExerciseId, setExercisePointsByExerciseId] = useState<Record<string, Record<string, string>>>({});
@@ -372,6 +407,143 @@ export function JournalClient({
     return `${mid}:${studentId}:${courseEvaId}`;
   }
 
+  useEffect(() => {
+    meetingPendingRef.current = meetingPendingByKey;
+  }, [meetingPendingByKey]);
+
+  useEffect(() => {
+    exercisePendingRef.current = exercisePendingByKey;
+  }, [exercisePendingByKey]);
+
+  useEffect(() => {
+    const t = window.setInterval(() => setNowMs(Date.now()), 30000);
+    return () => window.clearInterval(t);
+  }, []);
+
+  async function flushMeetingQueue(mid: string): Promise<boolean> {
+    if (meetingSavingRef.current[mid]) return true;
+    meetingSavingRef.current[mid] = true;
+    let ok = true;
+    try {
+      while ((meetingSaveQueueRef.current[mid] ?? []).length) {
+        const batch = meetingSaveQueueRef.current[mid];
+        meetingSaveQueueRef.current[mid] = [];
+        const uniq = new Map<string, { student_id: string; course_eva_id: string; value: string | null }>();
+        for (const c of batch) uniq.set(`${c.student_id}:${c.course_eva_id}`, c);
+        const cells = Array.from(uniq.values());
+        if (!cells.length) continue;
+        setSavingHint("Yadda saxlanılır…");
+        const res = await upsertTeacherJournalCellsBulk(courseId, { course_meeting_id: mid, cells });
+        if (!res.ok) {
+          setErr(res.error);
+          meetingSaveQueueRef.current[mid] = [...cells, ...(meetingSaveQueueRef.current[mid] ?? [])];
+          ok = false;
+          break;
+        }
+        setMeetingPendingByKey((prev) => {
+          const next = { ...prev };
+          for (const c of cells) delete next[meetingCellKey(mid, c.student_id, c.course_eva_id)];
+          return next;
+        });
+      }
+    } finally {
+      meetingSavingRef.current[mid] = false;
+      if (ok && (meetingSaveQueueRef.current[mid] ?? []).length) {
+        ok = await flushMeetingQueue(mid);
+      }
+    }
+    if (ok) setSavingHint(null);
+    return ok;
+  }
+
+  function queueMeetingCells(mid: string, cells: { student_id: string; course_eva_id: string; value: string | null }[]) {
+    if (!cells.length) return;
+    meetingSaveQueueRef.current[mid] = [...(meetingSaveQueueRef.current[mid] ?? []), ...cells];
+    void flushMeetingQueue(mid);
+  }
+
+  async function flushAllMeetingQueues(): Promise<boolean> {
+    const mids = Object.keys(meetingSaveQueueRef.current);
+    let ok = true;
+    for (const mid of mids) {
+      if (!(await flushMeetingQueue(mid))) ok = false;
+    }
+    return ok;
+  }
+
+  async function flushExerciseQueue(exType: "colloquium" | "referat", exerciseId: string): Promise<boolean> {
+    const qk = `${exType}:${exerciseId}`;
+    if (exerciseSavingRef.current[qk]) return true;
+    exerciseSavingRef.current[qk] = true;
+    let ok = true;
+    try {
+      while ((exerciseSaveQueueRef.current[qk]?.cells ?? []).length) {
+        const batch = exerciseSaveQueueRef.current[qk].cells;
+        exerciseSaveQueueRef.current[qk] = { type: exType, cells: [] };
+        const uniq = new Map<string, { student_id: string; value: string | null }>();
+        for (const c of batch) uniq.set(c.student_id, c);
+        const cells = Array.from(uniq.values());
+        if (!cells.length) continue;
+        setSavingHint("Yadda saxlanılır…");
+        const res = await upsertTeacherCourseExercisePointsBulk(courseId, exType, exerciseId, { cells });
+        if (!res) {
+          setErr("Yadda saxlanmadı (1 həftə limiti bitmiş və ya təsdiqlənmiş ola bilər)");
+          exerciseSaveQueueRef.current[qk] = { type: exType, cells: [...cells, ...(exerciseSaveQueueRef.current[qk]?.cells ?? [])] };
+          ok = false;
+          break;
+        }
+        setExercisePendingByKey((prev) => {
+          const next = { ...prev };
+          for (const c of cells) delete next[`${exType}:${exerciseId}:${c.student_id}`];
+          return next;
+        });
+      }
+    } finally {
+      exerciseSavingRef.current[qk] = false;
+      if (ok && (exerciseSaveQueueRef.current[qk]?.cells ?? []).length) {
+        ok = await flushExerciseQueue(exType, exerciseId);
+      }
+    }
+    if (ok) setSavingHint(null);
+    return ok;
+  }
+
+  function queueExerciseCells(exType: "colloquium" | "referat", exerciseId: string, cells: { student_id: string; value: string | null }[]) {
+    if (!cells.length) return;
+    const qk = `${exType}:${exerciseId}`;
+    const cur = exerciseSaveQueueRef.current[qk]?.cells ?? [];
+    exerciseSaveQueueRef.current[qk] = { type: exType, cells: [...cur, ...cells] };
+    void flushExerciseQueue(exType, exerciseId);
+  }
+
+  async function flushAllExerciseQueues(): Promise<boolean> {
+    let ok = true;
+    for (const [qk, item] of Object.entries(exerciseSaveQueueRef.current)) {
+      const parts = qk.split(":");
+      const exType = parts[0] as "colloquium" | "referat";
+      const exerciseId = parts.slice(1).join(":");
+      if (!exerciseId || (item.cells ?? []).length === 0) continue;
+      if (!(await flushExerciseQueue(exType, exerciseId))) ok = false;
+    }
+    return ok;
+  }
+
+  useEffect(() => {
+    const flush = () => {
+      void flushAllMeetingQueues();
+      void flushAllExerciseQueues();
+    };
+    const onHide = () => flush();
+    window.addEventListener("pagehide", onHide);
+    document.addEventListener("visibilitychange", onHide);
+    return () => {
+      window.removeEventListener("pagehide", onHide);
+      document.removeEventListener("visibilitychange", onHide);
+      flush();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [courseId]);
+
   const seminarMaxPoint = Math.min(Number(evalSeminar[0]?.max_point ?? 10) || 10, 10);
   const meetingCombinedOpts = useMemo(() => combinedMeetingOptions(seminarMaxPoint), [seminarMaxPoint]);
 
@@ -391,20 +563,25 @@ export function JournalClient({
   }
 
   /** Bir select: rəqəm → EVA_02 (+ i.e), davamiyyət kodu → EVA_01 (aktivlik silinir). */
-  function setMeetingCombined(mid: string, studentId: string, rawNext: string) {
+  function setMeetingCombined(mid: string, studentId: string, rawNext: string, meeting: CourseMeetingItem) {
     if (meetingLockedById[mid]) return;
     const evaA = evalAttendance[0];
     const evaS = evalSeminar[0];
     if (!evaA && !evaS) return;
 
+    const cellMap = meetingWindowCellsByMeetingId[mid] ?? {};
+    const currentDisplay = meetingCombinedDisplay(cellMap, studentId);
+    if (isQbLocked(meeting, currentDisplay, nowMs)) return;
+
     const next = String(rawNext ?? "").trim();
     const n = parseNum(next);
     const isAtt = isAttendanceValue(next);
+    const cells: { student_id: string; course_eva_id: string; value: string | null }[] = [];
 
     setMeetingWindowCellsByMeetingId((prev) => {
-      const cellMap = { ...(prev[mid] ?? {}) };
+      const nextMap = { ...(prev[mid] ?? {}) };
       const write = (evaId: string, value: string | null) => {
-        cellMap[key(studentId, evaId)] = { student_id: studentId, course_eva_id: evaId, value };
+        nextMap[key(studentId, evaId)] = { student_id: studentId, course_eva_id: evaId, value };
       };
 
       if (!next) {
@@ -419,7 +596,7 @@ export function JournalClient({
       } else {
         return prev;
       }
-      return { ...prev, [mid]: cellMap };
+      return { ...prev, [mid]: nextMap };
     });
 
     setMeetingPendingByKey((prev) => {
@@ -436,9 +613,22 @@ export function JournalClient({
       }
       return p;
     });
+
+    if (!next) {
+      if (evaA) cells.push({ student_id: studentId, course_eva_id: evaA.course_eva_id, value: null });
+      if (evaS) cells.push({ student_id: studentId, course_eva_id: evaS.course_eva_id, value: null });
+    } else if (n != null) {
+      if (evaS) cells.push({ student_id: studentId, course_eva_id: evaS.course_eva_id, value: next });
+      if (evaA) cells.push({ student_id: studentId, course_eva_id: evaA.course_eva_id, value: "i.e" });
+    } else if (isAtt) {
+      if (evaA) cells.push({ student_id: studentId, course_eva_id: evaA.course_eva_id, value: next });
+      if (evaS) cells.push({ student_id: studentId, course_eva_id: evaS.course_eva_id, value: null });
+    }
+    queueMeetingCells(mid, cells);
+    if (isQbText(next)) setNowMs(Date.now());
   }
 
-  function bulkApplyMeeting(mid: string) {
+  function bulkApplyMeeting(mid: string, meeting: CourseMeetingItem) {
     if (meetingLockedById[mid]) return;
     const raw = (bulkValueByMeetingId[mid] ?? "").trim();
     const evaA = evalAttendance[0];
@@ -448,10 +638,15 @@ export function JournalClient({
     const n = parseNum(raw);
     const isAtt = isAttendanceValue(raw);
     setErr(null);
+    const persistCells: { student_id: string; course_eva_id: string; value: string | null }[] = [];
+    const currentMap = meetingWindowCellsByMeetingId[mid] ?? {};
 
     setMeetingWindowCellsByMeetingId((prev) => {
-      const cellMap = { ...(prev[mid] ?? {}) };
+      const source = prev[mid] ?? {};
+      const cellMap = { ...source };
       for (const s of roster) {
+        const display = meetingCombinedDisplay(source, s.student_id);
+        if (isQbLocked(meeting, display, nowMs)) continue;
         const write = (evaId: string, value: string | null) => {
           cellMap[key(s.student_id, evaId)] = { student_id: s.student_id, course_eva_id: evaId, value };
         };
@@ -472,6 +667,8 @@ export function JournalClient({
     setMeetingPendingByKey((prev) => {
       const p = { ...prev };
       for (const s of roster) {
+        const display = meetingCombinedDisplay(currentMap, s.student_id);
+        if (isQbLocked(meeting, display, nowMs)) continue;
         if (!raw) {
           if (evaA) p[meetingCellKey(mid, s.student_id, evaA.course_eva_id)] = "";
           if (evaS) p[meetingCellKey(mid, s.student_id, evaS.course_eva_id)] = "";
@@ -485,6 +682,24 @@ export function JournalClient({
       }
       return p;
     });
+
+    for (const s of roster) {
+      const display = meetingCombinedDisplay(currentMap, s.student_id);
+      if (isQbLocked(meeting, display, nowMs)) continue;
+      if (!raw) {
+        if (evaA) persistCells.push({ student_id: s.student_id, course_eva_id: evaA.course_eva_id, value: null });
+        if (evaS) persistCells.push({ student_id: s.student_id, course_eva_id: evaS.course_eva_id, value: null });
+      } else if (n != null) {
+        if (evaS) persistCells.push({ student_id: s.student_id, course_eva_id: evaS.course_eva_id, value: raw });
+        if (evaA) persistCells.push({ student_id: s.student_id, course_eva_id: evaA.course_eva_id, value: "i.e" });
+      } else if (isAtt) {
+        if (evaA) persistCells.push({ student_id: s.student_id, course_eva_id: evaA.course_eva_id, value: raw });
+        if (evaS) persistCells.push({ student_id: s.student_id, course_eva_id: evaS.course_eva_id, value: null });
+      }
+    }
+
+    queueMeetingCells(mid, persistCells);
+    if (isQbText(raw)) setNowMs(Date.now());
   }
 
   function loadMeetingWindowGrids(mids: string[]) {
@@ -506,7 +721,22 @@ export function JournalClient({
           liveMeetings.find((m) => String(m.course_meeting_id) === mid)?.point_status
         );
       }
-      setMeetingWindowCellsByMeetingId((prev) => ({ ...prev, ...next }));
+      setMeetingWindowCellsByMeetingId((prev) => {
+        const merged = { ...prev, ...next };
+        const pending = meetingPendingRef.current;
+        for (const [k, v] of Object.entries(pending)) {
+          const parts = k.split(":");
+          const pmid = parts[0];
+          const studentId = parts[1];
+          const courseEvaId = parts[2];
+          if (!pmid || !studentId || !courseEvaId || !merged[pmid]) continue;
+          merged[pmid] = {
+            ...merged[pmid],
+            [key(studentId, courseEvaId)]: { student_id: studentId, course_eva_id: courseEvaId, value: v || null },
+          };
+        }
+        return merged;
+      });
       setMeetingLockedById((prev) => ({ ...prev, ...locked }));
     });
   }
@@ -587,14 +817,17 @@ export function JournalClient({
           pointsMapByExerciseId[eid][String(c.student_id)] = exercisePointDisplay(c.value);
         }
       }
-      setExercisePointsByExerciseId((prev) => ({ ...prev, ...pointsMapByExerciseId }));
-      setExercisePendingByKey((prev) => {
-        const prefix = `${type}:`;
-        const next: Record<string, string> = {};
-        for (const [k, v] of Object.entries(prev)) {
-          if (!k.startsWith(prefix)) next[k] = v;
+      setExercisePointsByExerciseId((prev) => {
+        const merged = { ...prev, ...pointsMapByExerciseId };
+        for (const [k, v] of Object.entries(exercisePendingRef.current)) {
+          if (!k.startsWith(`${type}:`)) continue;
+          const parts = k.split(":");
+          const eid = parts[1];
+          const sid = parts[2];
+          if (!eid || !sid) continue;
+          merged[eid] = { ...(merged[eid] ?? {}), [sid]: v };
         }
-        return next;
+        return merged;
       });
     });
   }
@@ -634,6 +867,7 @@ export function JournalClient({
     }
     const k = `${type}:${exerciseId}:${studentId}`;
     setExercisePendingByKey((prev) => ({ ...prev, [k]: next }));
+    queueExerciseCells(type, exerciseId, [{ student_id: studentId, value: next || null }]);
   }
 
   // initial load
@@ -714,9 +948,20 @@ export function JournalClient({
   }, [meetingPairs, visibleMeetings]);
 
   useEffect(() => {
-    if (tab !== "attendance") return;
-    const mids = meetingWindow.map((m) => String(m.course_meeting_id));
-    loadMeetingWindowGrids(mids);
+    if (tab !== "attendance") {
+      void flushAllMeetingQueues();
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      await flushAllMeetingQueues();
+      if (cancelled) return;
+      const mids = meetingWindow.map((m) => String(m.course_meeting_id));
+      loadMeetingWindowGrids(mids);
+    })();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, meetingWindowStart, meetingPairs.length]);
 
@@ -830,10 +1075,30 @@ export function JournalClient({
     const prefix = `${tab}:`;
     return Object.keys(exercisePendingByKey).filter((k) => k.startsWith(prefix)).length;
   }, [exercisePendingByKey, tab]);
+  const attendanceCanConfirm = useMemo(() => {
+    return meetingWindow.some((m) => {
+      const mid = String(m.course_meeting_id);
+      if (meetingLockedById[mid]) return false;
+      if (Object.keys(meetingPendingByKey).some((k) => k.startsWith(`${mid}:`))) return true;
+      const cellMap = meetingWindowCellsByMeetingId[mid] ?? {};
+      return Object.values(cellMap).some((c) => String(c.value ?? "").trim() !== "");
+    });
+  }, [meetingWindow, meetingLockedById, meetingPendingByKey, meetingWindowCellsByMeetingId]);
+  const exerciseCanConfirm = useMemo(() => {
+    if (tab !== "referat" && tab !== "colloquium") return false;
+    if (exercisePendingCount > 0) return true;
+    const items = (exerciseItemsByType[tab]?.items ?? []) as any[];
+    return items.some((it) => {
+      if (it.confirmed || !it.editable) return false;
+      const pts = exercisePointsByExerciseId[String(it.course_execises_id)] ?? {};
+      return Object.values(pts).some((v) => String(v ?? "").trim() !== "");
+    });
+  }, [tab, exercisePendingCount, exerciseItemsByType, exercisePointsByExerciseId]);
 
   function cancelPendingForAttendance() {
     setPendingByKey({});
     setMeetingPendingByKey({});
+    meetingSaveQueueRef.current = {};
     if (meetingId) loadMeetingGrid(meetingId);
     loadPointsGrid();
     const mids = meetingWindow.map((m) => String(m.course_meeting_id));
@@ -849,38 +1114,57 @@ export function JournalClient({
       }
       return next;
     });
+    for (const qk of Object.keys(exerciseSaveQueueRef.current)) {
+      if (qk.startsWith(`${exType}:`)) delete exerciseSaveQueueRef.current[qk];
+    }
     loadExercises(exType);
   }
 
+  function meetingHasStoredValues(mid: string): boolean {
+    if (Object.keys(meetingPendingRef.current).some((k) => k.startsWith(`${mid}:`))) return true;
+    if ((meetingSaveQueueRef.current[mid] ?? []).length) return true;
+    const cellMap = meetingWindowCellsByMeetingId[mid] ?? {};
+    return Object.values(cellMap).some((c) => String(c.value ?? "").trim() !== "");
+  }
+
   function confirmSaveAttendance() {
-    if (meetingPendingCount === 0) return;
-    if (!window.confirm("Daxil etdiyiniz göstəriciləri yadda saxlayıb təsdiqləmək istəyirsiniz? Təsdiqdən sonra dəyişiklik mümkün olmayacaq.")) return;
+    const mids = meetingWindow
+      .map((m) => String(m.course_meeting_id))
+      .filter((mid) => !meetingLockedById[mid] && meetingHasStoredValues(mid));
+    if (mids.length === 0 && meetingPendingCount === 0) return;
+    if (!window.confirm("Qiymətləndirməni təsdiqləmək istəyirsiniz? Təsdiqdən sonra dəyişiklik mümkün olmayacaq və ümumi hesablamada nəzərə alınacaq.")) return;
 
     setErr(null);
     startTransition(async () => {
-      const byMeeting: Record<string, { student_id: string; course_eva_id: string; value: string | null }[]> = {};
-      for (const [k, v] of Object.entries(meetingPendingByKey)) {
+      if (!(await flushAllMeetingQueues())) return;
+
+      const pendingByMeeting: Record<string, { student_id: string; course_eva_id: string; value: string | null }[]> = {};
+      for (const [k, v] of Object.entries(meetingPendingRef.current)) {
         const parts = k.split(":");
         const mid = parts[0];
         const studentId = parts[1];
         const courseEvaId = parts[2];
         if (!mid || !studentId || !courseEvaId) continue;
         if (meetingLockedById[mid]) continue;
-        (byMeeting[mid] ??= []).push({
+        (pendingByMeeting[mid] ??= []).push({
           student_id: studentId,
           course_eva_id: courseEvaId,
           value: v.trim() || null,
         });
       }
 
-      for (const [mid, cells] of Object.entries(byMeeting)) {
-        const res = await upsertTeacherJournalCellsBulk(courseId, {
-          course_meeting_id: mid,
-          cells,
-        });
-        if (!res.ok) {
-          setErr(res.error);
-          return;
+      const confirmIds = Array.from(new Set([...mids, ...Object.keys(pendingByMeeting)]));
+      for (const mid of confirmIds) {
+        const cells = pendingByMeeting[mid];
+        if (cells?.length) {
+          const res = await upsertTeacherJournalCellsBulk(courseId, {
+            course_meeting_id: mid,
+            cells,
+          });
+          if (!res.ok) {
+            setErr(res.error);
+            return;
+          }
         }
         const confirmed = await confirmTeacherJournalMeeting(courseId, { course_meeting_id: mid });
         if (!confirmed) {
@@ -900,29 +1184,40 @@ export function JournalClient({
 
   function confirmSaveExercises(exType: "colloquium" | "referat") {
     const prefix = `${exType}:`;
-    const entries = Object.entries(exercisePendingByKey).filter(([k]) => k.startsWith(prefix));
-    if (entries.length === 0) return;
-    if (!window.confirm("Daxil etdiyiniz göstəriciləri yadda saxlayıb təsdiqləmək istəyirsiniz? Təsdiqdən sonra dəyişiklik mümkün olmayacaq.")) return;
+    const items = (exerciseItemsByType[exType]?.items ?? []) as any[];
+    const idsFromPending = Object.keys(exercisePendingRef.current)
+      .filter((k) => k.startsWith(prefix))
+      .map((k) => k.split(":")[1])
+      .filter(Boolean);
+    const idsFromSaved = items
+      .filter((it) => !it.confirmed && it.editable)
+      .map((it) => String(it.course_execises_id))
+      .filter((eid) => {
+        const pts = exercisePointsByExerciseId[eid] ?? {};
+        return Object.values(pts).some((v) => String(v ?? "").trim() !== "");
+      });
+    const touchedExerciseIds = Array.from(new Set([...idsFromPending, ...idsFromSaved]));
+    if (touchedExerciseIds.length === 0) return;
+    if (!window.confirm("Qiymətləndirməni təsdiqləmək istəyirsiniz? Təsdiqdən sonra dəyişiklik mümkün olmayacaq və ümumi hesablamada nəzərə alınacaq.")) return;
 
     setErr(null);
     startTransition(async () => {
-      const byExercise: Record<string, { student_id: string; value: string | null }[]> = {};
-      for (const [k, v] of entries) {
-        const parts = k.split(":");
-        const exerciseId = parts[1];
-        const studentId = parts[2];
-        if (!exerciseId || !studentId) continue;
-        (byExercise[exerciseId] ??= []).push({ student_id: studentId, value: v || null });
-      }
+      if (!(await flushAllExerciseQueues())) return;
 
-      const touchedExerciseIds = Object.keys(byExercise);
       for (const exerciseId of touchedExerciseIds) {
-        const cells = byExercise[exerciseId];
-        if (!cells?.length) continue;
-        const res = await upsertTeacherCourseExercisePointsBulk(courseId, exType, exerciseId, { cells });
-        if (!res) {
-          setErr("Yadda saxlanmadı (1 həftə limiti bitmiş və ya təsdiqlənmiş ola bilər)");
-          return;
+        const pendingCells: { student_id: string; value: string | null }[] = [];
+        for (const [k, v] of Object.entries(exercisePendingRef.current)) {
+          if (!k.startsWith(`${exType}:${exerciseId}:`)) continue;
+          const studentId = k.split(":")[2];
+          if (!studentId) continue;
+          pendingCells.push({ student_id: studentId, value: v || null });
+        }
+        if (pendingCells.length) {
+          const res = await upsertTeacherCourseExercisePointsBulk(courseId, exType, exerciseId, { cells: pendingCells });
+          if (!res) {
+            setErr("Yadda saxlanmadı (1 həftə limiti bitmiş və ya təsdiqlənmiş ola bilər)");
+            return;
+          }
         }
         const confirmed = await confirmTeacherCourseExercise(courseId, exType, exerciseId);
         if (!confirmed) {
@@ -962,8 +1257,16 @@ export function JournalClient({
     <div className={styles.page}>
       <div className={styles.headerCard}>
         <div>
-          <h1 className={styles.title}>E-jurnal</h1>
-          <p className={styles.meta}>CourseTeacherId: {courseTeacherId} · CourseId: {courseId}</p>
+          <h1 className={styles.title}>E-jurnal{subjectName ? ` · ${subjectName}` : ""}</h1>
+          <p className={styles.meta}>
+            {educationGroupName ? (
+              <span className={styles.groupMeta}>Qrup: {educationGroupName}</span>
+            ) : null}
+            {educationGroupName && halfGroupName ? " · " : null}
+            {halfGroupName ? <span>Yarımqrup: {halfGroupName}</span> : null}
+            {educationGroupName || halfGroupName ? " · " : null}
+            CourseTeacherId: {courseTeacherId} · CourseId: {courseId}
+          </p>
         </div>
         <a className={styles.backButton} href={`/${locale}/dashboard`}>
           Geri
@@ -1011,7 +1314,11 @@ export function JournalClient({
               key={t.id}
               type="button"
               className={`${styles.tab} ${tab === t.id ? styles.tabActive : ""}`}
-              onClick={() => setTab(t.id)}
+              onClick={() => {
+                void flushAllMeetingQueues();
+                void flushAllExerciseQueues();
+                setTab(t.id);
+              }}
             >
               {t.label}
             </button>
@@ -1036,7 +1343,7 @@ export function JournalClient({
                 type="button"
                 className={`${styles.btn} ${styles.btnPrimary}`}
                 onClick={() => confirmSaveAttendance()}
-                disabled={isPending || meetingPendingCount === 0}
+                disabled={isPending || !attendanceCanConfirm}
               >
                 Təsdiq et
               </button>
@@ -1053,7 +1360,13 @@ export function JournalClient({
               </button>
             </div>
             <div className={styles.muted} style={{ alignSelf: "end" }}>
-              {meetingPendingCount ? `${meetingPendingCount} dəyişiklik gözləyir` : "Dəyişiklik yoxdur"}
+              {savingHint
+                ? savingHint
+                : meetingPendingCount
+                  ? `${meetingPendingCount} dəyişiklik yadda saxlanır`
+                  : attendanceCanConfirm
+                    ? "Qiymətlər yadda saxlanılıb. Ümumi hesablama üçün təsdiq edin."
+                    : "Dəyişiklik yoxdur"}
             </div>
             <div className={styles.muted} style={{ alignSelf: "end", padding: 0 }}>
               Üst və alt həftə eyni xanada düzəldilir (sol — üst, sağ — alt).
@@ -1119,7 +1432,7 @@ export function JournalClient({
                                     <button
                                       type="button"
                                       className={styles.bulkButton}
-                                      onClick={() => bulkApplyMeeting(mid)}
+                                      onClick={() => bulkApplyMeeting(mid, m)}
                                       disabled={isPending}
                                     >
                                       Hamısına
@@ -1153,13 +1466,15 @@ export function JournalClient({
                               const cellMap = meetingWindowCellsByMeetingId[mid] ?? {};
                               const display = meetingCombinedDisplay(cellMap, s.student_id);
                               const tone = cellToneClass(styles, display, isAttendanceValue(display));
+                              const qbLocked = isQbLocked(m, display, nowMs);
                               return (
                                 <select
                                   key={mid}
                                   className={`${styles.cellSelect} ${tone}`}
                                   value={display}
-                                  onChange={(ev) => setMeetingCombined(mid, s.student_id, String(ev.target.value))}
-                                  disabled={isPending || locked}
+                                  onChange={(ev) => setMeetingCombined(mid, s.student_id, String(ev.target.value), m)}
+                                  disabled={isPending || locked || qbLocked}
+                                  title={qbLocked ? "q.b dərs başladıqdan 15 dəqiqə sonra dəyişdirilə bilməz" : undefined}
                                 >
                                   {meetingCombinedOpts.map((o) => (
                                     <option key={`${o.value}-${o.label}`} value={o.value}>
@@ -1266,7 +1581,7 @@ export function JournalClient({
                 })}
               </tbody>
             </table>
-            <div className={styles.muted}>Qeyd: Bu cədvəl serverdə “köhnə sistem” hesablanma qaydası ilə çıxarılır.</div>
+            <div className={styles.muted}>Qeyd: Yalnız təsdiqlənmiş qiymətlər ümumi hesablamaya daxil edilir.</div>
           </div>
         ) : tab === "attendance" ? null : tab === "colloquium" || tab === "referat" || visibleEvals.length > 0 ? (
           <div className={styles.tableWrap}>
@@ -1284,7 +1599,7 @@ export function JournalClient({
                           type="button"
                           className={`${styles.btn} ${styles.btnPrimary}`}
                           onClick={() => confirmSaveExercises(exType as any)}
-                          disabled={isPending || exercisePendingCount === 0}
+                          disabled={isPending || !exerciseCanConfirm}
                         >
                           Təsdiq et
                         </button>
@@ -1301,7 +1616,13 @@ export function JournalClient({
                         </button>
                       </div>
                       <div className={styles.muted} style={{ alignSelf: "end" }}>
-                        {exercisePendingCount ? `${exercisePendingCount} dəyişiklik gözləyir` : "Dəyişiklik yoxdur"}
+                        {savingHint
+                          ? savingHint
+                          : exercisePendingCount
+                            ? `${exercisePendingCount} dəyişiklik yadda saxlanır`
+                            : exerciseCanConfirm
+                              ? "Qiymətlər yadda saxlanılıb. Ümumi hesablama üçün təsdiq edin."
+                              : "Dəyişiklik yoxdur"}
                       </div>
                     </div>
 

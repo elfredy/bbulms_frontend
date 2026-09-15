@@ -48,7 +48,7 @@ type EvaRow = {
   access_l: boolean;
 };
 type TeacherPick = { teacher_id: string; lesson_type_id: string };
-type HalfPick = { half_group_id: string; lesson_type_id: string; teacher_id: string };
+type HalfPick = { half_group_id: string; lesson_type_id: string; teacher_id: string; student_ids: string[] };
 
 type Lookups = {
   organizations: Opt[];
@@ -123,6 +123,59 @@ function lessonKind(o: Opt): "m" | "s" | "l" | "fm" | "other" {
   if (n.includes("sem") || n.includes("məşğ") || n.includes("mashg") || n.includes("məsg")) return "s";
   if (n.includes("kurs") || n.includes("fərdi") || n.includes("fm")) return "fm";
   return "other";
+}
+
+function autoSplitHalves(studentIds: string[], halves: HalfPick[], students: Opt[], lessonTypeId?: string): HalfPick[] {
+  const types = lessonTypeId
+    ? [lessonTypeId]
+    : Array.from(new Set(halves.map((h) => h.lesson_type_id).filter(Boolean)));
+  let next = halves.map((h) => ({ ...h, student_ids: [...(h.student_ids ?? [])] }));
+  for (const lt of types) {
+    const group = next.filter((h) => h.lesson_type_id === lt);
+    if (group.length === 0) continue;
+    const sorted = [...studentIds].sort((a, b) => {
+      const na = students.find((s) => s.id === a)?.name || "";
+      const nb = students.find((s) => s.id === b)?.name || "";
+      return na.localeCompare(nb, "az");
+    });
+    const size = Math.max(1, Math.ceil(sorted.length / group.length));
+    const buckets = new Map<string, string[]>();
+    for (const h of group) buckets.set(h.half_group_id, []);
+    sorted.forEach((sid, i) => {
+      const gi = Math.min(Math.floor(i / size), group.length - 1);
+      buckets.get(group[gi].half_group_id)?.push(sid);
+    });
+    next = next.map((h) => (h.lesson_type_id === lt ? { ...h, student_ids: buckets.get(h.half_group_id) ?? [] } : h));
+  }
+  return next;
+}
+
+function withAssignedHalfStudents(halfPicks: HalfPick[], studentIds: string[], students: Opt[]): HalfPick[] {
+  let next = halfPicks.map((h) => ({
+    ...h,
+    student_ids: (h.student_ids ?? []).filter((id) => studentIds.includes(id)),
+  }));
+  const types = Array.from(new Set(next.map((h) => h.lesson_type_id).filter(Boolean)));
+  for (const lt of types) {
+    const group = next.filter((h) => h.lesson_type_id === lt);
+    const assigned = new Set(group.flatMap((h) => h.student_ids));
+    if (assigned.size === 0) {
+      next = autoSplitHalves(studentIds, next, students, lt);
+      continue;
+    }
+    const missing = studentIds.filter((id) => !assigned.has(id));
+    for (const sid of missing) {
+      const counts = new Map(group.map((h) => [h.half_group_id, h.student_ids.length]));
+      const smallestId = [...counts.entries()].sort((a, b) => a[1] - b[1])[0]?.[0];
+      if (!smallestId) continue;
+      next = next.map((h) =>
+        h.half_group_id === smallestId && h.lesson_type_id === lt ? { ...h, student_ids: [...h.student_ids, sid] } : h,
+      );
+      const g = group.find((h) => h.half_group_id === smallestId);
+      if (g) g.student_ids.push(sid);
+    }
+  }
+  return next;
 }
 
 async function readDetail(res: Response, fallback: string) {
@@ -284,6 +337,7 @@ export function SubjectGroupCreateForm({
             half_group_id: String(h.half_group_id),
             lesson_type_id: String(h.lesson_type_id),
             teacher_id: h.teacher_id ? String(h.teacher_id) : "",
+            student_ids: Array.isArray(h.student_ids) ? h.student_ids.map(String) : [],
           }))
         );
       })
@@ -680,13 +734,16 @@ export function SubjectGroupCreateForm({
       })),
       teachers: teacherPicks.filter((t) => t.teacher_id && t.lesson_type_id),
       student_ids: studentIds,
-      half_groups: halfPicks
-        .filter((h) => h.half_group_id && h.lesson_type_id)
-        .map((h) => ({
-          half_group_id: h.half_group_id,
-          lesson_type_id: h.lesson_type_id,
-          teacher_id: h.teacher_id || null,
-        })),
+      half_groups: withAssignedHalfStudents(
+        halfPicks.filter((h) => h.half_group_id && h.lesson_type_id),
+        studentIds,
+        students,
+      ).map((h) => ({
+        half_group_id: h.half_group_id,
+        lesson_type_id: h.lesson_type_id,
+        teacher_id: h.teacher_id || null,
+        student_ids: h.student_ids,
+      })),
     };
     try {
       const updating = Boolean(createdCourseId);
@@ -763,13 +820,16 @@ export function SubjectGroupCreateForm({
           })),
           teachers: teacherPicks.filter((t) => t.teacher_id && t.lesson_type_id),
           student_ids: studentIds,
-          half_groups: halfPicks
-            .filter((h) => h.half_group_id && h.lesson_type_id)
-            .map((h) => ({
-              half_group_id: h.half_group_id,
-              lesson_type_id: h.lesson_type_id,
-              teacher_id: h.teacher_id || null,
-            })),
+          half_groups: withAssignedHalfStudents(
+            halfPicks.filter((h) => h.half_group_id && h.lesson_type_id),
+            studentIds,
+            students,
+          ).map((h) => ({
+            half_group_id: h.half_group_id,
+            lesson_type_id: h.lesson_type_id,
+            teacher_id: h.teacher_id || null,
+            student_ids: h.student_ids,
+          })),
         }),
       });
       if (!res.ok) {
@@ -1251,7 +1311,7 @@ export function SubjectGroupCreateForm({
                     checked={Boolean(picked)}
                     onChange={(e) => {
                       if (e.target.checked) {
-                        setHalfPicks((prev) => [...prev, { half_group_id: hg.id, lesson_type_id: seminarId, teacher_id: "" }]);
+                        setHalfPicks((prev) => [...prev, { half_group_id: hg.id, lesson_type_id: seminarId, teacher_id: "", student_ids: [] }]);
                       } else {
                         setHalfPicks((prev) => prev.filter((x) => x.half_group_id !== hg.id));
                       }
@@ -1289,6 +1349,66 @@ export function SubjectGroupCreateForm({
               </div>
             );
           })}
+          {halfPicks.length > 0 ? (
+            <div className={styles.halfStudents}>
+              <div className={styles.studentHead}>
+                <h3 className={styles.cardTitle}>Tələbə bölgüsü</h3>
+                <button
+                  type="button"
+                  className={styles.buttonAdd}
+                  onClick={() => setHalfPicks((prev) => autoSplitHalves(studentIds, prev, students))}
+                  disabled={studentIds.length === 0}
+                >
+                  Avtomatik böl
+                </button>
+              </div>
+              {studentIds.length === 0 ? (
+                <p className={styles.label}>Əvvəl Tələbələr tabında tələbə seçin.</p>
+              ) : (
+                <div className={styles.halfStudentList}>
+                  {studentIds.map((sid) => {
+                    const st = students.find((s) => s.id === sid);
+                    const current = halfPicks.find((h) => (h.student_ids ?? []).includes(sid));
+                    return (
+                      <label key={sid} className={styles.halfStudentRow}>
+                        <span>{st?.name || sid}{st?.group_name ? ` · ${st.group_name}` : ""}</span>
+                        <select
+                          className={styles.select}
+                          value={current ? `${current.lesson_type_id}:${current.half_group_id}` : ""}
+                          onChange={(e) => {
+                            const [lt, hid] = e.target.value.split(":");
+                            setHalfPicks((prev) =>
+                              prev.map((h) => {
+                                const without = (h.student_ids ?? []).filter((id) => id !== sid);
+                                if (h.lesson_type_id === lt && h.half_group_id === hid) {
+                                  return { ...h, student_ids: [...without, sid] };
+                                }
+                                if (h.lesson_type_id === lt) {
+                                  return { ...h, student_ids: without };
+                                }
+                                return h;
+                              }),
+                            );
+                          }}
+                        >
+                          <option value="">— yarımqrup —</option>
+                          {halfPicks.map((h) => {
+                            const hg = lookups.half_groups.find((x) => x.id === h.half_group_id);
+                            const lt = visibleLessonTypes.find((x) => x.id === h.lesson_type_id);
+                            return (
+                              <option key={`${h.lesson_type_id}:${h.half_group_id}`} value={`${h.lesson_type_id}:${h.half_group_id}`}>
+                                {[labelOf(hg || { id: h.half_group_id }), lt ? labelOf(lt) : ""].filter(Boolean).join(" · ")}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : null}
         </section>
       </div>
 

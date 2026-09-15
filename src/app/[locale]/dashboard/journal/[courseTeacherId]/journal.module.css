@@ -27,6 +27,11 @@
   font-size: 0.86rem;
 }
 
+.groupMeta {
+  color: var(--text);
+  font-weight: 700;
+}
+
 .controls {
   padding: 1rem 1.15rem;
   background: var(--card);

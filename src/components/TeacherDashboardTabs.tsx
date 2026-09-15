@@ -33,6 +33,7 @@ type CourseCard = {
   lesson_type_az_set: Set<string>;
   lesson_type_code_set: Set<string>;
   course_teacher_ids: string[];
+  half_group_az_set: Set<string>;
 };
 
 function lessonLetter(codes: Set<string>, names: Set<string>): string {
@@ -73,6 +74,7 @@ function mergeCourses(items: TeacherCourseItem[]): CourseCard[] {
       lesson_type_az_set: new Set<string>(),
       lesson_type_code_set: new Set<string>(),
       course_teacher_ids: [],
+      half_group_az_set: new Set<string>(),
     };
     if (c.education_group_name) {
       for (const part of String(c.education_group_name).split(",")) {
@@ -83,6 +85,12 @@ function mergeCourses(items: TeacherCourseItem[]): CourseCard[] {
     if (c.lesson_type_az) cur.lesson_type_az_set.add(String(c.lesson_type_az));
     if (c.lesson_type_code) cur.lesson_type_code_set.add(String(c.lesson_type_code));
     cur.course_teacher_ids.push(String(c.course_teacher_id));
+    if (c.half_group_az) {
+      for (const part of String(c.half_group_az).split(",")) {
+        const name = part.trim();
+        if (name) cur.half_group_az_set.add(name);
+      }
+    }
     m.set(key, cur);
   }
   return Array.from(m.values());
@@ -124,7 +132,8 @@ function CourseRows({
               const code = (g.course_code ?? "").trim();
               const letter = lessonLetter(g.lesson_type_code_set, g.lesson_type_az_set);
               const groupNames = Array.from(g.education_group_name_set.values()).filter(Boolean).join(", ");
-              const subtitle = code || groupNames;
+              const halfNames = Array.from(g.half_group_az_set.values()).filter(Boolean).join(", ");
+              const subtitle = [code || groupNames, halfNames].filter(Boolean).join(" · ");
               return (
                 <li key={ctIds} className={styles.courseCard}>
                   <div className={styles.courseMain}>
