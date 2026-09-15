@@ -297,21 +297,21 @@
 
 .tdCell {
   text-align: center;
-  min-width: 132px;
+  min-width: 96px;
 }
 
 .thCell {
   text-align: center;
-  min-width: 132px;
-  max-width: 168px;
+  min-width: 96px;
+  max-width: 140px;
   vertical-align: top;
-  padding: 0.3rem 0.35rem;
+  padding: 0.3rem 0.28rem;
 }
 
 .thPair,
 .tdPair {
-  min-width: 248px;
-  max-width: 320px;
+  min-width: 188px;
+  max-width: 240px;
 }
 
 .pairTitle {
@@ -360,7 +360,7 @@
 .splitBody {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 6px;
+  gap: 4px;
   align-items: start;
 }
 
@@ -414,7 +414,7 @@
 .splitHead > :nth-child(2),
 .splitBody > :nth-child(2) {
   border-left: 1px dashed rgba(2, 6, 23, 0.16);
-  padding-left: 8px;
+  padding-left: 6px;
 }
 
 .bulkRow {
@@ -486,10 +486,13 @@
 }
 
 .cellSelect {
-  width: 100%;
+  display: block;
+  width: 4.4rem;
+  max-width: 100%;
   min-width: 0;
   height: 32px;
-  padding: 0 0.2rem;
+  margin: 0 auto;
+  padding: 0 0.15rem;
   border-radius: 8px;
   border: 1px solid rgba(2, 6, 23, 0.12);
   background: rgba(2, 6, 23, 0.02);

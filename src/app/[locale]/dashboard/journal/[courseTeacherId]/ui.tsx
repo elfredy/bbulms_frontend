@@ -83,13 +83,13 @@ function isQbLocked(m: CourseMeetingItem, display: string, now: number): boolean
   return now >= start + 15 * 60 * 1000;
 }
 
-/** Qiymət (0–max) + davamiyyət kodları (10-dan sonra). */
+/** Davamiyyət kodları əvvəl, sonra qiymət (0–max). */
 function combinedMeetingOptions(maxPoint = 10): { value: string; label: string }[] {
   const opts: { value: string; label: string }[] = [{ value: "", label: "—" }];
-  for (let i = 0; i <= maxPoint; i++) opts.push({ value: String(i), label: String(i) });
   for (const o of ATTENDANCE_OPTIONS) {
     if (o.value) opts.push(o);
   }
+  for (let i = 0; i <= maxPoint; i++) opts.push({ value: String(i), label: String(i) });
   return opts;
 }
 
