@@ -120,6 +120,8 @@
     "loadError": "Məlumat yüklənmədi (superadmin icazəsi və backend-i yoxlayın).",
     "groupsHint": "Təhsil qrupları. Qrup detalında tələbələr və qrupa bağlı course-lar görünür.",
     "teachersHint": "Müəllimlər. Müəllim detalında course təyinatları (course_teacher) görünür.",
+    "journalAdmin": "Jurnal admin",
+    "journalAdminHint": "Fənn qrupuna görə tələbə davamiyyəti. q.b sayı sətrin sonunda avtomatik hesablanır.",
     "timetable": "Dərs cədvəli",
     "timetableCreate": "Cədvəl tərtib et",
     "timetableCreateHint": "Fakültə, il, semestr və qrup seçin. Fənni sağdan seçib xananın üst/alt həftəsinə və ya tam dərs blokuna qoyun.",

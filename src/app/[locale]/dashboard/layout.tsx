@@ -47,6 +47,7 @@ export default async function DashboardLayout({ children, params }: Props) {
               { href: `/${locale}/dashboard/admin/education-plans`, label: "Tədris planları", section: "Təhsil proqramları" },
               { href: `/${locale}/dashboard/admin/subject-groups`, label: "Fənn qrupları", section: "Təhsil proqramları" },
               { href: `/${locale}/dashboard/admin/courses`, label: "Cari semestrin dərs cədvəli", section: "Təhsil proqramları" },
+              { href: `/${locale}/dashboard/admin/journal`, label: "Jurnal admin", section: "Təhsil proqramları" },
             ]
           : []),
         ...(isDepartment ? [{ href: `/${locale}/dashboard/department`, label: "Kafedra paneli", section: "Kafedra" }] : []),

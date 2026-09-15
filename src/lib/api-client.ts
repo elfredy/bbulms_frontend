@@ -76,6 +76,14 @@ export async function upsertTeacherJournalCellsBulk(
   return { ok: true, data };
 }
 
+export async function getTeacherJournalQbCounts(courseId: string): Promise<{ items: { student_id: string; qb_count: number }[] } | null> {
+  const res = await fetch(`/api/teacher/courses/${courseId}/qb-counts`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  return jsonOrNull(res);
+}
+
 export async function confirmTeacherJournalMeeting(courseId: string, body: JournalConfirmRequest): Promise<JournalGridResponse | null> {
   const res = await fetch(`/api/teacher/courses/${courseId}/journal/confirm`, {
     method: "POST",

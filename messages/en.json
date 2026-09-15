@@ -120,6 +120,8 @@
     "loadError": "Could not load data (check superadmin access and the backend).",
     "groupsHint": "Education groups. Group detail shows students and linked courses.",
     "teachersHint": "Teachers. Teacher detail shows course assignments.",
+    "journalAdmin": "Journal admin",
+    "journalAdminHint": "View student attendance by subject group. Absence (q.b) counts are calculated automatically at the end of each row.",
     "timetable": "Timetable",
     "timetableCreate": "Create timetable",
     "timetableCreateHint": "Choose faculty, year, semester and group. Select a subject on the right and place it on the upper/lower week or the full-lesson block.",

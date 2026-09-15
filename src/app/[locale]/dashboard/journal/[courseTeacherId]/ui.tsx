@@ -14,6 +14,7 @@ import {
   getTeacherCourseExercises,
   getTeacherJournalGrid,
   getTeacherJournalPointsGrid,
+  getTeacherJournalQbCounts,
   getTeacherJournalResultSimple,
   upsertTeacherCourseExercisePointsBulk,
   upsertTeacherJournalCell,
@@ -187,11 +188,30 @@ function lessonTypeShort(m: CourseMeetingItem): string | null {
 
 function dateOnly(v: string | null | undefined): string {
   const s = String(v ?? "").trim();
+  if (!s) return "";
   const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
   const dmy = s.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})/);
   if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}`;
+  const t = Date.parse(s);
+  if (Number.isFinite(t)) {
+    const baku = new Date(t + 4 * 60 * 60 * 1000);
+    const y = baku.getUTCFullYear();
+    const mo = String(baku.getUTCMonth() + 1).padStart(2, "0");
+    const d = String(baku.getUTCDate()).padStart(2, "0");
+    return `${y}-${mo}-${d}`;
+  }
   return s.slice(0, 10);
+}
+
+function compareMeetings(a: CourseMeetingItem, b: CourseMeetingItem): number {
+  const da = dateOnly(a.meeting_date);
+  const db = dateOnly(b.meeting_date);
+  if (da !== db) return da.localeCompare(db);
+  const ta = String(a.start_time ?? "");
+  const tb = String(b.start_time ?? "");
+  if (ta !== tb) return ta.localeCompare(tb);
+  return String(a.course_meeting_id).localeCompare(String(b.course_meeting_id));
 }
 
 type MeetingPair = {
@@ -206,12 +226,14 @@ type MeetingPair = {
 };
 
 function weekDayOf(m: CourseMeetingItem): number {
+  const d = dateOnly(m.meeting_date);
+  if (d) {
+    const js = new Date(`${d}T12:00:00`).getDay();
+    if (Number.isFinite(js)) return js === 0 ? 7 : js;
+  }
   const wd = Number(m.week_day ?? 0);
   if (wd >= 1 && wd <= 7) return wd;
-  const d = dateOnly(m.meeting_date);
-  if (!d) return 0;
-  const js = new Date(`${d}T12:00:00`).getDay();
-  return js === 0 ? 7 : js;
+  return 0;
 }
 
 function weekHalfOf(m: CourseMeetingItem): 1 | 2 | 0 {
@@ -228,10 +250,22 @@ function daysBetween(a: string, b: string): number {
 }
 
 function pairHalves(p: MeetingPair): { tag: "Üst" | "Alt"; m: CourseMeetingItem }[] {
-  const out: { tag: "Üst" | "Alt"; m: CourseMeetingItem }[] = [];
-  if (p.upper) out.push({ tag: "Üst", m: p.upper });
-  if (p.lower) out.push({ tag: "Alt", m: p.lower });
-  return out;
+  const items = [p.upper, p.lower].filter((m): m is CourseMeetingItem => Boolean(m));
+  items.sort(compareMeetings);
+  if (items.length === 2) {
+    return [
+      { tag: "Üst", m: items[0] },
+      { tag: "Alt", m: items[1] },
+    ];
+  }
+  return items.map((m) => ({ tag: weekHalfOf(m) === 2 ? "Alt" : "Üst", m }));
+}
+
+function pairEarliest(p: MeetingPair): CourseMeetingItem | null {
+  const items = [p.upper, p.lower].filter((m): m is CourseMeetingItem => Boolean(m));
+  if (!items.length) return null;
+  items.sort(compareMeetings);
+  return items[0];
 }
 
 function buildMeetingPairs(meetings: CourseMeetingItem[]): MeetingPair[] {
@@ -245,40 +279,32 @@ function buildMeetingPairs(meetings: CourseMeetingItem[]): MeetingPair[] {
 
   const pairs: MeetingPair[] = [];
   for (const [slotKey, arr] of buckets) {
-    arr.sort((a, b) => dateOnly(a.meeting_date).localeCompare(dateOnly(b.meeting_date)));
+    arr.sort(compareMeetings);
     let i = 0;
     while (i < arr.length) {
       const a = arr[i];
       const b = arr[i + 1];
       const gap = b ? daysBetween(dateOnly(a.meeting_date), dateOnly(b.meeting_date)) : 999;
-      const canPair = Boolean(b) && gap >= 5 && gap <= 10;
+      const sameWeekday = Boolean(b) && weekDayOf(a) === weekDayOf(b);
+      const canPair = Boolean(b) && sameWeekday && gap >= 5 && gap <= 10;
       let upper: CourseMeetingItem | null = null;
       let lower: CourseMeetingItem | null = null;
       if (canPair && b) {
-        const ha = weekHalfOf(a);
-        const hb = weekHalfOf(b);
-        if (ha === 2 && hb !== 2) {
-          upper = b;
-          lower = a;
-        } else {
-          upper = a;
-          lower = b;
-        }
+        upper = a;
+        lower = b;
         i += 2;
       } else {
         if (weekHalfOf(a) === 2) lower = a;
         else upper = a;
         i += 1;
       }
-      const sample = upper ?? lower;
-      if (!sample) continue;
       pairs.push({
-        key: `${slotKey}|${dateOnly(sample.meeting_date)}|${sample.course_meeting_id}`,
-        week_day: weekDayOf(sample),
-        start_time: sample.start_time ?? null,
-        end_time: sample.end_time ?? null,
-        lesson_type_az: sample.lesson_type_az ?? null,
-        lesson_type_id: sample.lesson_type_id ?? null,
+        key: `${slotKey}|${dateOnly(a.meeting_date)}|${a.course_meeting_id}`,
+        week_day: weekDayOf(a),
+        start_time: a.start_time ?? null,
+        end_time: a.end_time ?? null,
+        lesson_type_az: a.lesson_type_az ?? null,
+        lesson_type_id: a.lesson_type_id ?? null,
         upper,
         lower,
       });
@@ -286,10 +312,12 @@ function buildMeetingPairs(meetings: CourseMeetingItem[]): MeetingPair[] {
   }
 
   pairs.sort((p, q) => {
-    const da = dateOnly((p.upper ?? p.lower)?.meeting_date);
-    const db = dateOnly((q.upper ?? q.lower)?.meeting_date);
-    if (da !== db) return da.localeCompare(db);
-    return String(p.start_time ?? "").localeCompare(String(q.start_time ?? ""));
+    const a = pairEarliest(p);
+    const b = pairEarliest(q);
+    if (!a && !b) return 0;
+    if (!a) return 1;
+    if (!b) return -1;
+    return compareMeetings(a, b);
   });
   return pairs;
 }
@@ -323,11 +351,7 @@ export function JournalClient({
   const visibleMeetings = useMemo(() => {
     return [...liveMeetings]
       .filter((m) => Boolean(dateOnly(m.meeting_date)))
-      .sort((a, b) => {
-        const da = dateOnly(a.meeting_date);
-        const db = dateOnly(b.meeting_date);
-        return da.localeCompare(db);
-      });
+      .sort(compareMeetings);
   }, [liveMeetings]);
 
   const meetingPairs = useMemo(() => buildMeetingPairs(visibleMeetings), [visibleMeetings]);
@@ -342,6 +366,7 @@ export function JournalClient({
   const [meetingWindowStart, setMeetingWindowStart] = useState<number>(0);
   const [meetingWindowCellsByMeetingId, setMeetingWindowCellsByMeetingId] = useState<Record<string, Record<string, JournalCell>>>({});
   const [meetingLockedById, setMeetingLockedById] = useState<Record<string, boolean>>({});
+  const [qbCountByStudentId, setQbCountByStudentId] = useState<Record<string, number>>({});
   const [bulkValueByMeetingId, setBulkValueByMeetingId] = useState<Record<string, string>>({});
   const [resultByStudentId, setResultByStudentId] = useState<
     Record<
@@ -452,7 +477,10 @@ export function JournalClient({
         ok = await flushMeetingQueue(mid);
       }
     }
-    if (ok) setSavingHint(null);
+    if (ok) {
+      setSavingHint(null);
+      loadQbCounts();
+    }
     return ok;
   }
 
@@ -799,6 +827,15 @@ export function JournalClient({
     });
   }
 
+  function loadQbCounts() {
+    void getTeacherJournalQbCounts(courseId).then((res) => {
+      if (!res) return;
+      const map: Record<string, number> = {};
+      for (const r of res.items) map[String(r.student_id)] = Number(r.qb_count) || 0;
+      setQbCountByStudentId(map);
+    });
+  }
+
   function loadExercises(type: "colloquium" | "referat") {
     startTransition(async () => {
       const [list, allPts] = await Promise.all([
@@ -899,6 +936,7 @@ export function JournalClient({
     if (initialMeetingId) loadMeetingGrid(initialMeetingId);
     loadPointsGrid();
     loadResult();
+    loadQbCounts();
     loadExercises("colloquium");
     loadExercises("referat");
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1446,6 +1484,7 @@ export function JournalClient({
                       </th>
                     );
                   })}
+                  <th className={`${styles.th} ${styles.qbCol}`}>q.b</th>
                 </tr>
               </thead>
               <tbody>
@@ -1488,6 +1527,9 @@ export function JournalClient({
                         </td>
                       );
                     })}
+                    <td className={`${styles.td} ${styles.qbCol} ${(qbCountByStudentId[s.student_id] ?? 0) > 0 ? styles.qbAlert : ""}`}>
+                      {qbCountByStudentId[s.student_id] ?? 0}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -1525,13 +1567,15 @@ export function JournalClient({
                   {pairWindow.length > 0 ? (
                     <td
                       className={`${styles.td} ${styles.pagerMetaCell}`}
-                      colSpan={pairWindow.length}
+                      colSpan={pairWindow.length + 1}
                     >
                       <div className={styles.pagerMeta}>
                         {`${meetingWindowStart + 1}-${Math.min(meetingPairs.length, meetingWindowStart + pairWindow.length)} / ${meetingPairs.length}`}
                       </div>
                     </td>
-                  ) : null}
+                  ) : (
+                    <td className={`${styles.td} ${styles.qbCol}`} />
+                  )}
                 </tr>
               </tfoot>
             </table>

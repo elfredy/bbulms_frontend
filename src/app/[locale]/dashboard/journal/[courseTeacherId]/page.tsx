@@ -84,8 +84,13 @@ export default async function JournalPage({ params, searchParams }: Props) {
   const meetings = Array.from(uniqueById.values()).sort((a, b) => {
     const da = String(a.meeting_date ?? "");
     const db = String(b.meeting_date ?? "");
-    if (da === db) return String(b.course_meeting_id).localeCompare(String(a.course_meeting_id));
-    return db.localeCompare(da);
+    const na = /^\d{4}-\d{2}-\d{2}/.test(da) ? da.slice(0, 10) : da;
+    const nb = /^\d{4}-\d{2}-\d{2}/.test(db) ? db.slice(0, 10) : db;
+    if (na !== nb) return na.localeCompare(nb);
+    const ta = String(a.start_time ?? "");
+    const tb = String(b.start_time ?? "");
+    if (ta !== tb) return ta.localeCompare(tb);
+    return String(a.course_meeting_id).localeCompare(String(b.course_meeting_id));
   });
 
   const [roster, evals, teacherCourses] = await Promise.all([

@@ -43,6 +43,7 @@ export default async function AdminHomePage({ params }: Props) {
         { href: `/${locale}/dashboard/admin/education-plans`, label: t("educationPlans") },
         { href: `/${locale}/dashboard/admin/subject-groups`, label: t("subjectGroups") },
         { href: `/${locale}/dashboard/admin/courses`, label: t("timetable") },
+        { href: `/${locale}/dashboard/admin/journal`, label: "Jurnal admin" },
       ],
     },
   ];
