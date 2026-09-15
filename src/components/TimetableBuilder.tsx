@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type DragEvent } from "react";
 
 import styles from "./TimetableBuilder.module.css";
+import { SearchableSelect } from "./SearchableSelect";
 import { fmtClockRange } from "@/lib/clock-time";
 import {
   adminTimetableBoard,
@@ -28,6 +29,10 @@ type RoomOpt = { id: string; name: string | null; faculty_id?: string | null; oc
 
 function lessonKey(courseId: string, lessonTypeId: string, courseGroupId?: string | null) {
   return `${courseId}:${lessonTypeId}:${courseGroupId || ""}`;
+}
+
+function slotKey(weekDay: number, clockId: string, weekType: number) {
+  return `${weekDay}:${clockId}:${weekType}`;
 }
 
 function fmtColumnDate(iso?: string | null) {
