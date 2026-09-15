@@ -23,7 +23,8 @@ export default async function ImportStudentsPage({ params }: Props) {
         <div>
           <h1 className={styles.title}>Çoxlu tələbə əlavə et</h1>
           <p className={styles.meta}>
-            BAK imtahan keçənlər Excel-ini yükləyin. Hər tələbə Excel-dəki QRUP sütununa görə mövcud qrupa düşür.
+          BAK və ya magistr Excel-ini yükləyin. Qrup sütunu və təhsil səviyyəsi (Magistratura) nəzərə alınır — magistr
+          tələbələr bakalavr qruplarına düşmür.
           </p>
         </div>
         <div className={styles.headerActions}>

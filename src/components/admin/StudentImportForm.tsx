@@ -11,7 +11,7 @@ import styles from "./StudentImport.module.css";
 
 type PreviewRow = {
   row_number: number;
-  action: "create" | "skip" | string;
+  action: "create" | "skip" | "promote" | string;
   lastname: string | null;
   firstname: string | null;
   patronymic: string | null;
@@ -30,6 +30,9 @@ type PreviewRow = {
   birthdate: string | null;
   registered: boolean | null;
   group_source?: "excel" | "auto" | string | null;
+  existing_group_name?: string | null;
+  existing_level_name?: string | null;
+  reuse_person?: boolean;
   issues: string[];
 };
 
@@ -37,6 +40,8 @@ type PreviewResponse = {
   total: number;
   ready: number;
   skipped: number;
+  promote_count?: number;
+  existing_fin_blocked?: number;
   education_year_name?: string | null;
   warnings: string[];
   unmatched_groups: { name: string; count: number }[];
@@ -66,6 +71,7 @@ export function StudentImportForm({ lookups }: { lookups: InstitutionLookups; lo
   const [file, setFile] = useState<File | null>(null);
   const [orderId, setOrderId] = useState("");
   const [skipUnregistered, setSkipUnregistered] = useState(true);
+  const [allowExistingFin, setAllowExistingFin] = useState(false);
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -81,13 +87,14 @@ export function StudentImportForm({ lookups }: { lookups: InstitutionLookups; lo
     [lookups.orders],
   );
 
-  const visibleRows = preview?.rows.filter((row) => !onlyProblems || row.action !== "create" || row.issues.length > 0) ?? [];
+  const visibleRows = preview?.rows.filter((row) => !onlyProblems || (row.action !== "create" && row.action !== "promote") || row.issues.length > 0) ?? [];
 
   function formData() {
     if (!file) throw new Error("no-file");
     const data = new FormData();
     data.set("file", file);
     data.set("skip_unregistered", skipUnregistered ? "true" : "false");
+    data.set("allow_existing_fin", allowExistingFin ? "true" : "false");
     return data;
   }
 
@@ -128,7 +135,12 @@ export function StudentImportForm({ lookups }: { lookups: InstitutionLookups; lo
       setError("Əlavə ediləcək hazır sətir yoxdur.");
       return;
     }
-    const ok = window.confirm(`${preview.ready} tələbə öz qrupuna əlavə olunacaq. Davam edilsin?`);
+    const promote = preview.promote_count ?? 0;
+    const ok = window.confirm(
+      promote
+        ? `${preview.ready} tələbə öz magistr qrupuna əlavə olunacaq. Onlardan ${promote} nəfərin FİN-i artıq bakalavrda var — eyni şəxs magistraturaya keçiriləcək. Davam edilsin?`
+        : `${preview.ready} tələbə öz qrupuna əlavə olunacaq. Davam edilsin?`,
+    );
     if (!ok) return;
     setLoading("import");
     try {
@@ -176,11 +188,24 @@ export function StudentImportForm({ lookups }: { lookups: InstitutionLookups; lo
               <input type="checkbox" checked={skipUnregistered} onChange={(e) => setSkipUnregistered(e.target.checked)} />
               <span>Qeydiyyatdan keçməyənləri ötür (tövsiyə olunur)</span>
             </label>
+            <label className={styles.check}>
+              <input
+                type="checkbox"
+                checked={allowExistingFin}
+                onChange={(e) => {
+                  setAllowExistingFin(e.target.checked);
+                  setPreview(null);
+                  setResult(null);
+                }}
+              />
+              <span>Mövcud FİN-ləri bakalavrdan magistraturaya keçir (təsdiq tələb olunur)</span>
+            </label>
           </Field>
         </FieldGroup>
         <p className={dash.meta}>
-          Qrup sütunu varsa ada görə tutuşdurulur; yoxdursa ixtisas, forma və dilə görə I kurs qruplarına paylanır.
-          FİN artıq sistemdədirsə həmin sətir ötürülür — eyni tələbə ikinci dəfə əlavə olunmur.
+          Qrup sütunu varsa ada görə tutuşdurulur; yoxdursa ixtisas, ixtisaslaşma və təhsil səviyyəsinə (bakalavr/magistratura)
+          görə I kurs qruplarına paylanır. Magistr Excel-i bakalavr qruplarına düşmür. FİN artıq bakalavrda olan tələbə üçün
+          aşağıdakı seçimi işə salın — eyni şəxsə yeni magistr qeydi açılır.
         </p>
         <div className={styles.actions}>
           <button type="button" className={dash.button} onClick={() => void runPreview()} disabled={loading !== null}>
@@ -214,6 +239,12 @@ export function StudentImportForm({ lookups }: { lookups: InstitutionLookups; lo
               <p className={dash.statValue}>{preview.ready}</p>
               <p className={dash.statLabel}>Qrupa düşəcək</p>
             </div>
+            {preview.promote_count ? (
+              <div className={dash.statCard}>
+                <p className={dash.statValue}>{preview.promote_count}</p>
+                <p className={dash.statLabel}>Bakalavrdan keçid</p>
+              </div>
+            ) : null}
             <div className={dash.statCard}>
               <p className={dash.statValue}>{preview.skipped}</p>
               <p className={dash.statLabel}>Buraxılan</p>
@@ -275,7 +306,18 @@ export function StudentImportForm({ lookups }: { lookups: InstitutionLookups; lo
                         {row.score ? ` · ${row.score} bal` : ""}
                       </div>
                       {row.issues.map((issue) => (
-                        <span key={issue} className={issue.startsWith("Cins") || issue.startsWith("Ödəniş") ? `${styles.issue} ${styles.mutedIssue}` : styles.issue}>
+                        <span
+                          key={issue}
+                          className={
+                            issue.startsWith("Cins") ||
+                            issue.startsWith("Ödəniş") ||
+                            issue.startsWith("Bakalavr") ||
+                            issue.startsWith("Mövcud şəxs") ||
+                            issue.startsWith("Qrup ixtisas")
+                              ? `${styles.issue} ${styles.mutedIssue}`
+                              : styles.issue
+                          }
+                        >
                           {issue}
                         </span>
                       ))}
@@ -284,6 +326,9 @@ export function StudentImportForm({ lookups }: { lookups: InstitutionLookups; lo
                       {row.group_label || row.group_name || "—"}
                       {row.specialty_name_az ? <div className={dash.tdMuted}>{row.specialty_name_az}</div> : null}
                       {row.group_source === "auto" ? <div className={dash.tdMuted}>avtomatik paylandı</div> : null}
+                      {row.action === "promote" && row.existing_group_name ? (
+                        <div className={dash.tdMuted}>əvvəl: {row.existing_level_name || "bakalavr"} · {row.existing_group_name}</div>
+                      ) : null}
                     </td>
                     <td className={dash.td}>{row.payment_name_az ?? "—"}</td>
                     <td className={dash.td}>
@@ -291,8 +336,12 @@ export function StudentImportForm({ lookups }: { lookups: InstitutionLookups; lo
                       {row.gender_inferred ? <div className={dash.tdMuted}>təxmin</div> : null}
                     </td>
                     <td className={dash.td}>
-                      <span className={row.action === "create" ? dash.badgeOk : dash.badgePending}>
-                        {row.action === "create" ? "Əlavə olunacaq" : "Buraxılır"}
+                      <span
+                        className={
+                          row.action === "promote" ? dash.badgePending : row.action === "create" ? dash.badgeOk : dash.badgePending
+                        }
+                      >
+                        {row.action === "promote" ? "Keçiriləcək" : row.action === "create" ? "Əlavə olunacaq" : "Buraxılır"}
                       </span>
                     </td>
                   </tr>

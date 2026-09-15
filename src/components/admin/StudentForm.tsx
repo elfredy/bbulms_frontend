@@ -31,7 +31,14 @@ export function StudentForm({
   const [langId, setLangId] = useState(initial?.education_lang_id ?? "");
   const [statusId, setStatusId] = useState(initial?.status_id ?? "");
   const [cardNumber, setCardNumber] = useState(initial?.card_number ?? "");
-  const [existing, setExisting] = useState<{ person_id: string; fullname: string; message: string } | null>(null);
+  const [existing, setExisting] = useState<{
+    person_id: string;
+    fullname: string;
+    message: string;
+    has_student?: boolean;
+    student_group_name?: string | null;
+    student_level_name?: string | null;
+  } | null>(null);
 
   const payload = {
     lastname,
@@ -53,7 +60,9 @@ export function StudentForm({
     <AdminFormFrame
       error={error}
       saving={saving}
-      submitLabel={isEdit ? "Yenilə" : existing ? "Mövcud şəxsi tələbə et" : "Əlavə et"}
+      submitLabel={
+        isEdit ? "Yenilə" : existing?.has_student ? "Magistraturaya keçir" : existing ? "Mövcud şəxsi tələbə et" : "Əlavə et"
+      }
       onSubmit={async () => {
         if (!groupId) {
           window.alert("Tələbə qrupu seçilməlidir.");
@@ -67,6 +76,14 @@ export function StudentForm({
           await save(`/api/admin/students/${initial?.student_id}`, "PUT", payload);
           return;
         }
+        if (existing?.has_student) {
+          const ok = window.confirm(
+            `${existing.fullname} artıq tələbədir${
+              existing.student_group_name ? ` (${[existing.student_level_name, existing.student_group_name].filter(Boolean).join(" · ")})` : ""
+            }. Seçilmiş magistr qrupuna yeni qeyd yaradılsın?`,
+          );
+          if (!ok) return;
+        }
         const res = await fetch("/api/admin/students", {
           method: "POST",
           credentials: "include",
@@ -77,7 +94,14 @@ export function StudentForm({
           const data = await res.json().catch(() => null);
           const detail = data?.detail;
           if (detail?.person_id) {
-            setExisting({ person_id: String(detail.person_id), fullname: detail.fullname || "", message: detail.message || "" });
+            setExisting({
+              person_id: String(detail.person_id),
+              fullname: detail.fullname || "",
+              message: detail.message || "",
+              has_student: Boolean(detail.has_student),
+              student_group_name: detail.student_group_name || null,
+              student_level_name: detail.student_level_name || null,
+            });
             setError(detail.message || "Bu FİN artıq mövcuddur.");
             return;
           }
@@ -91,8 +115,14 @@ export function StudentForm({
     >
       {existing ? (
         <FormHint>
-          {existing.fullname} artıq bazadadır. «Mövcud şəxsi tələbə et» ilə tələbə qeydi yaradın və ya{" "}
-          <Link href={`/${locale}/dashboard/admin/user-roles/${existing.person_id}`}>yeni rol təyin edin</Link>.
+          {existing.fullname} artıq bazadadır
+          {existing.student_group_name
+            ? ` (${[existing.student_level_name, existing.student_group_name].filter(Boolean).join(" · ")})`
+            : ""}
+          . {existing.has_student
+            ? "«Magistraturaya keçir» ilə eyni şəxsə yeni tələbə qeydi (yeni qrup) yaradın."
+            : "«Mövcud şəxsi tələbə et» ilə tələbə qeydi yaradın."}{" "}
+          və ya <Link href={`/${locale}/dashboard/admin/user-roles/${existing.person_id}`}>yeni rol təyin edin</Link>.
         </FormHint>
       ) : null}
       <FieldGroup title="Şəxsi məlumat">
