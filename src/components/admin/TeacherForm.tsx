@@ -18,6 +18,7 @@ export function TeacherForm({
 }) {
   const isEdit = Boolean(initial?.teacher_id);
   const { error, saving, save, setError } = useAdminSave(`/${locale}/dashboard/admin/teachers`);
+  const [busy, setBusy] = useState(false);
   const [lastname, setLastname] = useState(initial?.lastname ?? "");
   const [firstname, setFirstname] = useState(initial?.firstname ?? "");
   const [patronymic, setPatronymic] = useState(initial?.patronymic ?? "");
@@ -52,37 +53,58 @@ export function TeacherForm({
   return (
     <AdminFormFrame
       error={error}
-      saving={saving}
+      saving={saving || busy}
       submitLabel={isEdit ? "Yenilə" : existing ? "Mövcud şəxsi müəllim et" : "Əlavə et"}
       onSubmit={async () => {
         if (!departmentId) {
           window.alert("Müəllim kafedraya bağlanmalıdır.");
           return;
         }
+        if (!String(pincode || "").trim()) {
+          window.alert("FİN kod mütləqdir. Müəllim onunla daxil olur.");
+          return;
+        }
         if (isEdit) {
           await save(`/api/admin/teachers/${initial?.teacher_id}`, "PUT", payload);
           return;
         }
-        const res = await fetch("/api/admin/teachers", {
-          method: "POST",
-          credentials: "include",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ ...payload, use_existing_person: Boolean(existing) }),
-        });
-        if (res.status === 409) {
-          const data = await res.json().catch(() => null);
-          const detail = data?.detail;
-          if (detail?.person_id) {
-            setExisting({ person_id: String(detail.person_id), fullname: detail.fullname || "", message: detail.message || "" });
-            setError(detail.message || "Bu FİN artıq mövcuddur.");
+        setBusy(true);
+        setError(null);
+        try {
+          const res = await fetch("/api/admin/teachers", {
+            method: "POST",
+            credentials: "include",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ ...payload, use_existing_person: Boolean(existing) }),
+          });
+          if (res.status === 409) {
+            const data = await res.json().catch(() => null);
+            const detail = data?.detail;
+            if (detail?.person_id) {
+              setExisting({ person_id: String(detail.person_id), fullname: detail.fullname || "", message: detail.message || "" });
+              setError(detail.message || "Bu FİN artıq mövcuddur.");
+              return;
+            }
+          }
+          if (!res.ok) {
+            setError(await readDetail(res, "Müəllim əlavə olunmadı"));
             return;
           }
+          const data = await res.json().catch(() => null);
+          const pin = String(pincode || "").trim();
+          if (data?.login_created && pin) {
+            window.alert(
+              `Müəllim əlavə olundu.\n\nİlk giriş:\nİstifadəçi adı: ${pin}\nŞifrə: ${pin}\n\nİlk dəfə daxil olanda şifrəni dəyişməlidir.`,
+            );
+          } else if (pin) {
+            window.alert(`Müəllim əlavə olundu. Bu FİN üzrə giriş hesabı artıq var: ${data?.username || pin}`);
+          }
+          window.location.href = `/${locale}/dashboard/admin/teachers`;
+        } catch {
+          setError("Serverə qoşulmaq mümkün olmadı");
+        } finally {
+          setBusy(false);
         }
-        if (!res.ok) {
-          setError(await readDetail(res, "Müəllim əlavə olunmadı"));
-          return;
-        }
-        window.location.href = `/${locale}/dashboard/admin/teachers`;
       }}
     >
       {existing ? (
@@ -101,8 +123,8 @@ export function TeacherForm({
         <Field label="Ata adı">
           <TextInput value={patronymic} onChange={(e) => setPatronymic(e.target.value)} />
         </Field>
-        <Field label="FİN kod">
-          <TextInput value={pincode} onChange={(e) => setPincode(e.target.value)} />
+        <Field label="FİN kod" required>
+          <TextInput value={pincode} required onChange={(e) => setPincode(e.target.value)} />
         </Field>
         <Field label="Cinsi" required>
           <SelectInput value={genderId} onChange={setGenderId} required options={lookups.genders.map(opt)} />
@@ -111,6 +133,9 @@ export function TeacherForm({
           <TextInput value={cardNumber} onChange={(e) => setCardNumber(e.target.value)} />
         </Field>
       </FieldGroup>
+      <FormHint>
+        FİN həm istifadəçi adı, həm ilk şifrədir. Müəllim ilk dəfə daxil olanda şifrəni dəyişməlidir.
+      </FormHint>
       <FieldGroup title="Kafedra və vəzifə">
         <Field label="Kafedra" required span2>
           <SearchSelect

@@ -25,7 +25,9 @@ export function PasswordResetPanel({ initial }: { initial: UserRoleDetail }) {
       return;
     }
     const ok = window.confirm(
-      `İstifadəçi adı və şifrə FİN koduna (${initial.pincode}) sıfırlanacaq. Davam edilsin?`,
+      initial.has_login
+        ? `İstifadəçi adı və şifrə FİN koduna (${initial.pincode}) sıfırlanacaq. Davam edilsin?`
+        : `Bu şəxs üçün giriş hesabı yaradılacaq. İstifadəçi adı və şifrə FİN (${initial.pincode}) olacaq. Davam edilsin?`,
     );
     if (!ok) return;
     setSaving(true);
@@ -44,6 +46,9 @@ export function PasswordResetPanel({ initial }: { initial: UserRoleDetail }) {
         username: data.reset_username || initial.pincode,
         message: data.message || "Parol sıfırlandı.",
       });
+      if (data.login_created || !initial.has_login) {
+        window.setTimeout(() => window.location.reload(), 600);
+      }
     } catch {
       setError("Serverə qoşulmaq mümkün olmadı");
     } finally {
@@ -53,7 +58,7 @@ export function PasswordResetPanel({ initial }: { initial: UserRoleDetail }) {
 
   return (
     <div className={styles.form}>
-      <FieldGroup title="Parol sıfırlama">
+      <FieldGroup title={initial.has_login ? "Parol sıfırlama" : "Giriş hesabı"}>
         <Field label="Cari istifadəçi adı" span2>
           <p className={styles.hint}>{initial.username || "—"}</p>
         </Field>
@@ -62,8 +67,9 @@ export function PasswordResetPanel({ initial }: { initial: UserRoleDetail }) {
         </Field>
       </FieldGroup>
       <FormHint>
-        Sıfırlananda həm istifadəçi adı, həm şifrə FİN olur. İstifadəçi daxil olandan sonra öz şifrəsini təyin edir.
-        Növbəti girişdə istifadəçi adı yenə FİN, şifrə isə onun seçdiyi olur.
+        {initial.has_login
+          ? "Sıfırlananda həm istifadəçi adı, həm şifrə FİN olur. İstifadəçi daxil olandan sonra öz şifrəsini təyin edir. Növbəti girişdə istifadəçi adı yenə FİN, şifrə isə onun seçdiyi olur."
+          : "Hesab yoxdursa, FİN ilə giriş hesabı yaranır. Müəllim FİN / FİN yazıb daxil olur, sonra şifrəni dəyişməlidir."}
       </FormHint>
       {error ? <p className={styles.error}>{error}</p> : null}
       {done ? (
@@ -75,7 +81,7 @@ export function PasswordResetPanel({ initial }: { initial: UserRoleDetail }) {
       ) : null}
       <div className={styles.actions}>
         <button type="button" className={styles.submitWarn} disabled={saving || !initial.pincode} onClick={() => void onReset()}>
-          {saving ? "Sıfırlanır…" : "Parolu FİN-ə sıfırla"}
+          {saving ? "Sıfırlanır…" : initial.has_login ? "Parolu FİN-ə sıfırla" : "Giriş hesabı yarat (FİN)"}
         </button>
       </div>
     </div>

@@ -16,7 +16,12 @@ export default async function NewTeacherPage({ params }: Props) {
   if (!lookups) redirect(`/${locale}/dashboard/admin/teachers`);
 
   return (
-    <AdminFormPage wide title="Müəllim əlavə et" hint="Müəllim mütləq kafedraya bağlanır." backHref={`/${locale}/dashboard/admin/teachers`}>
+    <AdminFormPage
+      wide
+      title="Müəllim əlavə et"
+      hint="Müəllim kafedraya bağlanır. İlk giriş: istifadəçi adı və şifrə FİN-dir."
+      backHref={`/${locale}/dashboard/admin/teachers`}
+    >
       <TeacherForm lookups={lookups} locale={locale} />
     </AdminFormPage>
   );

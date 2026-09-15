@@ -49,11 +49,13 @@ export default async function AdminUserRoleDetailPage({ params, searchParams }: 
         </div>
         {saved ? <p className={styles.alertOk}>Rol yeniləndi. İstifadəçi girişdə rollar arasında keçid edə bilər.</p> : null}
         {!person.has_login ? (
-          <p className={styles.alertError}>Bu FİN üzrə giriş hesabı yoxdur. Rol dəyişmək üçün şəxsin sistemə giriş hesabı olmalıdır.</p>
+          <p className={styles.alertError}>
+            Bu FİN üzrə giriş hesabı yoxdur. Aşağıdan FİN ilə hesab yarada, sonra rol təyin edə bilərsiniz.
+          </p>
         ) : null}
         {person.notes.length > 0 ? <p className={styles.meta}>{person.notes.join(" · ")}</p> : null}
         {person.has_login ? <UserRoleForm lookups={lookups} initial={person} locale={locale} /> : null}
-        {person.has_login ? (
+        {person.pincode ? (
           <div style={{ marginTop: 24, paddingTop: 8, borderTop: "1px solid var(--border)" }}>
             <PasswordResetPanel initial={person} />
           </div>
