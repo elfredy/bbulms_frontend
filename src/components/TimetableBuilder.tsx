@@ -93,12 +93,19 @@ export function TimetableBuilder() {
   const [lookups, setLookups] = useState<TimetableLookups | null>(null);
   const [subjectTypeId, setSubjectTypeId] = useState("");
   const [facultyId, setFacultyId] = useState("");
+  const [educationLevelId, setEducationLevelId] = useState("");
   const [yearId, setYearId] = useState("");
   const [semesterId, setSemesterId] = useState("");
   const [kurs, setKurs] = useState("");
   const [groupId, setGroupId] = useState("");
   const [groups, setGroups] = useState<
-    { education_group_id: string; education_group_name: string | null; education_year_name?: string | null; kurs?: number | null }[]
+    {
+      education_group_id: string;
+      education_group_name: string | null;
+      education_year_name?: string | null;
+      education_level_az?: string | null;
+      kurs?: number | null;
+    }[]
   >([]);
   const [clocks, setClocks] = useState<{ id: string; start_time: string | null; end_time: string | null }[]>([]);
   const [available, setAvailable] = useState<TimetableAvailableLesson[]>([]);
@@ -146,6 +153,7 @@ export function TimetableBuilder() {
     adminTimetableGroups({
       faculty_id: facultyId,
       education_year_id: yearId,
+      education_level_id: educationLevelId || null,
       kurs: kurs ? Number(kurs) : null,
     }).then((data) => {
       if (!alive) return;
@@ -154,7 +162,7 @@ export function TimetableBuilder() {
     return () => {
       alive = false;
     };
-  }, [facultyId, yearId, kurs]);
+  }, [facultyId, yearId, educationLevelId, kurs]);
 
   const loadBoard = useCallback(async () => {
     if (!groupId || !yearId || !semesterId) {
@@ -615,6 +623,17 @@ export function TimetableBuilder() {
           </select>
         </label>
         <label className={styles.field}>
+          <span className={styles.label}>Təhsil səviyyəsi</span>
+          <select className={styles.select} value={educationLevelId} onChange={(e) => setEducationLevelId(e.target.value)}>
+            <option value="">Hamısı</option>
+            {(lookups?.education_levels ?? []).map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.name_az ?? l.id}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className={styles.field}>
           <span className={styles.label}>Tədris ili</span>
           <select className={styles.select} value={yearId} onChange={(e) => setYearId(e.target.value)}>
             <option value="">— seç —</option>
@@ -658,12 +677,18 @@ export function TimetableBuilder() {
             options={groups.map((g) => ({
               id: g.education_group_id,
               label:
-                [g.education_group_name, g.kurs != null ? `${g.kurs} kurs` : null, g.education_year_name].filter(Boolean).join(" · ") ||
-                g.education_group_id,
+                [
+                  g.education_group_name,
+                  g.education_level_az,
+                  g.kurs != null ? `${g.kurs} kurs` : null,
+                  g.education_year_name,
+                ]
+                  .filter(Boolean)
+                  .join(" · ") || g.education_group_id,
             }))}
           />
           {facultyId && yearId && groups.length === 0 ? (
-            <span className={styles.hint}>Bu dekanlıq və il üçün qrup tapılmadı. Kursu “Hamısı” edin.</span>
+            <span className={styles.hint}>Bu dekanlıq və il üçün qrup tapılmadı. Səviyyəni və ya kursu “Hamısı” edin.</span>
           ) : null}
         </label>
 

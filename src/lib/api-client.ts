@@ -318,6 +318,7 @@ export async function deleteTeacherLessonFile(
 
 export type TimetableLookups = {
   faculties: { id: string; name_az: string | null }[];
+  education_levels: { id: string; name_az: string | null; code?: string | null }[];
   years: { id: string; name: string | null }[];
   semesters: { id: string; code: string | null; name_az: string | null }[];
   subject_types: { id: string; code: string | null; name_az: string | null }[];
@@ -332,6 +333,8 @@ export type TimetableGroupItem = {
   education_group_name: string | null;
   education_year_name?: string | null;
   faculty_name_az?: string | null;
+  education_level_az?: string | null;
+  education_level_id?: string | null;
   kurs?: number | null;
 };
 
@@ -413,12 +416,14 @@ export async function adminTimetableLookups(): Promise<TimetableLookups | null> 
 export async function adminTimetableGroups(opts: {
   faculty_id: string;
   education_year_id: string;
+  education_level_id?: string | null;
   kurs?: number | null;
 }): Promise<{ items: TimetableGroupItem[] } | null> {
   const params = new URLSearchParams({
     faculty_id: opts.faculty_id,
     education_year_id: opts.education_year_id,
   });
+  if (opts.education_level_id) params.set("education_level_id", String(opts.education_level_id));
   if (opts.kurs != null) params.set("kurs", String(opts.kurs));
   const res = await fetch(`/api/admin/timetable/groups?${params}`, { credentials: "include", cache: "no-store" });
   return jsonOrNull(res);

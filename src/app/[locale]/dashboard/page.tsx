@@ -55,13 +55,6 @@ export default async function DashboardPage({ params }: Props) {
           items: teacherCourses.teaching_past,
         },
         {
-          id: "attestation" as const,
-          label: t("sections.attestation"),
-          subtitle: t("sections.attestationSub"),
-          empty: t("empty.attestation"),
-          items: teacherCourses.attestation,
-        },
-        {
           id: "practice" as const,
           label: t("sections.practice"),
           subtitle: t("sections.practiceSub"),

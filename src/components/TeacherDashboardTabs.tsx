@@ -8,7 +8,7 @@ import type { TeacherCourseItem } from "@/lib/api";
 import styles from "./TeacherDashboardTabs.module.css";
 
 export type TeacherDashboardTabSpec = {
-  id: "current" | "past" | "attestation" | "practice";
+  id: "current" | "past" | "practice";
   label: string;
   subtitle: string;
   empty: string;

@@ -269,6 +269,45 @@ function pairEarliest(p: MeetingPair): CourseMeetingItem | null {
   return items[0];
 }
 
+function todayInBaku(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Baku",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+function mondayOfIso(iso: string): string {
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return iso;
+  const dt = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0));
+  const js = dt.getUTCDay();
+  const back = js === 0 ? 6 : js - 1;
+  dt.setUTCDate(dt.getUTCDate() - back);
+  return dt.toISOString().slice(0, 10);
+}
+
+function pairMatchesDate(p: MeetingPair, iso: string): boolean {
+  return dateOnly(p.upper?.meeting_date) === iso || dateOnly(p.lower?.meeting_date) === iso;
+}
+
+function windowStartForToday(pairs: MeetingPair[], today: string, size: number): number {
+  const maxStart = Math.max(0, pairs.length - size);
+  if (!pairs.length) return 0;
+  const weekStart = mondayOfIso(today);
+  const firstThisWeek = pairs.findIndex((p) => {
+    const d = dateOnly(pairEarliest(p)?.meeting_date);
+    return Boolean(d) && d >= weekStart;
+  });
+  const idxToday = pairs.findIndex((p) => pairMatchesDate(p, today));
+  let start = firstThisWeek >= 0 ? firstThisWeek : 0;
+  if (idxToday >= 0) {
+    start = Math.min(start, Math.max(0, idxToday - 2));
+  }
+  return Math.min(maxStart, Math.max(0, start));
+}
+
 function buildMeetingPairs(meetings: CourseMeetingItem[]): MeetingPair[] {
   const buckets = new Map<string, CourseMeetingItem[]>();
   for (const m of meetings) {
@@ -917,15 +956,9 @@ export function JournalClient({
     }
     if (Object.keys(initialLocked).length) setMeetingLockedById(initialLocked);
 
-    const today = new Date().toISOString().slice(0, 10);
-    const idxToday = meetingPairs.findIndex((p) => {
-      const du = dateOnly(p.upper?.meeting_date);
-      const dl = dateOnly(p.lower?.meeting_date);
-      return du === today || dl === today;
-    });
-    const maxStart = Math.max(0, meetingPairs.length - PAIR_WINDOW_SIZE);
-    const initialStart = Math.min(maxStart, Math.max(0, (idxToday >= 0 ? idxToday : 0) - 2));
-    setMeetingWindowStart(initialStart);
+    const today = todayInBaku();
+    const idxToday = meetingPairs.findIndex((p) => pairMatchesDate(p, today));
+    setMeetingWindowStart(windowStartForToday(meetingPairs, today, PAIR_WINDOW_SIZE));
 
     const initialMeetingId =
       String(
@@ -967,12 +1000,8 @@ export function JournalClient({
 
   useEffect(() => {
     if (!visibleMeetings.length) return;
-    const today = new Date().toISOString().slice(0, 10);
-    const idxToday = meetingPairs.findIndex((p) => {
-      const du = dateOnly(p.upper?.meeting_date);
-      const dl = dateOnly(p.lower?.meeting_date);
-      return du === today || dl === today;
-    });
+    const today = todayInBaku();
+    const idxToday = meetingPairs.findIndex((p) => pairMatchesDate(p, today));
     setMeetingId((prev) => {
       if (prev && visibleMeetings.some((m) => String(m.course_meeting_id) === prev)) return prev;
       const fromToday = idxToday >= 0 ? meetingPairs[idxToday]?.upper ?? meetingPairs[idxToday]?.lower : null;
@@ -980,9 +1009,7 @@ export function JournalClient({
     });
     setMeetingWindowStart((prev) => {
       if (prev !== 0) return prev;
-      const maxStart = Math.max(0, meetingPairs.length - PAIR_WINDOW_SIZE);
-      const idx = idxToday >= 0 ? idxToday : 0;
-      return Math.min(maxStart, Math.max(0, idx - 2));
+      return windowStartForToday(meetingPairs, today, PAIR_WINDOW_SIZE);
     });
   }, [meetingPairs, visibleMeetings]);
 
