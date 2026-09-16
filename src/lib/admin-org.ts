@@ -27,9 +27,10 @@ export async function adminInstitutionLookups(): Promise<InstitutionLookups | nu
   return adminGet("/api/admin/institution/lookups");
 }
 
-export async function adminListOrders(opts?: { q?: string | null; limit?: number; offset?: number }) {
+export async function adminListOrders(opts?: { q?: string | null; purpose?: string | null; limit?: number; offset?: number }) {
   const params = new URLSearchParams();
   if (opts?.q?.trim()) params.set("q", opts.q.trim());
+  if (opts?.purpose) params.set("purpose", opts.purpose);
   params.set("limit", String(opts?.limit ?? 25));
   params.set("offset", String(opts?.offset ?? 0));
   return adminGet<{ items: any[]; total: number; limit: number; offset: number }>(`/api/admin/orders?${params}`);

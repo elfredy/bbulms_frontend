@@ -329,6 +329,35 @@
   border-color: #fedf89;
 }
 
+.badgeWarn {
+  composes: badge;
+  color: #b42318;
+  background: #fef3f2;
+  border-color: #fecdca;
+}
+
+.rowMuted .td {
+  color: var(--muted);
+}
+
+.inlineForm {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.compactSelect {
+  min-width: 220px;
+  max-width: 320px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+}
+
 .rowAction {
   display: inline-flex;
   align-items: center;

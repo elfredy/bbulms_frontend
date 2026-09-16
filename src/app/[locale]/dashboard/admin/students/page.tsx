@@ -120,10 +120,13 @@ export default async function AdminStudentsPage({ params, searchParams }: Props)
               </thead>
               <tbody>
                 {data.items.map((s, i) => (
-                  <tr key={s.student_id} className={styles.row}>
+                  <tr key={s.student_id} className={s.is_hidden ? `${styles.row} ${styles.rowMuted}` : styles.row}>
                     <td className={`${styles.td} ${styles.tdNum}`}>{(page - 1) * pageSize + i + 1}</td>
                     <td className={`${styles.td} ${styles.tdName}`}>
                       <Link href={`/${locale}/dashboard/admin/students/${s.student_id}`}>{s.fullname || s.student_id}</Link>
+                      {s.is_hidden ? (
+                        <div className={styles.tdMuted}>{s.out_order_form_name_az || "Fasilə / xaric"}</div>
+                      ) : null}
                     </td>
                     <td className={styles.td}>{s.pincode ?? "—"}</td>
                     <td className={styles.td}>{s.gender_name_az ?? "—"}</td>

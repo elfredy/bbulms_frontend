@@ -112,6 +112,7 @@ export default async function AdminGroupsPage({ params, searchParams }: Props) {
                       </Link>
                       <div className={styles.tdMuted}>
                         {g.student_count} tələbə
+                        {Number(g.hidden_count) > 0 ? ` · ${g.hidden_count} fasilə/xaric` : ""}
                       </div>
                     </td>
                     <td className={styles.td}>{[g.specialty_name_az, g.faculty_name_az].filter(Boolean).join(" / ") || "—"}</td>

@@ -4,6 +4,8 @@ import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 
 import { adminListCourses, adminListTeachers, adminGetGroupDetail, getMe } from "@/lib/api";
+import { adminListOrders } from "@/lib/admin-org";
+import { GroupStudentsPanel } from "@/components/admin/GroupStudentsPanel";
 import { serverApiBase } from "@/lib/server-api-base";
 
 import styles from "../../../dashboard.module.css";
@@ -64,6 +66,10 @@ export default async function AdminGroupDetailPage({ params, searchParams }: Pro
   const selectedCourseIsInGroup = selectedCourseId ? data.courses.some((c) => String(c.course_id) === String(selectedCourseId)) : false;
 
   const teachers = (await adminListTeachers(teacherQ, 200, 0))?.items ?? [];
+  const [hideOrders, restoreOrders] = await Promise.all([
+    adminListOrders({ purpose: "hide", limit: 200, offset: 0 }),
+    adminListOrders({ purpose: "restore", limit: 200, offset: 0 }),
+  ]);
 
   async function assignCourseToThisGroupAction(formData: FormData) {
     "use server";
@@ -334,15 +340,12 @@ export default async function AdminGroupDetailPage({ params, searchParams }: Pro
 
         <section>
           <h2 style={{ margin: "0 0 8px", fontSize: 16 }}>{t("students")}</h2>
-          {data.students.length === 0 ? (
-            <p className={styles.alertMuted}>{t("emptyStudents")}</p>
-          ) : (
-            <ul style={{ margin: 0, paddingLeft: 18, columns: 2, columnGap: 24 }}>
-              {data.students.map((s) => (
-                <li key={s.student_id}>{s.student_fullname ?? s.student_id}</li>
-              ))}
-            </ul>
-          )}
+          <GroupStudentsPanel
+            locale={locale}
+            students={data.students}
+            hideOrders={hideOrders?.items ?? []}
+            restoreOrders={restoreOrders?.items ?? []}
+          />
         </section>
 
         <section>

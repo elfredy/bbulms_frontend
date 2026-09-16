@@ -31,6 +31,7 @@ export type AdminGroupItem = {
   education_year_id: string | null;
   education_year_name: string | null;
   student_count: number;
+  hidden_count?: number;
 };
 
 export type AdminGroupListResponse = {
@@ -42,6 +43,12 @@ export type AdminGroupListResponse = {
 export type AdminGroupStudentItem = {
   student_id: string;
   student_fullname: string | null;
+  pincode?: string | null;
+  out_order_id?: string | null;
+  out_order_serial?: string | null;
+  out_order_date?: string | null;
+  out_order_form_name_az?: string | null;
+  is_hidden?: boolean;
 };
 
 export type AdminGroupCourseItem = {
