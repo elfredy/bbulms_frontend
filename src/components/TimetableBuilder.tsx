@@ -613,7 +613,22 @@ export function TimetableBuilder() {
         </label>
         <label className={styles.field}>
           <span className={styles.label}>Fakültə</span>
-          <select className={styles.select} value={facultyId} onChange={(e) => setFacultyId(e.target.value)}>
+          <select
+            className={styles.select}
+            value={facultyId}
+            onChange={(e) => {
+              const id = e.target.value;
+              setFacultyId(id);
+              const fac = (lookups?.faculties ?? []).find((f) => f.id === id);
+              const isMaster = (fac?.name_az || "").toLowerCase().includes("magistr");
+              if (isMaster) {
+                const level =
+                  (lookups?.education_levels ?? []).find((l) => (l.name_az || "").toLowerCase().includes("magistr")) ??
+                  null;
+                if (level?.id) setEducationLevelId(level.id);
+              }
+            }}
+          >
             <option value="">— seç —</option>
             {(lookups?.faculties ?? []).map((f) => (
               <option key={f.id} value={f.id}>
