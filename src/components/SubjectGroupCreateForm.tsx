@@ -681,7 +681,6 @@ export function SubjectGroupCreateForm({
     setEvas([]);
     setTeacherPicks([{ teacher_id: "", lesson_type_id: sem }]);
     setHalfPicks([]);
-    setOpenHalfId(null);
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -894,7 +893,7 @@ export function SubjectGroupCreateForm({
   }
 
   function halfLabel(halfGroupId: string) {
-    const hg = lookups.half_groups.find((x) => x.id === halfGroupId);
+    const hg = lookups?.half_groups.find((x) => x.id === halfGroupId);
     return hg ? labelOf(hg) : halfGroupId;
   }
 
