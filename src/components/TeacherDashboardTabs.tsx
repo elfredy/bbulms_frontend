@@ -62,7 +62,8 @@ function mergeCourses(items: TeacherCourseItem[]): CourseCard[] {
   const m = new Map<string, CourseCard>();
   for (const c of items) {
     const cid = String(c.course_id ?? "").trim();
-    const key = cid || c.course_teacher_id;
+    const halfKey = String(c.half_group_az ?? "").trim();
+    const key = `${cid || c.course_teacher_id}::${halfKey}`;
     const cur = m.get(key) ?? {
       course_id: cid,
       course_code: c.course_code,

@@ -241,7 +241,6 @@ export function SubjectGroupCreateForm({
   const [extraStudentQuery, setExtraStudentQuery] = useState("");
   const [extraLoading, setExtraLoading] = useState(false);
   const [halfPicks, setHalfPicks] = useState<HalfPick[]>([]);
-  const [openHalfId, setOpenHalfId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -894,21 +893,21 @@ export function SubjectGroupCreateForm({
     return st ? `${st.name || sid}${st.group_name ? ` · ${st.group_name}` : ""}` : sid;
   }
 
-  function showHalfStudents(halfGroupId: string) {
-    if (openHalfId === halfGroupId) {
-      setOpenHalfId(null);
-      return;
-    }
-    setHalfPicks((prev) => {
-      const picked = prev.find((h) => h.half_group_id === halfGroupId);
-      if (!picked || studentIds.length === 0) return prev;
-      const sameTypeHasStudents = prev.some(
-        (h) => h.lesson_type_id === picked.lesson_type_id && (h.student_ids ?? []).length > 0,
-      );
-      if (sameTypeHasStudents) return prev;
-      return autoSplitHalves(studentIds, prev, students, picked.lesson_type_id);
-    });
-    setOpenHalfId(halfGroupId);
+  function halfLabel(halfGroupId: string) {
+    const hg = lookups.half_groups.find((x) => x.id === halfGroupId);
+    return hg ? labelOf(hg) : halfGroupId;
+  }
+
+  function moveHalfStudent(studentId: string, toHalfId: string, lessonTypeId: string) {
+    if (!toHalfId || !lessonTypeId) return;
+    setHalfPicks((prev) =>
+      prev.map((h) => {
+        if (h.lesson_type_id !== lessonTypeId) return h;
+        const nextIds = h.student_ids.filter((id) => id !== studentId);
+        if (h.half_group_id === toHalfId) nextIds.push(studentId);
+        return { ...h, student_ids: nextIds };
+      }),
+    );
   }
 
   return (
@@ -1350,13 +1349,18 @@ export function SubjectGroupCreateForm({
               </button>
             ) : null}
           </div>
+          <p className={styles.halfHint}>
+            Tələbəni istənilən vaxt başqa yarımqrupa keçirə bilərsiniz. Dəyişikliklər «Yadda saxla»dan sonra e-jurnalda da eyni siyahı ilə görünəcək.
+          </p>
           {lookups.half_groups.length === 0 ? <p className={styles.label}>Yarımqrup tapılmadı.</p> : null}
           {lookups.half_groups.map((hg) => {
             const picked = halfPicks.find((x) => x.half_group_id === hg.id);
             const halfStudents = (picked?.student_ids ?? [])
               .filter((id) => studentIds.includes(id))
               .sort((a, b) => studentLabel(a).localeCompare(studentLabel(b), "az"));
-            const open = openHalfId === hg.id;
+            const siblingHalves = picked
+              ? halfPicks.filter((h) => h.lesson_type_id === picked.lesson_type_id && h.half_group_id)
+              : [];
             return (
               <div key={hg.id} className={styles.halfBlock}>
                 <div className={styles.halfRow}>
@@ -1372,11 +1376,13 @@ export function SubjectGroupCreateForm({
                           ]);
                         } else {
                           setHalfPicks((prev) => prev.filter((x) => x.half_group_id !== hg.id));
-                          setOpenHalfId((cur) => (cur === hg.id ? null : cur));
                         }
                       }}
                     />
-                    <span>{labelOf(hg)}</span>
+                    <span>
+                      {labelOf(hg)}
+                      {picked ? <span className={styles.halfCount}> · {halfStudents.length} tələbə</span> : null}
+                    </span>
                   </label>
                   <select
                     className={styles.select}
@@ -1405,21 +1411,13 @@ export function SubjectGroupCreateForm({
                       label: teacherSearchLabel(t),
                     }))}
                   />
-                  <button
-                    type="button"
-                    className={styles.buttonGhost}
-                    disabled={!picked}
-                    onClick={() => showHalfStudents(hg.id)}
-                  >
-                    {open ? "Gizlət" : "Tələbələri göstər"}
-                  </button>
                 </div>
-                {picked && open ? (
+                {picked ? (
                   <div className={styles.halfStudentPanel}>
                     {studentIds.length === 0 ? (
                       <p className={styles.label}>Əvvəl Tələbələr tabında tələbə seçin.</p>
                     ) : halfStudents.length === 0 ? (
-                      <p className={styles.label}>Bu yarımqrupda tələbə yoxdur. Əvvəl «Avtomatik böl» düyməsini basın.</p>
+                      <p className={styles.label}>Bu yarımqrupda tələbə yoxdur. «Avtomatik böl» düyməsini basın və ya aşağıdan əl ilə keçirin.</p>
                     ) : (
                       <>
                         <p className={styles.label}>
@@ -1427,7 +1425,23 @@ export function SubjectGroupCreateForm({
                         </p>
                         <ol className={styles.halfStudentList}>
                           {halfStudents.map((sid) => (
-                            <li key={sid}>{studentLabel(sid)}</li>
+                            <li key={sid} className={styles.halfStudentRow}>
+                              <span>{studentLabel(sid)}</span>
+                              {siblingHalves.length > 1 ? (
+                                <select
+                                  className={styles.select}
+                                  value={hg.id}
+                                  onChange={(e) => moveHalfStudent(sid, e.target.value, picked.lesson_type_id)}
+                                  aria-label={`${studentLabel(sid)} yarımqrupu`}
+                                >
+                                  {siblingHalves.map((h) => (
+                                    <option key={h.half_group_id} value={h.half_group_id}>
+                                      {halfLabel(h.half_group_id)}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : null}
+                            </li>
                           ))}
                         </ol>
                       </>
@@ -1437,6 +1451,49 @@ export function SubjectGroupCreateForm({
               </div>
             );
           })}
+          {(() => {
+            const types = Array.from(new Set(halfPicks.map((h) => h.lesson_type_id).filter(Boolean)));
+            return types.map((lt) => {
+              const assigned = new Set(halfPicks.filter((h) => h.lesson_type_id === lt).flatMap((h) => h.student_ids));
+              const missing = studentIds
+                .filter((id) => !assigned.has(id))
+                .sort((a, b) => studentLabel(a).localeCompare(studentLabel(b), "az"));
+              if (!missing.length) return null;
+              const targets = halfPicks.filter((h) => h.lesson_type_id === lt);
+              const ltOpt = lookups.lesson_types.find((o) => o.id === lt);
+              return (
+                <div key={`unassigned-${lt}`} className={styles.halfStudentPanel}>
+                  <p className={styles.label}>
+                    Bölünməmiş tələbələr{ltOpt ? ` · ${labelOf(ltOpt)}` : ""} · {missing.length}
+                  </p>
+                  <ol className={styles.halfStudentList}>
+                    {missing.map((sid) => (
+                      <li key={sid} className={styles.halfStudentRow}>
+                        <span>{studentLabel(sid)}</span>
+                        {targets.length ? (
+                          <select
+                            className={styles.select}
+                            value=""
+                            onChange={(e) => {
+                              if (e.target.value) moveHalfStudent(sid, e.target.value, lt);
+                            }}
+                            aria-label={`${studentLabel(sid)} yarımqrupa keçir`}
+                          >
+                            <option value="">Yarımqrupa keçir</option>
+                            {targets.map((h) => (
+                              <option key={h.half_group_id} value={h.half_group_id}>
+                                {halfLabel(h.half_group_id)}
+                              </option>
+                            ))}
+                          </select>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              );
+            });
+          })()}
         </section>
       </div>
 

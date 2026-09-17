@@ -25,7 +25,7 @@ type Meeting = {
   lesson_type_az: string | null;
   confirmed?: boolean;
 };
-type Student = { student_id: string; person_fullname: string; qb_count: number };
+type Student = { student_id: string; person_fullname: string; qb_count: number; half_group_az?: string | null };
 type Eva = { course_eva_id: string; evaluation_code: string | null; evaluation_name_az: string | null };
 type Cell = {
   student_id: string;
@@ -123,6 +123,7 @@ export function AdminJournalClient({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
+  const [halfFilter, setHalfFilter] = useState("");
 
   useEffect(() => {
     let alive = true;
@@ -232,6 +233,7 @@ export function AdminJournalClient({
 
   useEffect(() => {
     void loadGrid(courseId);
+    setHalfFilter("");
     if (!courseId || typeof window === "undefined") return;
     const url = new URL(window.location.href);
     url.searchParams.set("course_id", courseId);
@@ -260,6 +262,21 @@ export function AdminJournalClient({
     () => (grid?.evaluations ?? []).filter((e) => (e.evaluation_code ?? "").trim().toUpperCase() === "EVA_02"),
     [grid],
   );
+
+  const halfOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of grid?.students ?? []) {
+      const name = String(s.half_group_az ?? "").trim();
+      if (name) set.add(name);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "az"));
+  }, [grid]);
+
+  const visibleStudents = useMemo(() => {
+    const list = grid?.students ?? [];
+    if (!halfFilter) return list;
+    return list.filter((s) => String(s.half_group_az ?? "").trim() === halfFilter);
+  }, [grid, halfFilter]);
 
   const cellMap = useMemo(() => {
     const m = new Map<string, Cell>();
@@ -361,17 +378,18 @@ export function AdminJournalClient({
                 </tr>
               </thead>
               <tbody>
-                {grid.students.length === 0 ? (
+                {visibleStudents.length === 0 ? (
                   <tr>
                     <td className={`${styles.td} ${styles.nameCol}`} colSpan={windowMeetings.length + 2}>
-                      Bu fənn qrupunda tələbə yoxdur.
+                      Bu fənn qrupunda{halfFilter ? " bu yarımqrup üçün" : ""} tələbə yoxdur.
                     </td>
                   </tr>
                 ) : (
-                  grid.students.map((s, idx) => (
+                  visibleStudents.map((s, idx) => (
                     <tr key={s.student_id} className={styles.row}>
                       <td className={`${styles.td} ${styles.nameCol}`}>
                         {idx + 1}. {s.person_fullname}
+                        {s.half_group_az ? <span className={styles.halfTag}>{s.half_group_az}</span> : null}
                       </td>
                       {windowMeetings.map((m) => {
                         const value = displayValue(s.student_id, m.course_meeting_id);
@@ -467,11 +485,24 @@ export function AdminJournalClient({
             emptyText="Fənn qrupu tapılmadı"
           />
         </label>
+        {halfOptions.length > 0 ? (
+          <label className={styles.field}>
+            <span className={styles.label}>Yarımqrup</span>
+            <select className={styles.select} value={halfFilter} onChange={(e) => setHalfFilter(e.target.value)}>
+              <option value="">Hamısı</option>
+              {halfOptions.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
         {grid?.course ? (
           <p className={styles.meta}>
             {grid.course.subject_name_az || grid.course.code || courseId}
             {grid.course.status_name_az ? ` · ${grid.course.status_name_az}` : ""}
-            {` · ${grid.students.length} tələbə · ${grid.meetings.length} dərs`}
+            {` · ${visibleStudents.length} tələbə · ${grid.meetings.length} dərs`}
           </p>
         ) : (
           <p className={styles.meta}>{courses.length} fənn qrupu</p>
