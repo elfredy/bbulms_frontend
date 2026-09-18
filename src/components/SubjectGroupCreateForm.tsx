@@ -909,6 +909,20 @@ export function SubjectGroupCreateForm({
     );
   }
 
+  const visibleStudents = students.filter((s) => {
+    const q = studentSearch.trim().toLocaleLowerCase("az");
+    if (!q) return true;
+    return `${s.name || ""} ${s.group_name || ""} ${s.id}`.toLocaleLowerCase("az").includes(q);
+  });
+
+  function selectAllVisibleStudents() {
+    setStudentIds((prev) => {
+      const next = new Set(prev);
+      for (const s of visibleStudents) next.add(s.id);
+      return Array.from(next);
+    });
+  }
+
   return (
     <form className={styles.form} onSubmit={onSubmit} noValidate>
       <nav className={styles.tabs}>
@@ -1292,9 +1306,19 @@ export function SubjectGroupCreateForm({
         <section className={styles.card}>
           <div className={styles.studentHead}>
             <h2 className={styles.cardTitle}>Tələbələr</h2>
-            <button type="button" className={styles.buttonAdd} onClick={() => setExtraOpen(true)}>
-              Alt qrup tələbə
-            </button>
+            <div className={styles.studentHeadActions}>
+              <button
+                type="button"
+                className={styles.buttonGhost}
+                onClick={selectAllVisibleStudents}
+                disabled={visibleStudents.length === 0}
+              >
+                Hamısını seç
+              </button>
+              <button type="button" className={styles.buttonAdd} onClick={() => setExtraOpen(true)}>
+                Alt qrup tələbə
+              </button>
+            </div>
           </div>
           <input
             className={styles.input}
@@ -1304,13 +1328,7 @@ export function SubjectGroupCreateForm({
           />
           <div className={styles.checkList} style={{ maxHeight: 360 }}>
             {students.length === 0 ? <span className={styles.label}>Əvvəl akademik qrup seçin</span> : null}
-            {students
-              .filter((s) => {
-                const q = studentSearch.trim().toLocaleLowerCase("az");
-                if (!q) return true;
-                return `${s.name || ""} ${s.group_name || ""} ${s.id}`.toLocaleLowerCase("az").includes(q);
-              })
-              .map((s) => {
+            {visibleStudents.map((s) => {
                 const checked = studentIds.includes(s.id);
                 const selectedNames = new Set(groups.filter((g) => groupIds.includes(g.id)).map((g) => g.name || g.name_az));
                 const extra = Boolean(s.group_name) && selectedNames.size > 0 && !selectedNames.has(s.group_name || "");
