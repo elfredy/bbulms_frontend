@@ -295,6 +295,46 @@
   z-index: 3;
 }
 
+.rowMissing .td,
+.rowMissing .nameCol,
+.rowMissing:nth-child(even) .td,
+.rowMissing:nth-child(even) .nameCol,
+.rowMissing:hover .td,
+.rowMissing:hover .nameCol,
+.rowMissing:nth-child(even) .qbCol,
+.rowMissing:hover .qbCol {
+  background: #fee2e2 !important;
+}
+
+.rowMissing .nameCol {
+  color: #9f1239;
+  font-weight: 700;
+  box-shadow: inset 3px 0 0 0 #dc2626;
+}
+
+.rowMissing:focus-within .td,
+.rowMissing:focus-within .nameCol {
+  background: #fecaca !important;
+}
+
+.cellMissing {
+  background: #fecaca !important;
+  border-color: #dc2626 !important;
+  color: #9f1239 !important;
+}
+
+.leaveBanner {
+  flex: 1 1 100%;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #fee2e2;
+  color: #9f1239;
+  font-size: 0.82rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
 .tdCell {
   text-align: center;
   min-width: 96px;

@@ -41,6 +41,19 @@
   color: var(--muted);
 }
 
+.hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+.hint a {
+  color: #175cd3;
+  font-weight: 600;
+}
+
 .req::after {
   content: " *";
   color: #d92d20;

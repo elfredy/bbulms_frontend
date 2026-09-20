@@ -4,12 +4,19 @@ import { useLocale } from "next-intl";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 
-export function LogoutButton({ className }: { className?: string }) {
+export function LogoutButton({
+  className,
+  onBeforeLogout,
+}: {
+  className?: string;
+  onBeforeLogout?: () => boolean;
+}) {
   const t = useTranslations("dashboard");
   const router = useRouter();
   const locale = useLocale();
 
   async function logout() {
+    if (onBeforeLogout && !onBeforeLogout()) return;
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
     router.push(`/${locale}/login`);
     router.refresh();

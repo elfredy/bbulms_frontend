@@ -16,6 +16,7 @@ type Opt = {
   faculty_name_az?: string | null;
   organization_id?: string | null;
   education_level_id?: string | null;
+  education_level_ids?: string[] | null;
   education_type_id?: string | null;
   group_name?: string | null;
   season_code?: string | null;
@@ -358,7 +359,11 @@ export function SubjectGroupCreateForm({
         .map((p) => p.organization_id)
         .filter((id): id is string => Boolean(id))
     );
-    return all.filter((o) => o.education_level_id === levelId || fromPlans.has(o.id));
+    return all.filter((o) => {
+      if (o.education_level_id === levelId || fromPlans.has(o.id)) return true;
+      const ids = Array.isArray(o.education_level_ids) ? o.education_level_ids : [];
+      return ids.includes(levelId);
+    });
   }, [lookups, levelId]);
 
   const visiblePlans = useMemo(() => {
@@ -386,14 +391,21 @@ export function SubjectGroupCreateForm({
   function changeLevel(id: string) {
     setLevelId(id);
     if (!id) return;
+    const currentPlan = (lookups?.plans ?? []).find((p) => p.id === planId);
+    if (currentPlan?.education_level_id && currentPlan.education_level_id !== id) {
+      resetDownstreamFromOrg();
+    }
     const allowed = new Set(
       (lookups?.plans ?? [])
         .filter((p) => p.education_level_id === id)
         .map((p) => p.organization_id)
         .filter((oid): oid is string => Boolean(oid))
     );
-    const orgOk =
-      !orgId || allowed.has(orgId) || Boolean(lookups?.organizations.some((o) => o.id === orgId && o.education_level_id === id));
+    const orgLevels = (lookups?.organizations ?? []).find((o) => o.id === orgId);
+    const orgLevelOk =
+      Boolean(orgLevels?.education_level_id === id) ||
+      (Array.isArray(orgLevels?.education_level_ids) && orgLevels.education_level_ids.includes(id));
+    const orgOk = !orgId || allowed.has(orgId) || orgLevelOk;
     if (!orgOk) {
       setOrgId("");
       resetDownstreamFromOrg();
@@ -1000,9 +1012,17 @@ export function SubjectGroupCreateForm({
                   onChange={applyPlan}
                   placeholder="— seç —"
                   searchPlaceholder="Axtar…"
+                  emptyText="Tədris planı tapılmadı"
                   disabled={locked}
                   options={visiblePlans.map((o) => ({ id: o.id, label: labelOf(o) }))}
                 />
+                {levelId && visiblePlans.length === 0 ? (
+                  <span className={styles.hint}>
+                    Bu təhsil səviyyəsi / ixtisas üçün tədris planı yoxdur. Əvvəl{" "}
+                    <Link href={`/${locale}/dashboard/admin/education-plans/new`}>magistratura tədris planı yaradın</Link> və
+                    fənnləri əlavə edin.
+                  </span>
+                ) : null}
               </label>
               <label className={styles.field}>
                 <span className={`${styles.label} ${styles.req}`}>Tədris planı semestr</span>
@@ -1024,12 +1044,24 @@ export function SubjectGroupCreateForm({
                   onChange={applySubject}
                   placeholder="— seç —"
                   searchPlaceholder="Axtar…"
+                  emptyText={planId ? "Bu planda fənn yoxdur" : "Əvvəl tədris planı seçin"}
                   disabled={locked}
                   options={subjects.map((o) => ({
                     id: o.id,
                     label: subjectLabel(o),
                   }))}
                 />
+                {planId && subjects.length === 0 ? (
+                  <span className={styles.hint}>
+                    {planSemesterId
+                      ? "Bu semestrdə tədris planında fənn yoxdur. Semestri dəyişin və ya "
+                      : "Fənn qrupu yalnız tədris planındakı fənnlərdən yaradılır. Əvvəl "}
+                    <Link href={`/${locale}/dashboard/admin/education-plans/${encodeURIComponent(planId)}/subjects/new`}>
+                      plana fənn əlavə edin
+                    </Link>
+                    .
+                  </span>
+                ) : null}
               </label>
               <label className={styles.field}>
                 <span className={`${styles.label} ${styles.req}`}>Tədris ili</span>

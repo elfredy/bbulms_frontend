@@ -122,6 +122,11 @@ export function EducationPlanSubjectForm({
             onQueryChange={setSubjectQuery}
             debounceMs={350}
           />
+          {organizationId && subjectOptions.length === 0 ? (
+            <p style={{ margin: "6px 0 0", fontSize: "0.8rem", color: "var(--muted)" }}>
+              Siyahı boşdursa fənn adını axtarışa yazın. Magistratura ixtisaslaşmasında fənnlər adətən kafedradadır.
+            </p>
+          ) : null}
         </Field>
         <Field label="Semestr" required>
           <SelectInput value={semesterId} onChange={setSemesterId} required options={semesterOptions} />

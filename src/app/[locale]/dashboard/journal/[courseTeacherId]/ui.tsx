@@ -57,6 +57,8 @@ const ATTENDANCE_CODE_SET = new Set(
 const COLUMN_WINDOW_SIZE = 12;
 const COLUMN_WINDOW_STEP = 6;
 const WEEK_DAY_LABELS = ["", "I", "II", "III", "IV", "V", "VI", "VII"];
+const LEAVE_INCOMPLETE_MSG =
+  "Bəzi tələbələrdə qiymət və ya i.e / q.b yazılmayıb (qırmızı sətirlər). Dəyişikliklər yadda qalır, ümumi hesablama üçün təsdiq lazımdır. Səhifəni tərk etmək istəyirsiniz?";
 
 function isAttendanceValue(rawValue: string | null | undefined): boolean {
   return ATTENDANCE_CODE_SET.has(String(rawValue ?? "").trim().toLowerCase());
@@ -414,12 +416,15 @@ export function JournalClient({
   const [isPending, startTransition] = useTransition();
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [savingHint, setSavingHint] = useState<string | null>(null);
+  const [leaveHighlight, setLeaveHighlight] = useState(false);
   const meetingSaveQueueRef = useRef<Record<string, { student_id: string; course_eva_id: string; value: string | null }[]>>({});
   const meetingSavingRef = useRef<Record<string, boolean>>({});
   const exerciseSaveQueueRef = useRef<Record<string, { type: "colloquium" | "referat"; cells: { student_id: string; value: string | null }[] }>>({});
   const exerciseSavingRef = useRef<Record<string, boolean>>({});
   const meetingPendingRef = useRef<Record<string, string>>({});
   const exercisePendingRef = useRef<Record<string, string>>({});
+  const leaveAllowedRef = useRef(false);
+  const needsLeaveWarnRef = useRef(false);
 
   const [exerciseItemsByType, setExerciseItemsByType] = useState<Record<string, { items: any[] }>>({});
   const [exercisePointsByExerciseId, setExercisePointsByExerciseId] = useState<Record<string, Record<string, string>>>({});
@@ -1146,6 +1151,104 @@ export function JournalClient({
     });
   }, [tab, exercisePendingCount, exerciseItemsByType, exercisePointsByExerciseId]);
 
+  const incompleteStudentIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const m of visibleMeetings) {
+      const mid = String(m.course_meeting_id);
+      if (meetingLockedById[mid]) continue;
+      const cellMap = meetingWindowCellsByMeetingId[mid] ?? {};
+      const started = roster.some((s) => meetingCombinedDisplay(cellMap, s.student_id).trim() !== "");
+      if (!started) continue;
+      for (const s of roster) {
+        if (!meetingCombinedDisplay(cellMap, s.student_id).trim()) ids.add(s.student_id);
+      }
+    }
+    for (const exType of ["colloquium", "referat"] as const) {
+      const items = (exerciseItemsByType[exType]?.items ?? []) as any[];
+      for (const it of items) {
+        if (it.confirmed || !it.editable) continue;
+        const eid = String(it.course_execises_id);
+        const pts = exercisePointsByExerciseId[eid] ?? {};
+        const started = roster.some((s) => exercisePointDisplay(pts[s.student_id]).trim() !== "");
+        if (!started) continue;
+        for (const s of roster) {
+          if (!exercisePointDisplay(pts[s.student_id]).trim()) ids.add(s.student_id);
+        }
+      }
+    }
+    return ids;
+  }, [
+    visibleMeetings,
+    meetingLockedById,
+    meetingWindowCellsByMeetingId,
+    roster,
+    exerciseItemsByType,
+    exercisePointsByExerciseId,
+  ]);
+
+  const hasInFlightSaves =
+    meetingPendingCount > 0 ||
+    Object.keys(exercisePendingByKey).length > 0 ||
+    Object.values(meetingSaveQueueRef.current).some((q) => q.length > 0);
+
+  needsLeaveWarnRef.current = incompleteStudentIds.size > 0 || hasInFlightSaves;
+
+  function confirmLeavePage(): boolean {
+    if (leaveAllowedRef.current) return true;
+    if (!needsLeaveWarnRef.current) return true;
+    setLeaveHighlight(true);
+    const ok = window.confirm(LEAVE_INCOMPLETE_MSG);
+    if (ok) {
+      leaveAllowedRef.current = true;
+      void flushAllMeetingQueues();
+      void flushAllExerciseQueues();
+    }
+    return ok;
+  }
+
+  useEffect(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (leaveAllowedRef.current || !needsLeaveWarnRef.current) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    const onDocClick = (e: MouseEvent) => {
+      if (leaveAllowedRef.current || !needsLeaveWarnRef.current) return;
+      if (e.defaultPrevented) return;
+      const el = e.target as HTMLElement | null;
+      if (!el) return;
+      const a = el.closest("a");
+      if (!a) return;
+      if (a.target === "_blank" || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+      const href = a.getAttribute("href");
+      if (!href || href.startsWith("#")) return;
+      let next: URL;
+      try {
+        next = new URL(href, window.location.href);
+      } catch {
+        return;
+      }
+      if (next.origin !== window.location.origin) return;
+      if (next.pathname === window.location.pathname && next.search === window.location.search) return;
+      setLeaveHighlight(true);
+      if (!window.confirm(LEAVE_INCOMPLETE_MSG)) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      leaveAllowedRef.current = true;
+      void flushAllMeetingQueues();
+      void flushAllExerciseQueues();
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    document.addEventListener("click", onDocClick, true);
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      document.removeEventListener("click", onDocClick, true);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [courseId]);
+
   function cancelPendingForAttendance() {
     setPendingByKey({});
     setMeetingPendingByKey({});
@@ -1355,7 +1458,7 @@ export function JournalClient({
           <a className={styles.backButton} href={`/${locale}/dashboard`}>
             Geri
           </a>
-          <LogoutButton className={styles.logoutButton} />
+          <LogoutButton className={styles.logoutButton} onBeforeLogout={confirmLeavePage} />
         </div>
       </div>
 
@@ -1414,6 +1517,12 @@ export function JournalClient({
                     ? "Qiymətlər yadda saxlanılıb. Ümumi hesablama üçün təsdiq edin."
                     : "Dəyişiklik yoxdur"}
             </div>
+            {incompleteStudentIds.size > 0 ? (
+              <p className={styles.leaveBanner}>
+                {incompleteStudentIds.size} tələbədə qiymət və ya i.e / q.b yazılmayıb (qırmızı).
+                {leaveHighlight ? " Səhifəni tərk etməzdən əvvəl yazın və ya təsdiq edin." : ""}
+              </p>
+            ) : null}
             <div className={styles.actionHint}>
               Üst və alt həftə tarix sırası ilə göstərilir.
             </div>
@@ -1490,8 +1599,10 @@ export function JournalClient({
                 </tr>
               </thead>
               <tbody>
-                {roster.map((s, idx) => (
-                  <tr key={s.student_id} className={styles.row}>
+                {roster.map((s, idx) => {
+                  const rowMissing = incompleteStudentIds.has(s.student_id);
+                  return (
+                  <tr key={s.student_id} className={`${styles.row} ${rowMissing ? styles.rowMissing : ""}`}>
                     <td className={`${styles.td} ${styles.nameCol}`}>
                       {idx + 1}. {s.person_fullname}
                     </td>
@@ -1500,7 +1611,9 @@ export function JournalClient({
                       const locked = Boolean(meetingLockedById[mid]);
                       const cellMap = meetingWindowCellsByMeetingId[mid] ?? {};
                       const display = meetingCombinedDisplay(cellMap, s.student_id);
-                      const tone = cellToneClass(styles, display, isAttendanceValue(display));
+                      const started = !locked && roster.some((x) => meetingCombinedDisplay(cellMap, x.student_id).trim() !== "");
+                      const cellMissing = started && !display.trim();
+                      const tone = cellMissing ? styles.cellMissing : cellToneClass(styles, display, isAttendanceValue(display));
                       const qbLocked = isQbLocked(m, display, nowMs);
                       return (
                         <td key={mid} className={`${styles.td} ${styles.tdCell}`}>
@@ -1509,7 +1622,7 @@ export function JournalClient({
                             value={display}
                             onChange={(ev) => setMeetingCombined(mid, s.student_id, String(ev.target.value), m)}
                             disabled={isPending || locked || qbLocked}
-                            title={qbLocked ? "q.b dərs başladıqdan 15 dəqiqə sonra dəyişdirilə bilməz" : undefined}
+                            title={qbLocked ? "q.b dərs başladıqdan 15 dəqiqə sonra dəyişdirilə bilməz" : cellMissing ? "Qiymət və ya i.e / q.b yazılmayıb" : undefined}
                           >
                             {meetingCombinedOpts.map((o) => (
                               <option key={`${o.value}-${o.label}`} value={o.value}>
@@ -1524,7 +1637,8 @@ export function JournalClient({
                       {qbCountByStudentId[s.student_id] ?? 0}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
               <tfoot>
                 <tr className={styles.pagerRow}>
@@ -1655,6 +1769,12 @@ export function JournalClient({
                               ? "Qiymətlər yadda saxlanılıb. Ümumi hesablama üçün təsdiq edin."
                               : "Dəyişiklik yoxdur"}
                       </div>
+                      {incompleteStudentIds.size > 0 ? (
+                        <p className={styles.leaveBanner}>
+                          {incompleteStudentIds.size} tələbədə qiymət yazılmayıb (qırmızı).
+                          {leaveHighlight ? " Səhifəni tərk etməzdən əvvəl yazın və ya təsdiq edin." : ""}
+                        </p>
+                      ) : null}
                     </div>
 
                     <div className={styles.controls} style={{ marginBottom: 12 }}>
@@ -1698,14 +1818,22 @@ export function JournalClient({
                         {roster.map((s, idx) => {
                           const vals = items.map((it) => parseNum(exercisePointDisplay(exercisePointsByExerciseId[it.course_execises_id]?.[s.student_id])) ?? 0);
                           const avg = exType === "colloquium" ? (items.length ? vals.reduce((a, b) => a + b, 0) / items.length : 0) : 0;
+                          const rowMissing = incompleteStudentIds.has(s.student_id);
                           return (
-                            <tr key={s.student_id} className={styles.row}>
+                            <tr key={s.student_id} className={`${styles.row} ${rowMissing ? styles.rowMissing : ""}`}>
                               <td className={`${styles.td} ${styles.nameCol}`}>
                                 {idx + 1}. {s.person_fullname}
                               </td>
                               {items.map((it) => {
                                 const current = exercisePointDisplay(exercisePointsByExerciseId[it.course_execises_id]?.[s.student_id]);
-                                const tone = cellToneClass(styles, current, false);
+                                const started =
+                                  !it.confirmed &&
+                                  it.editable &&
+                                  roster.some((x) =>
+                                    exercisePointDisplay(exercisePointsByExerciseId[it.course_execises_id]?.[x.student_id]).trim() !== "",
+                                  );
+                                const cellMissing = started && !current.trim();
+                                const tone = cellMissing ? styles.cellMissing : cellToneClass(styles, current, false);
                                 return (
                                   <td key={it.course_execises_id} className={`${styles.td} ${styles.tdCell}`}>
                                     <select
@@ -1720,6 +1848,7 @@ export function JournalClient({
                                         stageExercisePoint(exType as any, it.course_execises_id, s.student_id, next);
                                       }}
                                       disabled={isPending || !it.editable}
+                                      title={cellMissing ? "Qiymət yazılmayıb" : undefined}
                                     >
                                       <option value="">—</option>
                                       {Array.from({ length: max + 1 }, (_, i) => (
