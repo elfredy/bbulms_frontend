@@ -13,6 +13,7 @@ type Opt = {
   name_az?: string | null;
   name?: string | null;
   code?: string | null;
+  parent_id?: string | null;
   faculty_name_az?: string | null;
   organization_id?: string | null;
   education_level_id?: string | null;
@@ -69,6 +70,16 @@ type Lookups = {
 function labelOf(o: Opt) {
   if (o.faculty_name_az) return [o.name_az, o.code, o.faculty_name_az].filter(Boolean).join(" — ");
   return o.name_az || o.name || o.id;
+}
+
+function planMatchesOrg(planOrgId: string | null | undefined, selectedOrgId: string, orgs: Opt[]) {
+  if (!planOrgId || !selectedOrgId) return false;
+  if (planOrgId === selectedOrgId) return true;
+  const selected = orgs.find((o) => o.id === selectedOrgId);
+  const planOrg = orgs.find((o) => o.id === planOrgId);
+  if (selected?.parent_id && planOrgId === selected.parent_id) return true;
+  if (planOrg?.parent_id && planOrg.parent_id === selectedOrgId) return true;
+  return false;
 }
 
 function subjectLabel(o: SubjectOpt) {
@@ -368,9 +379,10 @@ export function SubjectGroupCreateForm({
 
   const visiblePlans = useMemo(() => {
     const all = lookups?.plans ?? [];
+    const orgs = lookups?.organizations ?? [];
     if (!all.length) return [];
     let list = all;
-    if (orgId) list = list.filter((p) => p.organization_id === orgId);
+    if (orgId) list = list.filter((p) => planMatchesOrg(p.organization_id, orgId, orgs));
     if (levelId) list = list.filter((p) => p.education_level_id === levelId);
     if (typeId) list = list.filter((p) => p.education_type_id === typeId);
     if (planId && !list.some((p) => p.id === planId)) {
@@ -395,17 +407,17 @@ export function SubjectGroupCreateForm({
     if (currentPlan?.education_level_id && currentPlan.education_level_id !== id) {
       resetDownstreamFromOrg();
     }
-    const allowed = new Set(
-      (lookups?.plans ?? [])
-        .filter((p) => p.education_level_id === id)
-        .map((p) => p.organization_id)
-        .filter((oid): oid is string => Boolean(oid))
-    );
-    const orgLevels = (lookups?.organizations ?? []).find((o) => o.id === orgId);
+    const orgs = lookups?.organizations ?? [];
+    const orgLevels = orgs.find((o) => o.id === orgId);
     const orgLevelOk =
       Boolean(orgLevels?.education_level_id === id) ||
       (Array.isArray(orgLevels?.education_level_ids) && orgLevels.education_level_ids.includes(id));
-    const orgOk = !orgId || allowed.has(orgId) || orgLevelOk;
+    const orgOk =
+      !orgId ||
+      orgLevelOk ||
+      (lookups?.plans ?? [])
+        .filter((p) => p.education_level_id === id)
+        .some((p) => planMatchesOrg(p.organization_id, orgId, orgs));
     if (!orgOk) {
       setOrgId("");
       resetDownstreamFromOrg();

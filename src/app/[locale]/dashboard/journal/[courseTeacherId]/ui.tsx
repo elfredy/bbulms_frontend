@@ -255,15 +255,10 @@ function daysBetween(a: string, b: string): number {
 type MeetingColumn = { tag: "Üst" | "Alt"; m: CourseMeetingItem };
 
 function pairHalves(p: MeetingPair): MeetingColumn[] {
-  const items = [p.upper, p.lower].filter((m): m is CourseMeetingItem => Boolean(m));
-  items.sort(compareMeetings);
-  if (items.length === 2) {
-    return [
-      { tag: "Üst", m: items[0] },
-      { tag: "Alt", m: items[1] },
-    ];
-  }
-  return items.map((m) => ({ tag: weekHalfOf(m) === 2 ? "Alt" : "Üst", m }));
+  const cols: MeetingColumn[] = [];
+  if (p.upper) cols.push({ tag: "Üst", m: p.upper });
+  if (p.lower) cols.push({ tag: "Alt", m: p.lower });
+  return cols;
 }
 
 function todayInBaku(): string {
@@ -323,8 +318,16 @@ function buildMeetingPairs(meetings: CourseMeetingItem[]): MeetingPair[] {
       let upper: CourseMeetingItem | null = null;
       let lower: CourseMeetingItem | null = null;
       if (canPair && b) {
-        upper = a;
-        lower = b;
+        if (weekHalfOf(a) === 2 && weekHalfOf(b) !== 2) {
+          upper = b;
+          lower = a;
+        } else if (weekHalfOf(b) === 2 || weekHalfOf(a) !== 2) {
+          upper = a;
+          lower = b;
+        } else {
+          upper = b;
+          lower = a;
+        }
         i += 2;
       } else {
         if (weekHalfOf(a) === 2) lower = a;

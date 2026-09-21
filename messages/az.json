@@ -37,7 +37,7 @@
     "coursesLoadError": "Dərslər yüklənmədi. Backend və verilənlər bazasını yoxlayın.",
     "yearHint": "Cari tədris ili (DB): {year}. Müəllim: cari il və açıq təyinat.",
     "sections": {
-      "current": "Tədris olunanlar",
+      "current": "Cari fənnlər",
       "currentSub": "Cari tədris ili, aktiv fənn təyinatları.",
       "past": "Tədris olunmuşlar",
       "pastSub": "Əvvəlki illər və ya bağlanmış təyinatlar.",
@@ -124,7 +124,7 @@
     "journalAdminHint": "Fənn qrupuna görə tələbə davamiyyəti. q.b sayı sətrin sonunda avtomatik hesablanır.",
     "timetable": "Dərs cədvəli",
     "timetableCreate": "Cədvəl tərtib et",
-    "timetableCreateHint": "Fakültə, il, semestr və qrup seçin. Fənni sağdan seçib xananın üst/alt həftəsinə və ya tam dərs blokuna qoyun.",
+    "timetableCreateHint": "Fakültə (magistratura üçün siyahıdan Magistratura), il, semestr və qrup seçin. Fənn tipi Hamısı qalsın. Fənni sağdan seçib xananın üst/alt həftəsinə və ya tam dərs blokuna qoyun.",
     "coursesHint": "Kurs seçin və dərs tarixləri (`course_meeting`) siyahısını görün.",
     "meetingsHint": "Bu kurs üzrə dərs tarixləri və saatlar. Filtrlə daralda bilərsiniz.",
     "timetableCourse": "Timetable (CourseId: {id})",

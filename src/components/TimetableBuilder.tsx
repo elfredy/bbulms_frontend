@@ -31,6 +31,13 @@ function lessonKey(courseId: string, lessonTypeId: string, courseGroupId?: strin
   return `${courseId}:${lessonTypeId}:${courseGroupId || ""}`;
 }
 
+function asWeekType(value: unknown): 1 | 2 | 3 {
+  const n = Number(value);
+  if (n === 2) return 2;
+  if (n === 3) return 3;
+  return 1;
+}
+
 function slotKey(weekDay: number, clockId: string, weekType: number) {
   return `${weekDay}:${clockId}:${weekType}`;
 }
@@ -132,12 +139,8 @@ export function TimetableBuilder() {
       setLookups(data);
       const year = data.years.find((y) => y.name === "2026/2027") ?? data.years.find((y) => y.name === "2025/2026") ?? data.years[0];
       const sem = data.semesters.find((s) => (s.code || "").toUpperCase() === "PY") ?? data.semesters[0];
-      const st = data.subject_types.find((t) => (t.code || "").toUpperCase() === "MAINCOURSE") ?? data.subject_types[0];
-      const fac = data.faculties.find((f) => (f.name_az || "").toLowerCase().includes("biznes")) ?? data.faculties[0];
       if (year?.id) setYearId(year.id);
       if (sem?.id) setSemesterId(sem.id);
-      if (st?.id) setSubjectTypeId(st.id);
-      if (fac?.id) setFacultyId(fac.id);
       if (data.clocks.length) setClocks(data.clocks);
     });
     return () => {
@@ -215,7 +218,7 @@ export function TimetableBuilder() {
   const assignedMap = useMemo(() => {
     const map = new Map<string, TimetableAssignedSlot[]>();
     for (const slot of assigned) {
-      const k = slotKey(slot.week_day, slot.clock_id, Number(slot.week_type));
+      const k = slotKey(Number(slot.week_day), slot.clock_id, asWeekType(slot.week_type));
       const arr = map.get(k) ?? [];
       arr.push(slot);
       map.set(k, arr);
@@ -445,6 +448,7 @@ export function TimetableBuilder() {
     { week_day: 3, label: "III", name_az: "Çərşənbə" },
     { week_day: 4, label: "IV", name_az: "Cümə axşamı" },
     { week_day: 5, label: "V", name_az: "Cümə" },
+    { week_day: 6, label: "VI", name_az: "Şənbə" },
   ];
 
   function renderSlot(weekDay: number, clockId: string, weekType: 1 | 2 | 3, occList: TimetableAssignedSlot[], canPlace: boolean) {
@@ -703,7 +707,9 @@ export function TimetableBuilder() {
             }))}
           />
           {facultyId && yearId && groups.length === 0 ? (
-            <span className={styles.hint}>Bu dekanlıq və il üçün qrup tapılmadı. Səviyyəni və ya kursu “Hamısı” edin.</span>
+            <span className={styles.hint}>
+              Bu fakültə və il üçün qrup tapılmadı. Səviyyəni və ya kursu “Hamısı” edin, magistratura üçün fakültədən Magistratura seçin.
+            </span>
           ) : null}
         </label>
 

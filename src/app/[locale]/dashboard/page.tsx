@@ -54,13 +54,6 @@ export default async function DashboardPage({ params }: Props) {
           empty: t("empty.past"),
           items: teacherCourses.teaching_past,
         },
-        {
-          id: "practice" as const,
-          label: t("sections.practice"),
-          subtitle: t("sections.practiceSub"),
-          empty: t("empty.practice"),
-          items: teacherCourses.practice,
-        },
       ]
     : [];
 
