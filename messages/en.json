@@ -124,7 +124,7 @@
     "journalAdminHint": "View student attendance by subject group. Absence (q.b) counts are calculated automatically at the end of each row.",
     "timetable": "Timetable",
     "timetableCreate": "Create timetable",
-    "timetableCreateHint": "Choose faculty (pick Magistratura for master's groups), year, semester and group. Leave subject type as All. Select a subject on the right and place it on the upper/lower week or the full-lesson block.",
+    "timetableCreateHint": "Choose faculty (pick Magistratura for master's groups), year, semester and group. Leave subject type as All. Select a subject on the right and place it on the upper/lower week or the full-lesson block. To change a confirmed timetable, click Update.",
     "coursesHint": "Select a course to view meeting dates.",
     "meetingsHint": "Meeting dates and times for this course.",
     "timetableCourse": "Timetable (CourseId: {id})",

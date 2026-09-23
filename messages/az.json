@@ -124,7 +124,7 @@
     "journalAdminHint": "Fənn qrupuna görə tələbə davamiyyəti. q.b sayı sətrin sonunda avtomatik hesablanır.",
     "timetable": "Dərs cədvəli",
     "timetableCreate": "Cədvəl tərtib et",
-    "timetableCreateHint": "Fakültə (magistratura üçün siyahıdan Magistratura), il, semestr və qrup seçin. Fənn tipi Hamısı qalsın. Fənni sağdan seçib xananın üst/alt həftəsinə və ya tam dərs blokuna qoyun.",
+    "timetableCreateHint": "Fakültə (magistratura üçün siyahıdan Magistratura), il, semestr və qrup seçin. Fənn tipi Hamısı qalsın. Fənni sağdan seçib xananın üst/alt həftəsinə və ya tam dərs blokuna qoyun. Təsdiqlənmiş cədvəli dəyişmək üçün Yenilə düyməsinə basın.",
     "coursesHint": "Kurs seçin və dərs tarixləri (`course_meeting`) siyahısını görün.",
     "meetingsHint": "Bu kurs üzrə dərs tarixləri və saatlar. Filtrlə daralda bilərsiniz.",
     "timetableCourse": "Timetable (CourseId: {id})",

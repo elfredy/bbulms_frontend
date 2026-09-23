@@ -434,6 +434,81 @@
   white-space: nowrap;
 }
 
+.futureNote {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #64748b;
+  padding-top: 0.15rem;
+  white-space: nowrap;
+}
+
+.mailBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-top: 2px;
+  padding: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  color: #475569;
+  cursor: pointer;
+}
+
+.mailBtnSent {
+  background: #dbeafe;
+  border-color: #93c5fd;
+  color: #1d4ed8;
+}
+
+.appealBox {
+  display: grid;
+  gap: 4px;
+  width: 148px;
+  margin-top: 2px;
+}
+
+.appealInput {
+  width: 100%;
+  min-height: 54px;
+  resize: vertical;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 0.72rem;
+  line-height: 1.3;
+  padding: 4px 6px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  color: #0f172a;
+  background: #fff;
+}
+
+.appealSend {
+  border: none;
+  border-radius: 6px;
+  background: #0b5cab;
+  color: #fff;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 4px 6px;
+  cursor: pointer;
+}
+
+.appealSend:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.appealNote {
+  font-size: 0.64rem;
+  font-weight: 700;
+  color: #1d4ed8;
+  line-height: 1.2;
+}
+
 .weekTagUp,
 .weekTagDown {
   font-size: 0.72rem;

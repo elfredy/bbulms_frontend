@@ -24,6 +24,7 @@ type Meeting = {
   lesson_type_id: string | null;
   lesson_type_az: string | null;
   confirmed?: boolean;
+  unlock_request?: string | null;
 };
 type Student = { student_id: string; person_fullname: string; qb_count: number; half_group_az?: string | null };
 type Eva = { course_eva_id: string; evaluation_code: string | null; evaluation_name_az: string | null };
@@ -304,6 +305,29 @@ export function AdminJournalClient({
   const windowMeetings = meetings.slice(windowStart, windowStart + WINDOW_SIZE);
   const maxStart = Math.max(0, meetings.length - WINDOW_SIZE);
 
+  async function liftConfirm(meetingId: string) {
+    if (!courseId) return;
+    if (!window.confirm("Bu dərsin təsdiqi qaldırılsın? Müəllim davamiyyət və qiymətləndirməni yenidən dəyişə biləcək.")) return;
+    setBusy(true);
+    setError(null);
+    setOkMsg(null);
+    try {
+      const res = await fetch(
+        `/api/admin/journal/courses/${encodeURIComponent(courseId)}/meetings/${encodeURIComponent(meetingId)}/unconfirm`,
+        { method: "POST", credentials: "include" }
+      );
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError(typeof data?.detail === "string" ? data.detail : "Təsdiq qaldırılmadı");
+        return;
+      }
+      setOkMsg("Təsdiq qaldırıldı. Müəllim dəyişiklik edə bilər.");
+      await loadGrid(courseId);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function activateJournal() {
     if (!courseId) return;
     if (!window.confirm("Jurnalı aktivləşdirmək istəyirsiniz?")) return;
@@ -363,6 +387,7 @@ export function AdminJournalClient({
                   {windowMeetings.map((m) => {
                     const lt = lessonTypeShort(m);
                     const confirmed = Boolean(m.confirmed) || String(m.point_status ?? "") === STATUS_CONFIRMED;
+                    const request = String(m.unlock_request ?? "").trim();
                     return (
                       <th key={m.course_meeting_id} className={styles.th}>
                         <div className={styles.headDate}>
@@ -371,6 +396,23 @@ export function AdminJournalClient({
                         </div>
                         <span className={styles.headTime}>{fmtClockRange(m.start_time, m.end_time) || " "}</span>
                         <span className={styles.headStatus}>{confirmed ? "Təsdiq olunub" : " "}</span>
+                        {request ? (
+                          <div className={styles.requestBox}>
+                            <span className={styles.requestText} title={request}>
+                              {request}
+                            </span>
+                            {confirmed ? (
+                              <button
+                                type="button"
+                                className={styles.liftBtn}
+                                disabled={busy}
+                                onClick={() => void liftConfirm(m.course_meeting_id)}
+                              >
+                                Təsdiqi qaldır
+                              </button>
+                            ) : null}
+                          </div>
+                        ) : null}
                       </th>
                     );
                   })}

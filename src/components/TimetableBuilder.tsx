@@ -137,6 +137,8 @@ export function TimetableBuilder() {
     teacher_count: 0,
     confirmed: false,
   });
+  const [editing, setEditing] = useState(false);
+  const locked = confirmInfo.confirmed && !editing;
 
   useEffect(() => {
     let alive = true;
@@ -215,6 +217,11 @@ export function TimetableBuilder() {
       return cur;
     });
   }, [groupId, yearId, semesterId, subjectTypeId]);
+
+  useEffect(() => {
+    setEditing(false);
+    setOkMsg(null);
+  }, [groupId, yearId, semesterId]);
 
   useEffect(() => {
     setError(null);
@@ -298,6 +305,7 @@ export function TimetableBuilder() {
       setError(res.error);
       return;
     }
+    setEditing(false);
     setOkMsg(
       res.teacher_count > 0
         ? `Cədvəl təsdiqləndi. ${res.teacher_count} müəllimin kabinetində dərslər görünəcək.`
@@ -306,8 +314,28 @@ export function TimetableBuilder() {
     await loadBoard();
   }
 
+  function startEdit() {
+    const ok = window.confirm(
+      "Təsdiqlənmiş cədvəl yenilənsin? Bundan sonra dərsi silə, yerini dəyişə və yeni xanaya qoya bilərsiniz. Dəyişiklik dərhal cədvələ yazılır."
+    );
+    if (!ok) return;
+    setError(null);
+    setOkMsg(null);
+    setEditing(true);
+  }
+
+  function finishEdit() {
+    if (hoursRemaining > 0) {
+      setError(`Qalan ${hoursRemaining} saatı da cədvələ qoyun`);
+      return;
+    }
+    setError(null);
+    setOkMsg("Cədvəl yeniləndi.");
+    setEditing(false);
+  }
+
   async function place(weekDay: number, clockId: string, weekType: 1 | 2 | 3, lesson: SelectedLesson) {
-    if (!groupId || !yearId || !semesterId) return;
+    if (locked || !groupId || !yearId || !semesterId) return;
     setBusy(true);
     setError(null);
     const res = await adminTimetablePlace({
@@ -330,8 +358,12 @@ export function TimetableBuilder() {
   }
 
   async function unplace(slot: TimetableAssignedSlot) {
-    if (!groupId) return;
-    const ok = window.confirm("Bu dərs xanadan silinsin?");
+    if (locked || !groupId) return;
+    const ok = window.confirm(
+      editing
+        ? "Bu dərs təsdiqlənmiş cədvəldən silinsin? Dəyişiklik dərhal yazılacaq."
+        : "Bu dərs xanadan silinsin?"
+    );
     if (!ok) return;
     setBusy(true);
     setError(null);
@@ -353,7 +385,7 @@ export function TimetableBuilder() {
   }
 
   async function setRoom(slot: TimetableAssignedSlot, roomId: string | null) {
-    if (!groupId) return;
+    if (locked || !groupId) return;
     setBusy(true);
     setError(null);
     const res = await adminTimetableSetRoom({
@@ -375,7 +407,7 @@ export function TimetableBuilder() {
   }
 
   function onHalfClick(weekDay: number, clockId: string, weekType: 1 | 2 | 3, lessonOverride?: SelectedLesson, clicked?: TimetableAssignedSlot) {
-    if (busy) return;
+    if (busy || locked) return;
     const list = assignedMap.get(slotKey(weekDay, clockId, weekType)) ?? [];
     const lesson = lessonOverride ?? selected;
     if (clicked && (!lesson || sameLesson(clicked, lesson) || !isSiblingHalf(clicked, lesson))) {
@@ -429,7 +461,7 @@ export function TimetableBuilder() {
   }
 
   function onDragStart(e: DragEvent<HTMLButtonElement>, lesson: TimetableAvailableLesson) {
-    if (remainingOf(lesson) <= 0) {
+    if (locked || remainingOf(lesson) <= 0) {
       e.preventDefault();
       return;
     }
@@ -446,6 +478,7 @@ export function TimetableBuilder() {
   function onDrop(e: DragEvent<HTMLElement>, weekDay: number, clockId: string, weekType: 1 | 2 | 3) {
     e.preventDefault();
     e.stopPropagation();
+    if (locked) return;
     const raw = e.dataTransfer.getData("text/plain");
     const [courseId, lessonTypeId, courseGroupId] = raw.split(":");
     const lesson =
@@ -470,7 +503,10 @@ export function TimetableBuilder() {
     const title = weekType === 1 ? "Üst həftə" : weekType === 2 ? "Alt həftə" : "Tam dərs";
     const tag = weekType === 1 ? "Üst" : weekType === 2 ? "Alt" : "Tam";
     const occ = occList[0];
-    const canDrop = Boolean(groupId) && (occList.length === 0 || (selected && occList.some((x) => isSiblingHalf(x, selected)) && !occList.some((x) => sameLesson(x, selected))));
+    const canDrop =
+      !locked &&
+      Boolean(groupId) &&
+      (occList.length === 0 || (selected && occList.some((x) => isSiblingHalf(x, selected)) && !occList.some((x) => sameLesson(x, selected))));
     const roomOptionsFor = (item: TimetableAssignedSlot): RoomOpt[] =>
       (item.room_id && !rooms.some((r) => r.id === item.room_id) ? [{ id: item.room_id, name: item.room_name || item.room_id }, ...rooms] : rooms).map((r) => {
         const occupied = occupiedRooms.some(
@@ -492,7 +528,7 @@ export function TimetableBuilder() {
 
     return (
       <div
-        className={`${styles.slot} ${half ? styles.slotHalf : styles.slotFull} ${occ ? styles.slotFilled : ""} ${canPlace ? styles.slotActive : ""} ${!groupId ? styles.slotDisabled : ""}`}
+        className={`${styles.slot} ${half ? styles.slotHalf : styles.slotFull} ${occ ? styles.slotFilled : ""} ${canPlace && !locked ? styles.slotActive : ""} ${!groupId || locked ? styles.slotDisabled : ""}`}
         onDragOver={canDrop ? allowDrop : undefined}
         onDrop={canDrop ? (e) => onDrop(e, weekDay, clockId, weekType) : undefined}
       >
@@ -506,7 +542,7 @@ export function TimetableBuilder() {
                   <SearchableSelect
                     compact
                     value={item.room_id ?? ""}
-                    disabled={busy}
+                    disabled={busy || locked}
                     placeholder="Otaq"
                     searchPlaceholder="Otaq axtar…"
                     triggerClassName={styles.slotRoom}
@@ -523,8 +559,8 @@ export function TimetableBuilder() {
                 <button
                   type="button"
                   className={styles.slotBody}
-                  disabled={busy}
-                  title={slotTooltip(item)}
+                  disabled={busy || locked}
+                  title={locked ? "Əvvəl Yenilə düyməsinə basın" : slotTooltip(item)}
                   onClick={() => onHalfClick(weekDay, clockId, weekType, undefined, item)}
                 >
                   <span className={styles.slotName}>
@@ -540,8 +576,8 @@ export function TimetableBuilder() {
           <button
             type="button"
             className={styles.slotBody}
-            disabled={busy || !groupId}
-            title={title}
+            disabled={busy || !groupId || locked}
+            title={locked ? "Əvvəl Yenilə düyməsinə basın" : title}
             onClick={() => onHalfClick(weekDay, clockId, weekType)}
             onDragOver={allowDrop}
             onDrop={(e) => onDrop(e, weekDay, clockId, weekType)}
@@ -733,18 +769,37 @@ export function TimetableBuilder() {
         {error ? <p className={styles.error}>{error}</p> : null}
         {okMsg ? <p className={styles.okMsg}>{okMsg}</p> : null}
         {!error && !okMsg ? (
-          <p className={styles.hint}>Fənni seçib sol sütunda üst və ya alt həftəyə, sağda isə hər həftəki tam dərsə atın. Bitirdikdən sonra təsdiq edin.</p>
+          <p className={styles.hint}>
+            {locked
+              ? "Bu cədvəl təsdiqlənib. Dəyişmək üçün Yenilə düyməsinə basın."
+              : editing
+                ? "Redaktə rejimindəsiniz. Dərsi silin, yerini dəyişin və ya yeni xanaya qoyun."
+                : "Fənni seçib sol sütunda üst və ya alt həftəyə, sağda isə hər həftəki tam dərsə atın. Bitirdikdən sonra təsdiq edin."}
+          </p>
         ) : null}
 
-        <button
-          type="button"
-          className={styles.confirmBtn}
-          disabled={busy || !groupId || confirmInfo.meeting_count <= 0 || hoursRemaining > 0 || confirmInfo.confirmed}
-          onClick={() => void confirmTimetable()}
-        >
-          {confirmInfo.confirmed ? "Təsdiqlənib" : "Təsdiq et"}
-        </button>
-        {confirmInfo.meeting_count > 0 && !confirmInfo.confirmed ? (
+        {locked ? (
+          <button type="button" className={styles.confirmBtn} disabled={busy || !groupId} onClick={startEdit}>
+            Yenilə
+          </button>
+        ) : confirmInfo.confirmed && editing ? (
+          <button type="button" className={styles.confirmBtn} disabled={busy} onClick={finishEdit}>
+            Yeniləməni bitir
+          </button>
+        ) : (
+          <button
+            type="button"
+            className={styles.confirmBtn}
+            disabled={busy || !groupId || confirmInfo.meeting_count <= 0 || hoursRemaining > 0}
+            onClick={() => void confirmTimetable()}
+          >
+            Təsdiq et
+          </button>
+        )}
+        {editing && hoursRemaining > 0 ? (
+          <p className={styles.hint}>{`Qalan ${hoursRemaining} saatı da cədvələ qoyun.`}</p>
+        ) : null}
+        {!locked && !confirmInfo.confirmed && confirmInfo.meeting_count > 0 ? (
           <p className={styles.hint}>
             {hoursRemaining > 0
               ? `Təsdiq üçün qalan ${hoursRemaining} saatı da cədvələ qoyun.`
@@ -773,11 +828,11 @@ export function TimetableBuilder() {
                     <button
                       key={lessonKey(lesson.course_id, lesson.lesson_type_id, lesson.course_group_id)}
                       type="button"
-                      draggable={!done}
-                      disabled={done}
+                      draggable={!done && !locked}
+                      disabled={done || locked}
                       className={`${styles.chip} ${isSel ? styles.chipSelected : ""} ${done ? styles.chipDone : ""}`}
                       onClick={() => {
-                        if (done) return;
+                        if (done || locked) return;
                         setSelected({
                           course_id: lesson.course_id,
                           lesson_type_id: lesson.lesson_type_id,
@@ -785,7 +840,11 @@ export function TimetableBuilder() {
                         });
                       }}
                       onDragStart={(e) => onDragStart(e, lesson)}
-                      title={`${label}${lesson.teacher_fullname ? ` · ${lesson.teacher_fullname}` : ""} · qalan ${rem} saat`}
+                      title={
+                        locked
+                          ? "Əvvəl Yenilə düyməsinə basın"
+                          : `${label}${lesson.teacher_fullname ? ` · ${lesson.teacher_fullname}` : ""} · qalan ${rem} saat`
+                      }
                     >
                       <span className={styles.chipName}>
                         <span className={styles.chipLetter}>{lesson.lesson_letter}</span>

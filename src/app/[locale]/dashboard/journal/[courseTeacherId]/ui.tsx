@@ -9,6 +9,7 @@ import { fmtClockRange, fmtClockTime } from "@/lib/clock-time";
 import {
   confirmTeacherCourseExercise,
   confirmTeacherJournalMeeting,
+  requestTeacherJournalUnlock,
   createTeacherCourseExercise,
   getTeacherCourseExerciseAllPoints,
   getTeacherCourseExercises,
@@ -257,6 +258,18 @@ function todayInBaku(): string {
   }).format(new Date());
 }
 
+function isFutureLesson(m: CourseMeetingItem, today: string): boolean {
+  const d = dateOnly(m.meeting_date);
+  return Boolean(d) && d > today;
+}
+
+function isLessonOpen(m: CourseMeetingItem, today: string): boolean {
+  if (m.calendar_active === true) return true;
+  if (m.calendar_active === false) return false;
+  const d = dateOnly(m.meeting_date);
+  return Boolean(d) && d === today;
+}
+
 function mondayOfIso(iso: string): string {
   const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!m) return iso;
@@ -340,6 +353,8 @@ export function JournalClient({
   const [meetingWindowStart, setMeetingWindowStart] = useState<number>(0);
   const [meetingWindowCellsByMeetingId, setMeetingWindowCellsByMeetingId] = useState<Record<string, Record<string, JournalCell>>>({});
   const [meetingLockedById, setMeetingLockedById] = useState<Record<string, boolean>>({});
+  const [appealOpenId, setAppealOpenId] = useState<string | null>(null);
+  const [appealDraft, setAppealDraft] = useState("");
   const [qbCountByStudentId, setQbCountByStudentId] = useState<Record<string, number>>({});
   const [bulkValueByMeetingId, setBulkValueByMeetingId] = useState<Record<string, string>>({});
   const [resultByStudentId, setResultByStudentId] = useState<
@@ -569,7 +584,7 @@ export function JournalClient({
 
   /** Bir select: rəqəm → EVA_02 (+ i.e), davamiyyət kodu → EVA_01 (aktivlik silinir). */
   function setMeetingCombined(mid: string, studentId: string, rawNext: string, meeting: CourseMeetingItem) {
-    if (meetingLockedById[mid]) return;
+    if (meetingLockedById[mid] || !isLessonOpen(meeting, todayInBaku())) return;
     const evaA = evalAttendance[0];
     const evaS = evalSeminar[0];
     if (!evaA && !evaS) return;
@@ -634,7 +649,7 @@ export function JournalClient({
   }
 
   function bulkApplyMeeting(mid: string, meeting: CourseMeetingItem) {
-    if (meetingLockedById[mid]) return;
+    if (meetingLockedById[mid] || !isLessonOpen(meeting, todayInBaku())) return;
     const raw = (bulkValueByMeetingId[mid] ?? "").trim();
     const evaA = evalAttendance[0];
     const evaS = evalSeminar[0];
@@ -1076,7 +1091,9 @@ export function JournalClient({
     return Object.keys(exercisePendingByKey).filter((k) => k.startsWith(prefix)).length;
   }, [exercisePendingByKey, tab]);
   const attendanceCanConfirm = useMemo(() => {
+    const today = todayInBaku();
     return meetingWindow.some((m) => {
+      if (!isLessonOpen(m, today)) return false;
       const mid = String(m.course_meeting_id);
       if (meetingLockedById[mid]) return false;
       if (Object.keys(meetingPendingByKey).some((k) => k.startsWith(`${mid}:`))) return true;
@@ -1096,8 +1113,10 @@ export function JournalClient({
   }, [tab, exercisePendingCount, exerciseItemsByType, exercisePointsByExerciseId]);
 
   const incompleteStudentIds = useMemo(() => {
+    const today = todayInBaku();
     const ids = new Set<string>();
     for (const m of visibleMeetings) {
+      if (!isLessonOpen(m, today)) continue;
       const mid = String(m.course_meeting_id);
       if (meetingLockedById[mid]) continue;
       const cellMap = meetingWindowCellsByMeetingId[mid] ?? {};
@@ -1226,10 +1245,15 @@ export function JournalClient({
   }
 
   function confirmSaveAttendance() {
+    const today = todayInBaku();
+    const futureIds = new Set(
+      meetingWindow.filter((m) => !isLessonOpen(m, today)).map((m) => String(m.course_meeting_id))
+    );
     const mids = meetingWindow
+      .filter((m) => !futureIds.has(String(m.course_meeting_id)))
       .map((m) => String(m.course_meeting_id))
       .filter((mid) => !meetingLockedById[mid] && meetingHasStoredValues(mid));
-    if (mids.length === 0 && meetingPendingCount === 0) return;
+    if (mids.length === 0) return;
     if (!window.confirm("Qiymətləndirməni təsdiqləmək istəyirsiniz? Təsdiqdən sonra dəyişiklik mümkün olmayacaq və ümumi hesablamada nəzərə alınacaq.")) return;
 
     setErr(null);
@@ -1243,7 +1267,7 @@ export function JournalClient({
         const studentId = parts[1];
         const courseEvaId = parts[2];
         if (!mid || !studentId || !courseEvaId) continue;
-        if (meetingLockedById[mid]) continue;
+        if (meetingLockedById[mid] || futureIds.has(mid)) continue;
         (pendingByMeeting[mid] ??= []).push({
           student_id: studentId,
           course_eva_id: courseEvaId,
@@ -1251,7 +1275,9 @@ export function JournalClient({
         });
       }
 
-      const confirmIds = Array.from(new Set([...mids, ...Object.keys(pendingByMeeting)]));
+      const confirmIds = Array.from(new Set([...mids, ...Object.keys(pendingByMeeting)])).filter(
+        (mid) => !futureIds.has(mid)
+      );
       for (const mid of confirmIds) {
         const cells = pendingByMeeting[mid];
         if (cells?.length) {
@@ -1277,6 +1303,27 @@ export function JournalClient({
 
       setMeetingPendingByKey({});
       loadResult();
+    });
+  }
+
+  function sendAppeal(mid: string) {
+    const message = appealDraft.trim();
+    if (message.length < 3) {
+      setErr("Müraciəti bir az ətraflı yazın");
+      return;
+    }
+    setErr(null);
+    startTransition(async () => {
+      const res = await requestTeacherJournalUnlock(courseId, { course_meeting_id: mid, message });
+      if (!res.ok) {
+        setErr(res.error);
+        return;
+      }
+      setLiveMeetings((prev) =>
+        prev.map((item) => (String(item.course_meeting_id) === mid ? { ...item, unlock_request: res.message } : item))
+      );
+      setAppealOpenId(null);
+      setAppealDraft("");
     });
   }
 
@@ -1468,7 +1515,7 @@ export function JournalClient({
               </p>
             ) : null}
             <div className={styles.actionHint}>
-              Üst və alt həftə tarix sırası ilə göstərilir.
+              Üst və alt həftə tarix sırası ilə göstərilir. Yalnız bu günün dərsi aktivdir. Növbəti günlərə qiymət yazmaq və təsdiq etmək olmaz.
             </div>
             {!evalAttendance[0] && !evalSeminar[0] ? (
               <div className={`${styles.actionHint} ${styles.actionHintWarn}`}>
@@ -1489,6 +1536,10 @@ export function JournalClient({
                     const lt = lessonTypeShort(m);
                     const dayLabel = WEEK_DAY_LABELS[weekDayOf(m)] ?? "";
                     const locked = Boolean(meetingLockedById[mid]);
+                    const today = todayInBaku();
+                    const future = isFutureLesson(m, today);
+                    const closed = !isLessonOpen(m, today);
+                    const appeal = String(m.unlock_request ?? "").trim();
                     return (
                       <th key={mid} className={`${styles.th} ${styles.thCell}`}>
                         <div className={styles.pairTitle}>
@@ -1504,9 +1555,56 @@ export function JournalClient({
                           <div className={styles.halfMeta}>
                             <span className={tag === "Üst" ? styles.weekTagUp : styles.weekTagDown}>{tag}</span>
                             <span className={styles.halfDate}>{fmtDateShort(m.meeting_date)}</span>
+                            {locked ? (
+                              <button
+                                type="button"
+                                className={`${styles.mailBtn} ${appeal ? styles.mailBtnSent : ""}`}
+                                title={appeal ? "Müraciət göndərilib. Mətni dəyişmək üçün açın." : "Təsdiqin qaldırılması üçün müraciət yazın"}
+                                aria-label="Müraciət"
+                                aria-expanded={appealOpenId === mid}
+                                onClick={() => {
+                                  setAppealOpenId((cur) => (cur === mid ? null : mid));
+                                  setAppealDraft(appeal);
+                                }}
+                              >
+                                <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+                                  <path
+                                    fill="currentColor"
+                                    d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 4-8 5L4 8V6l8 5 8-5v2z"
+                                  />
+                                </svg>
+                              </button>
+                            ) : null}
                           </div>
+                          {locked && appealOpenId === mid ? (
+                            <form
+                              className={styles.appealBox}
+                              onSubmit={(ev) => {
+                                ev.preventDefault();
+                                sendAppeal(mid);
+                              }}
+                            >
+                              <textarea
+                                className={styles.appealInput}
+                                rows={3}
+                                maxLength={500}
+                                placeholder="Nəyi dəyişmək lazımdır?"
+                                value={appealDraft}
+                                onChange={(ev) => setAppealDraft(ev.target.value)}
+                                disabled={isPending}
+                              />
+                              <button type="submit" className={styles.appealSend} disabled={isPending}>
+                                Göndər
+                              </button>
+                            </form>
+                          ) : null}
+                          {locked && appeal && appealOpenId !== mid ? (
+                            <div className={styles.appealNote}>Müraciət göndərilib</div>
+                          ) : null}
                           {locked ? (
                             <div className={styles.lockedNote}>Təsdiqlənib</div>
+                          ) : closed ? (
+                            <div className={styles.futureNote}>{future ? "Gələcək dərs" : "Bağlı"}</div>
                           ) : (
                             <div className={styles.bulkRowStack}>
                               <select
@@ -1553,9 +1651,12 @@ export function JournalClient({
                     {columnWindow.map(({ m }) => {
                       const mid = String(m.course_meeting_id);
                       const locked = Boolean(meetingLockedById[mid]);
+                      const today = todayInBaku();
+                      const future = isFutureLesson(m, today);
+                      const closed = !isLessonOpen(m, today);
                       const cellMap = meetingWindowCellsByMeetingId[mid] ?? {};
                       const display = meetingCombinedDisplay(cellMap, s.student_id);
-                      const started = !locked && roster.some((x) => meetingCombinedDisplay(cellMap, x.student_id).trim() !== "");
+                      const started = !locked && !closed && roster.some((x) => meetingCombinedDisplay(cellMap, x.student_id).trim() !== "");
                       const cellMissing = started && !display.trim();
                       const tone = cellMissing ? styles.cellMissing : cellToneClass(styles, display, isAttendanceValue(display));
                       const qbLocked = isQbLocked(m, display, nowMs);
@@ -1565,8 +1666,18 @@ export function JournalClient({
                             className={`${styles.cellSelect} ${tone}`}
                             value={display}
                             onChange={(ev) => setMeetingCombined(mid, s.student_id, String(ev.target.value), m)}
-                            disabled={isPending || locked || qbLocked}
-                            title={qbLocked ? "q.b dərs başladıqdan 15 dəqiqə sonra dəyişdirilə bilməz" : cellMissing ? "Qiymət və ya i.e / q.b yazılmayıb" : undefined}
+                            disabled={isPending || locked || closed || qbLocked}
+                            title={
+                              future
+                                ? "Bu dərsin tarixi hələ çatmayıb"
+                                : closed
+                                  ? "Yalnız bu günün dərsi aktivdir"
+                                  : qbLocked
+                                  ? "q.b dərs başladıqdan 15 dəqiqə sonra dəyişdirilə bilməz"
+                                  : cellMissing
+                                    ? "Qiymət və ya i.e / q.b yazılmayıb"
+                                    : undefined
+                            }
                           >
                             {meetingCombinedOpts.map((o) => (
                               <option key={`${o.value}-${o.label}`} value={o.value}>

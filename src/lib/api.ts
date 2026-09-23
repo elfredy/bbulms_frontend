@@ -398,6 +398,8 @@ export type CourseMeetingItem = {
   lesson_type_az?: string | null;
   week_type?: number | null;
   week_day?: number | null;
+  unlock_request?: string | null;
+  calendar_active?: boolean;
 };
 
 export type CourseMeetingListResponse = {
@@ -498,6 +500,11 @@ export type JournalBulkUpsertRequest = {
 
 export type JournalConfirmRequest = {
   course_meeting_id: string;
+};
+
+export type JournalUnlockRequest = {
+  course_meeting_id: string;
+  message: string;
 };
 
 export type JournalPointsGridResponse = {

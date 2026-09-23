@@ -160,6 +160,43 @@
   margin-top: 2px;
 }
 
+.requestBox {
+  display: grid;
+  gap: 4px;
+  width: 148px;
+  margin: 6px auto 0;
+  text-align: left;
+}
+
+.requestText {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #1e3a8a;
+  white-space: normal;
+}
+
+.liftBtn {
+  border: none;
+  border-radius: 6px;
+  background: #b45309;
+  color: #fff;
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 4px 6px;
+  cursor: pointer;
+}
+
+.liftBtn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
 .cell {
   display: inline-flex;
   align-items: center;
