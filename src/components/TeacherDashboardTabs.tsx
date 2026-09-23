@@ -36,17 +36,17 @@ type CourseCard = {
   half_group_az_set: Set<string>;
 };
 
-function lessonLetter(codes: Set<string>, names: Set<string>): string {
+function lessonLetters(codes: Set<string>, names: Set<string>): string {
   const code = Array.from(codes)
     .map((c) => c.toUpperCase())
     .join(" ");
   const name = Array.from(names).join(" ").toLowerCase();
-  if (code.includes("LEC") || /\bM\b/.test(code) || name.includes("mühazirə") || name.includes("muhazire")) {
-    return "M";
-  }
-  if (code.includes("SEM") || /\bS\b/.test(code) || name.includes("seminar")) return "S";
-  if (code.includes("LAB") || /\bL\b/.test(code) || name.includes("laborator")) return "L";
-  if (code.includes("FM") || name.includes("fərdi")) return "F";
+  const parts: string[] = [];
+  if (code.includes("LEC") || /\bM\b/.test(code) || name.includes("mühazirə") || name.includes("muhazire")) parts.push("M");
+  if (code.includes("SEM") || /\bS\b/.test(code) || name.includes("seminar")) parts.push("S");
+  if (code.includes("LAB") || /\bL\b/.test(code) || name.includes("laborator")) parts.push("L");
+  if (code.includes("FM") || name.includes("fərdi")) parts.push("F");
+  if (parts.length) return parts.join("/");
   const first = Array.from(codes)[0] || Array.from(names)[0] || "";
   return (first.trim().charAt(0) || "M").toUpperCase();
 }
@@ -131,7 +131,7 @@ function CourseRows({
               const ctPrimary = g.course_teacher_ids[0];
               const ctIds = g.course_teacher_ids.join(",");
               const code = (g.course_code ?? "").trim();
-              const letter = lessonLetter(g.lesson_type_code_set, g.lesson_type_az_set);
+              const letter = lessonLetters(g.lesson_type_code_set, g.lesson_type_az_set);
               const groupNames = Array.from(g.education_group_name_set.values()).filter(Boolean).join(", ");
               const halfNames = Array.from(g.half_group_az_set.values()).filter(Boolean).join(", ");
               const subtitle = [code || groupNames, halfNames].filter(Boolean).join(" · ");

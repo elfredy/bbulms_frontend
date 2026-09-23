@@ -297,7 +297,7 @@ export default async function AdminGroupDetailPage({ params, searchParams }: Pro
               </label>
               <label style={{ display: "grid", gap: 6 }}>
                 <span className={styles.meta}>To</span>
-                <input name="to_date" defaultValue="2026-12-31" placeholder="YYYY-MM-DD" style={inputStyle} />
+                <input name="to_date" defaultValue="2026-12-27" placeholder="YYYY-MM-DD" style={inputStyle} />
               </label>
             </div>
 

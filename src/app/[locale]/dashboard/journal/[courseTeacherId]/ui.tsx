@@ -217,17 +217,6 @@ function compareMeetings(a: CourseMeetingItem, b: CourseMeetingItem): number {
   return String(a.course_meeting_id).localeCompare(String(b.course_meeting_id));
 }
 
-type MeetingPair = {
-  key: string;
-  week_day: number;
-  start_time: string | null;
-  end_time: string | null;
-  lesson_type_az: string | null;
-  lesson_type_id: string | null;
-  upper: CourseMeetingItem | null;
-  lower: CourseMeetingItem | null;
-};
-
 function weekDayOf(m: CourseMeetingItem): number {
   const d = dateOnly(m.meeting_date);
   if (d) {
@@ -239,26 +228,24 @@ function weekDayOf(m: CourseMeetingItem): number {
   return 0;
 }
 
-function weekHalfOf(m: CourseMeetingItem): 1 | 2 | 0 {
-  const wt = Number(m.week_type ?? 0);
-  if (wt === 1 || wt === 2) return wt;
-  return 0;
-}
-
-function daysBetween(a: string, b: string): number {
-  const da = Date.parse(`${a}T12:00:00`);
-  const db = Date.parse(`${b}T12:00:00`);
-  if (!Number.isFinite(da) || !Number.isFinite(db)) return 999;
-  return Math.round((db - da) / 86400000);
-}
-
 type MeetingColumn = { tag: "Üst" | "Alt"; m: CourseMeetingItem };
 
-function pairHalves(p: MeetingPair): MeetingColumn[] {
-  const cols: MeetingColumn[] = [];
-  if (p.upper) cols.push({ tag: "Üst", m: p.upper });
-  if (p.lower) cols.push({ tag: "Alt", m: p.lower });
-  return cols;
+function isUpperCalendarWeek(iso: string, semesterStart: string): boolean {
+  const startMonday = mondayOfIso(semesterStart);
+  const dayMonday = mondayOfIso(iso);
+  const ms = Date.parse(`${dayMonday}T12:00:00`) - Date.parse(`${startMonday}T12:00:00`);
+  if (!Number.isFinite(ms)) return true;
+  const idx = Math.round(ms / (7 * 86400000)) + 1;
+  return idx % 2 === 1;
+}
+
+function columnTag(m: CourseMeetingItem, semesterStart: string | null): "Üst" | "Alt" {
+  const wt = Number(m.week_type ?? 0);
+  if (wt === 2) return "Alt";
+  if (wt === 1) return "Üst";
+  const d = dateOnly(m.meeting_date);
+  if (semesterStart && d) return isUpperCalendarWeek(d, semesterStart) ? "Üst" : "Alt";
+  return "Üst";
 }
 
 function todayInBaku(): string {
@@ -296,61 +283,10 @@ function windowStartForToday(cols: MeetingColumn[], today: string, size: number)
   return Math.min(maxStart, Math.max(0, start));
 }
 
-function buildMeetingPairs(meetings: CourseMeetingItem[]): MeetingPair[] {
-  const buckets = new Map<string, CourseMeetingItem[]>();
-  for (const m of meetings) {
-    const key = `${weekDayOf(m)}|${m.clock_id ?? ""}|${m.lesson_type_id ?? ""}`;
-    const arr = buckets.get(key) ?? [];
-    arr.push(m);
-    buckets.set(key, arr);
-  }
-
-  const pairs: MeetingPair[] = [];
-  for (const [slotKey, arr] of buckets) {
-    arr.sort(compareMeetings);
-    let i = 0;
-    while (i < arr.length) {
-      const a = arr[i];
-      const b = arr[i + 1];
-      const gap = b ? daysBetween(dateOnly(a.meeting_date), dateOnly(b.meeting_date)) : 999;
-      const sameWeekday = Boolean(b) && weekDayOf(a) === weekDayOf(b);
-      const canPair = Boolean(b) && sameWeekday && gap >= 5 && gap <= 10;
-      let upper: CourseMeetingItem | null = null;
-      let lower: CourseMeetingItem | null = null;
-      if (canPair && b) {
-        if (weekHalfOf(a) === 2 && weekHalfOf(b) !== 2) {
-          upper = b;
-          lower = a;
-        } else if (weekHalfOf(b) === 2 || weekHalfOf(a) !== 2) {
-          upper = a;
-          lower = b;
-        } else {
-          upper = b;
-          lower = a;
-        }
-        i += 2;
-      } else {
-        if (weekHalfOf(a) === 2) lower = a;
-        else upper = a;
-        i += 1;
-      }
-      pairs.push({
-        key: `${slotKey}|${dateOnly(a.meeting_date)}|${a.course_meeting_id}`,
-        week_day: weekDayOf(a),
-        start_time: a.start_time ?? null,
-        end_time: a.end_time ?? null,
-        lesson_type_az: a.lesson_type_az ?? null,
-        lesson_type_id: a.lesson_type_id ?? null,
-        upper,
-        lower,
-      });
-    }
-  }
-  return pairs;
-}
-
-function buildMeetingColumns(meetings: CourseMeetingItem[]): MeetingColumn[] {
-  const cols = buildMeetingPairs(meetings).flatMap(pairHalves);
+function buildMeetingColumns(meetings: CourseMeetingItem[], semesterStart: string | null): MeetingColumn[] {
+  const cols = meetings
+    .filter((m) => Boolean(dateOnly(m.meeting_date)))
+    .map((m) => ({ tag: columnTag(m, semesterStart), m }));
   cols.sort((a, b) => compareMeetings(a.m, b.m));
   return cols;
 }
@@ -363,6 +299,7 @@ export function JournalClient({
   halfGroupName,
   subjectName,
   lessonTypeId,
+  semesterStart = null,
   meetings,
   roster,
   evaluations,
@@ -375,6 +312,7 @@ export function JournalClient({
   halfGroupName?: string | null;
   subjectName?: string | null;
   lessonTypeId: string | null;
+  semesterStart?: string | null;
   meetings: CourseMeetingItem[];
   roster: StudentRosterItem[];
   evaluations: CourseEvaluationItem[];
@@ -387,7 +325,10 @@ export function JournalClient({
       .sort(compareMeetings);
   }, [liveMeetings]);
 
-  const meetingColumns = useMemo(() => buildMeetingColumns(visibleMeetings), [visibleMeetings]);
+  const meetingColumns = useMemo(
+    () => buildMeetingColumns(visibleMeetings, semesterStart ?? null),
+    [visibleMeetings, semesterStart],
+  );
 
   const [tab, setTab] = useState<TabId>(initialTab ?? "attendance");
   const [meetingId, setMeetingId] = useState<string>("");

@@ -120,6 +120,7 @@ export default async function JournalPage({ params, searchParams }: Props) {
       halfGroupName={halfGroupName}
       subjectName={subjectName}
       lessonTypeId={firstOk.lesson_type_id}
+      semesterStart={firstOk.semester_start ?? null}
       meetings={meetings}
       roster={roster.students}
       evaluations={evals.evaluations}

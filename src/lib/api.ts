@@ -404,6 +404,7 @@ export type CourseMeetingListResponse = {
   course_id: string;
   course_teacher_id: string;
   lesson_type_id: string | null;
+  semester_start?: string | null;
   meetings: CourseMeetingItem[];
 };
 

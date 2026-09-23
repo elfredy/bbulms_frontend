@@ -38,6 +38,12 @@ function asWeekType(value: unknown): 1 | 2 | 3 {
   return 1;
 }
 
+const MASTER_CLOCK_STARTS = new Set(["18:30", "20:00", "21:30"]);
+
+function isMasterName(value: string | null | undefined) {
+  return (value || "").toLowerCase().includes("magistr");
+}
+
 function slotKey(weekDay: number, clockId: string, weekType: number) {
   return `${weekDay}:${clockId}:${weekType}`;
 }
@@ -225,6 +231,14 @@ export function TimetableBuilder() {
     }
     return map;
   }, [assigned]);
+
+  const visibleClocks = useMemo(() => {
+    const facultyName = lookups?.faculties.find((f) => f.id === facultyId)?.name_az;
+    const levelName = lookups?.education_levels.find((l) => l.id === educationLevelId)?.name_az;
+    if (!isMasterName(facultyName) && !isMasterName(levelName)) return clocks;
+    const evening = clocks.filter((c) => MASTER_CLOCK_STARTS.has((c.start_time || "").slice(0, 5)));
+    return evening.length ? evening : clocks;
+  }, [clocks, facultyId, educationLevelId, lookups]);
 
   const selectedLesson = useMemo(
     () =>
@@ -556,7 +570,7 @@ export function TimetableBuilder() {
             </tr>
           </thead>
           <tbody>
-            {clocks.map((clock) => (
+            {visibleClocks.map((clock) => (
               <tr key={clock.id}>
                 <td className={styles.timeCell}>
                   {fmtClockRange(clock.start_time, clock.end_time) || "—"}
@@ -624,12 +638,15 @@ export function TimetableBuilder() {
               const id = e.target.value;
               setFacultyId(id);
               const fac = (lookups?.faculties ?? []).find((f) => f.id === id);
-              const isMaster = (fac?.name_az || "").toLowerCase().includes("magistr");
+              const isMaster = isMasterName(fac?.name_az);
               if (isMaster) {
                 const level =
-                  (lookups?.education_levels ?? []).find((l) => (l.name_az || "").toLowerCase().includes("magistr")) ??
+                  (lookups?.education_levels ?? []).find((l) => (l.name_az || "").trim().toLowerCase() === "magistratura") ??
+                  (lookups?.education_levels ?? []).find((l) => isMasterName(l.name_az)) ??
                   null;
                 if (level?.id) setEducationLevelId(level.id);
+              } else if (isMasterName((lookups?.education_levels ?? []).find((l) => l.id === educationLevelId)?.name_az)) {
+                setEducationLevelId("");
               }
             }}
           >
