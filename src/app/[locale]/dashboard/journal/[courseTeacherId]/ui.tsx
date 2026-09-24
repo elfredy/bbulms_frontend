@@ -1540,6 +1540,14 @@ export function JournalClient({
                     const future = isFutureLesson(m, today);
                     const closed = !isLessonOpen(m, today);
                     const appeal = String(m.unlock_request ?? "").trim();
+                    const headCells = meetingWindowCellsByMeetingId[mid] ?? {};
+                    const lessonDay = dateOnly(m.meeting_date);
+                    const pastIncomplete =
+                      Boolean(lessonDay) &&
+                      lessonDay < today &&
+                      roster.some((s) => meetingCombinedDisplay(headCells, s.student_id).trim() !== "") &&
+                      roster.some((s) => !meetingCombinedDisplay(headCells, s.student_id).trim());
+                    const canAppeal = locked || pastIncomplete;
                     return (
                       <th key={mid} className={`${styles.th} ${styles.thCell}`}>
                         <div className={styles.pairTitle}>
@@ -1555,7 +1563,7 @@ export function JournalClient({
                           <div className={styles.halfMeta}>
                             <span className={tag === "Üst" ? styles.weekTagUp : styles.weekTagDown}>{tag}</span>
                             <span className={styles.halfDate}>{fmtDateShort(m.meeting_date)}</span>
-                            {locked ? (
+                            {canAppeal ? (
                               <button
                                 type="button"
                                 className={`${styles.mailBtn} ${appeal ? styles.mailBtnSent : ""}`}
@@ -1576,7 +1584,7 @@ export function JournalClient({
                               </button>
                             ) : null}
                           </div>
-                          {locked && appealOpenId === mid ? (
+                          {canAppeal && appealOpenId === mid ? (
                             <form
                               className={styles.appealBox}
                               onSubmit={(ev) => {
@@ -1598,7 +1606,7 @@ export function JournalClient({
                               </button>
                             </form>
                           ) : null}
-                          {locked && appeal && appealOpenId !== mid ? (
+                          {canAppeal && appeal && appealOpenId !== mid ? (
                             <div className={styles.appealNote}>Müraciət göndərilib</div>
                           ) : null}
                           {locked ? (

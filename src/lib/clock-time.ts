@@ -4,14 +4,6 @@ function pad(n: number): string {
   return String(n).padStart(2, "0");
 }
 
-function unshiftUtcPlusFour(hh: number, mm: number): [number, number] {
-  if (hh >= 20 && hh <= 23) {
-    const total = (hh * 60 + mm - 4 * 60 + 24 * 60) % (24 * 60);
-    return [Math.floor(total / 60), total % 60];
-  }
-  return [hh, mm];
-}
-
 function offsetMinutes(z: string): number | null {
   if (!z || z === "Z" || z === "+00:00" || z === "+0000" || z === "+00") return 0;
   const m = z.match(/^([+-])(\d{2}):?(\d{2})?$/);
@@ -35,14 +27,12 @@ export function fmtClockTime(v: string | null | undefined): string {
       hh = Math.floor(total / 60);
       mm = total % 60;
     }
-    const [h, m] = unshiftUtcPlusFour(hh, mm);
-    return `${pad(h)}:${pad(m)}`;
+    return `${pad(hh)}:${pad(mm)}`;
   }
 
   const hm = s.match(/(\d{1,2}):(\d{2})/);
   if (!hm) return s;
-  const [h, m] = unshiftUtcPlusFour(Number(hm[1]), Number(hm[2]));
-  return `${pad(h)}:${pad(m)}`;
+  return `${pad(Number(hm[1]))}:${pad(Number(hm[2]))}`;
 }
 
 export function fmtClockRange(start: string | null | undefined, end: string | null | undefined): string {

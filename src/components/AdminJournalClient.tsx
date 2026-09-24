@@ -401,16 +401,14 @@ export function AdminJournalClient({
                             <span className={styles.requestText} title={request}>
                               {request}
                             </span>
-                            {confirmed ? (
-                              <button
-                                type="button"
-                                className={styles.liftBtn}
-                                disabled={busy}
-                                onClick={() => void liftConfirm(m.course_meeting_id)}
-                              >
-                                Təsdiqi qaldır
-                              </button>
-                            ) : null}
+                            <button
+                              type="button"
+                              className={styles.liftBtn}
+                              disabled={busy}
+                              onClick={() => void liftConfirm(m.course_meeting_id)}
+                            >
+                              Təsdiqi qaldır
+                            </button>
                           </div>
                         ) : null}
                       </th>
