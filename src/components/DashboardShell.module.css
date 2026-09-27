@@ -32,6 +32,20 @@
   border-bottom: 1px solid var(--border);
 }
 
+.brandMark {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.brandLogo {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
 .brandTitle {
   font-weight: 800;
   letter-spacing: -0.03em;

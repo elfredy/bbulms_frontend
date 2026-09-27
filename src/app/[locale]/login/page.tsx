@@ -1,4 +1,5 @@
 import { getTranslations } from "next-intl/server";
+import Image from "next/image";
 import Link from "next/link";
 
 import { LoginForm } from "@/components/LoginForm";
@@ -14,6 +15,16 @@ export default async function LoginPage({ params }: Props) {
   return (
     <div className={styles.page}>
       <div className={styles.shell}>
+        <div className={styles.logoWrap}>
+          <Image
+            className={styles.logo}
+            src="/30il.png"
+            alt="Bakı Biznes Universiteti"
+            width={132}
+            height={132}
+            priority
+          />
+        </div>
         <p className={styles.topBrand}>BBU LMS</p>
         <h1 className={styles.title}>{t("title")}</h1>
         <p className={styles.subtitle}>{t("subtitle")}</p>

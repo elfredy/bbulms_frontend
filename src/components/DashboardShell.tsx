@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -141,7 +142,10 @@ export function DashboardShell({ me, items, children }: Props) {
     <div className={styles.shell}>
       <aside className={styles.sidebar} aria-label="Dashboard navigation">
         <div className={styles.brand}>
-          <div className={styles.brandTitle}>BBU LMS</div>
+          <div className={styles.brandMark}>
+            <Image className={styles.brandLogo} src="/30il.png" alt="" width={36} height={36} />
+            <div className={styles.brandTitle}>BBU LMS</div>
+          </div>
           <LocaleSwitcher />
         </div>
 

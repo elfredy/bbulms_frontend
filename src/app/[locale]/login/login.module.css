@@ -12,6 +12,18 @@
   max-width: 420px;
 }
 
+.logoWrap {
+  display: flex;
+  justify-content: center;
+  margin: 0 0 0.85rem;
+}
+
+.logo {
+  width: 132px;
+  height: 132px;
+  object-fit: contain;
+}
+
 .topBrand {
   margin: 0 0 0.5rem;
   font-size: 0.78rem;
