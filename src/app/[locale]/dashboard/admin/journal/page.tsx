@@ -7,7 +7,7 @@ import styles from "../../dashboard.module.css";
 
 type Props = {
   params: Promise<{ locale: string }>;
-  searchParams?: Promise<{ course_id?: string }>;
+  searchParams?: Promise<{ course_id?: string; meeting_id?: string }>;
 };
 
 export default async function AdminJournalPage({ params, searchParams }: Props) {
@@ -26,7 +26,11 @@ export default async function AdminJournalPage({ params, searchParams }: Props) 
         </div>
       </header>
       <div className={styles.content}>
-        <AdminJournalClient locale={locale} initialCourseId={(sp.course_id ?? "").trim() || undefined} />
+        <AdminJournalClient
+          locale={locale}
+          initialCourseId={(sp.course_id ?? "").trim() || undefined}
+          initialMeetingId={(sp.meeting_id ?? "").trim() || undefined}
+        />
       </div>
     </div>
   );

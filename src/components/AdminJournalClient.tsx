@@ -92,15 +92,34 @@ function cellTone(value: string): string {
   return styles.cellNeutral;
 }
 
+function todayInBaku(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Baku",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
 function courseLabel(c: CourseOpt): string {
   return [c.code, c.subject_name_az].filter(Boolean).join(" — ") || c.id;
 }
 
+function windowStartForMeeting(meetings: { course_meeting_id: string }[], meetingId: string | undefined): number {
+  if (!meetingId) return 0;
+  const idx = meetings.findIndex((m) => m.course_meeting_id === meetingId);
+  if (idx < 0) return 0;
+  const maxStart = Math.max(0, meetings.length - WINDOW_SIZE);
+  return Math.min(maxStart, idx);
+}
+
 export function AdminJournalClient({
   initialCourseId,
+  initialMeetingId,
 }: {
   locale: string;
   initialCourseId?: string;
+  initialMeetingId?: string;
 }) {
   const [lookups, setLookups] = useState<{
     current_year_id: string | null;
@@ -119,6 +138,7 @@ export function AdminJournalClient({
   const [groups, setGroups] = useState<Opt[]>([]);
   const [courses, setCourses] = useState<CourseOpt[]>([]);
   const [courseId, setCourseId] = useState(initialCourseId ?? "");
+  const [focusMeetingId, setFocusMeetingId] = useState(initialMeetingId ?? "");
   const [grid, setGrid] = useState<Grid | null>(null);
   const [windowStart, setWindowStart] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -207,7 +227,7 @@ export function AdminJournalClient({
     };
   }, [facultyId, specialtyId, yearId, semesterId, courseTypeId, groupId]);
 
-  const loadGrid = useCallback(async (id: string) => {
+  const loadGrid = useCallback(async (id: string, meetingId?: string) => {
     if (!id) {
       setGrid(null);
       return;
@@ -226,20 +246,27 @@ export function AdminJournalClient({
       }
       const data = (await res.json()) as Grid;
       setGrid(data);
-      setWindowStart(0);
+      setWindowStart(windowStartForMeeting(data.meetings ?? [], meetingId));
     } finally {
       setBusy(false);
     }
   }, []);
 
   useEffect(() => {
-    void loadGrid(courseId);
+    if (initialCourseId) setCourseId(initialCourseId);
+    setFocusMeetingId(initialMeetingId ?? "");
+  }, [initialCourseId, initialMeetingId]);
+
+  useEffect(() => {
+    void loadGrid(courseId, focusMeetingId || undefined);
     setHalfFilter("");
     if (!courseId || typeof window === "undefined") return;
     const url = new URL(window.location.href);
     url.searchParams.set("course_id", courseId);
+    if (focusMeetingId) url.searchParams.set("meeting_id", focusMeetingId);
+    else url.searchParams.delete("meeting_id");
     window.history.replaceState(null, "", `${url.pathname}${url.search}`);
-  }, [courseId, loadGrid]);
+  }, [courseId, focusMeetingId, loadGrid]);
 
   const courseOptions = useMemo(() => {
     const list = [...courses];
@@ -322,7 +349,44 @@ export function AdminJournalClient({
         return;
       }
       setOkMsg("Təsdiq qaldırıldı. Müəllim dəyişiklik edə bilər.");
-      await loadGrid(courseId);
+      window.dispatchEvent(new Event("bbu-journal-unlocks-changed"));
+      await loadGrid(courseId, meetingId);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const confirmedCount = meetings.filter(
+    (m) => Boolean(m.confirmed) || String(m.point_status ?? "") === STATUS_CONFIRMED,
+  ).length;
+
+  async function liftAllConfirms() {
+    if (!courseId || confirmedCount < 1) return;
+    const name = grid?.course?.subject_name_az || grid?.course?.code || "bu fənn qrupu";
+    if (
+      !window.confirm(
+        `${name} üçün ${confirmedCount} təsdiq qaldırılsın? Müəllim həmin dərsləri yenidən dəyişə biləcək.`,
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setOkMsg(null);
+    try {
+      const res = await fetch(`/api/admin/journal/courses/${encodeURIComponent(courseId)}/unconfirm-all`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError(typeof data?.detail === "string" ? data.detail : "Təsdiqlər qaldırılmadı");
+        return;
+      }
+      const count = Number(data?.count ?? confirmedCount);
+      setOkMsg(`${count} dərsin təsdiqi qaldırıldı. Müəllim dəyişiklik edə bilər.`);
+      window.dispatchEvent(new Event("bbu-journal-unlocks-changed"));
+      await loadGrid(courseId, focusMeetingId || undefined);
     } finally {
       setBusy(false);
     }
@@ -388,14 +452,17 @@ export function AdminJournalClient({
                     const lt = lessonTypeShort(m);
                     const confirmed = Boolean(m.confirmed) || String(m.point_status ?? "") === STATUS_CONFIRMED;
                     const request = String(m.unlock_request ?? "").trim();
+                    const day = String(m.meeting_date ?? "").slice(0, 10);
+                    const closed = Boolean(day) && day < todayInBaku() && !confirmed;
+                    const focused = focusMeetingId === m.course_meeting_id;
                     return (
-                      <th key={m.course_meeting_id} className={styles.th}>
+                      <th key={m.course_meeting_id} className={`${styles.th} ${focused || request ? styles.thFocus : ""}`}>
                         <div className={styles.headDate}>
                           {m.meeting_date || "—"}
                           {lt ? ` (${lt})` : ""}
                         </div>
                         <span className={styles.headTime}>{fmtClockRange(m.start_time, m.end_time) || " "}</span>
-                        <span className={styles.headStatus}>{confirmed ? "Təsdiq olunub" : " "}</span>
+                        <span className={styles.headStatus}>{confirmed ? "Təsdiq olunub" : closed ? "Bağlı" : " "}</span>
                         {request ? (
                           <div className={styles.requestBox}>
                             <span className={styles.requestText} title={request}>
@@ -518,7 +585,10 @@ export function AdminJournalClient({
           <span className={styles.label}>Fənn qrupu</span>
           <SearchableSelect
             value={courseId}
-            onChange={setCourseId}
+            onChange={(id) => {
+              setFocusMeetingId("");
+              setCourseId(id);
+            }}
             placeholder="— seç —"
             searchPlaceholder="Kod və ya fənn axtar…"
             options={courseOptions.map((c) => ({ id: c.id, label: courseLabel(c) }))}
@@ -549,6 +619,15 @@ export function AdminJournalClient({
         )}
         <button type="button" className={styles.activate} onClick={() => void activateJournal()} disabled={!courseId || busy}>
           Jurnalın aktivləşdirilməsi
+        </button>
+        <button
+          type="button"
+          className={styles.liftAll}
+          onClick={() => void liftAllConfirms()}
+          disabled={!courseId || busy || confirmedCount < 1}
+          title={confirmedCount < 1 ? "Təsdiqlənmiş dərs yoxdur" : `${confirmedCount} təsdiqi qaldır`}
+        >
+          Bütün təsdiqləri qaldır
         </button>
         {okMsg ? <p className={styles.ok}>{okMsg}</p> : null}
       </aside>

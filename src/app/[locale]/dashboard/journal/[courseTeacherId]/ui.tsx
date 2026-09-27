@@ -1540,14 +1540,7 @@ export function JournalClient({
                     const future = isFutureLesson(m, today);
                     const closed = !isLessonOpen(m, today);
                     const appeal = String(m.unlock_request ?? "").trim();
-                    const headCells = meetingWindowCellsByMeetingId[mid] ?? {};
-                    const lessonDay = dateOnly(m.meeting_date);
-                    const pastIncomplete =
-                      Boolean(lessonDay) &&
-                      lessonDay < today &&
-                      roster.some((s) => meetingCombinedDisplay(headCells, s.student_id).trim() !== "") &&
-                      roster.some((s) => !meetingCombinedDisplay(headCells, s.student_id).trim());
-                    const canAppeal = locked || pastIncomplete;
+                    const canAppeal = locked || (closed && !future);
                     return (
                       <th key={mid} className={`${styles.th} ${styles.thCell}`}>
                         <div className={styles.pairTitle}>
@@ -1567,7 +1560,13 @@ export function JournalClient({
                               <button
                                 type="button"
                                 className={`${styles.mailBtn} ${appeal ? styles.mailBtnSent : ""}`}
-                                title={appeal ? "Müraciət göndərilib. Mətni dəyişmək üçün açın." : "Təsdiqin qaldırılması üçün müraciət yazın"}
+                                title={
+                                  appeal
+                                    ? "Müraciət göndərilib. Mətni dəyişmək üçün açın."
+                                    : locked
+                                      ? "Təsdiqin qaldırılması üçün müraciət yazın"
+                                      : "Bağlı dərs üçün müraciət yazın"
+                                }
                                 aria-label="Müraciət"
                                 aria-expanded={appealOpenId === mid}
                                 onClick={() => {

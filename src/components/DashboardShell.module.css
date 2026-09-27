@@ -65,6 +65,144 @@
   color: var(--muted);
 }
 
+.noticeBox {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(11, 92, 171, 0.16);
+}
+
+.noticeToggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.noticeCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #b45309;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.noticeOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.noticeModal {
+  width: min(560px, 100%);
+  max-height: min(72vh, 640px);
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.22);
+}
+
+.noticeModalHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.noticeModalTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.noticeClose {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.noticeEmpty {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.noticeList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  overflow: auto;
+}
+
+.noticeItem {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid rgba(180, 83, 9, 0.28);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.noticeItem:hover {
+  border-color: #b45309;
+  text-decoration: none;
+}
+
+.noticeTitle {
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.noticeMeta,
+.noticeMsg {
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+.noticeMsg {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .roleSelect {
   width: 100%;
   padding: 7px 8px;
