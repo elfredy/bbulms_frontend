@@ -88,6 +88,18 @@ export function DashboardShell({ me, items, children }: Props) {
   const [openSections, setOpenSections] = useState<Set<string>>(() => new Set(activeSections));
   const [notices, setNotices] = useState<UnlockNotice[]>([]);
   const [noticesOpen, setNoticesOpen] = useState(false);
+  const [noticePage, setNoticePage] = useState(0);
+  const [liftingId, setLiftingId] = useState<string | null>(null);
+  const [noticeError, setNoticeError] = useState<string | null>(null);
+  const NOTICE_PAGE = 8;
+
+  const noticePageCount = Math.max(1, Math.ceil(notices.length / NOTICE_PAGE));
+  const noticePageSafe = Math.min(noticePage, noticePageCount - 1);
+  const noticeSlice = notices.slice(noticePageSafe * NOTICE_PAGE, noticePageSafe * NOTICE_PAGE + NOTICE_PAGE);
+
+  useEffect(() => {
+    if (noticePage > noticePageCount - 1) setNoticePage(Math.max(0, noticePageCount - 1));
+  }, [noticePage, noticePageCount]);
 
   useEffect(() => {
     if (!noticesOpen) return;
@@ -97,6 +109,31 @@ export function DashboardShell({ me, items, children }: Props) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [noticesOpen]);
+
+  async function liftNotice(notice: UnlockNotice) {
+    const title = [notice.course_code, notice.subject_name_az].filter(Boolean).join(" — ") || "Fənn qrupu";
+    const when = notice.meeting_date ? ` (${notice.meeting_date})` : "";
+    if (!window.confirm(`${title}${when} üçün təsdiq qaldırılsın? Müraciət siyahıdan çıxacaq.`)) return;
+    setLiftingId(notice.id);
+    setNoticeError(null);
+    try {
+      const res = await fetch(
+        `/api/admin/journal/courses/${encodeURIComponent(notice.course_id)}/meetings/${encodeURIComponent(notice.course_meeting_id)}/unconfirm`,
+        { method: "POST", credentials: "include" },
+      );
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setNoticeError(typeof data?.detail === "string" ? data.detail : "Təsdiq qaldırılmadı");
+        return;
+      }
+      setNotices((prev) => prev.filter((item) => item.id !== notice.id));
+      window.dispatchEvent(new Event("bbu-journal-unlocks-changed"));
+    } catch {
+      setNoticeError("Təsdiq qaldırılmadı");
+    } finally {
+      setLiftingId(null);
+    }
+  }
 
   useEffect(() => {
     if (!me.is_superadmin) return;
@@ -187,7 +224,11 @@ export function DashboardShell({ me, items, children }: Props) {
                 className={styles.noticeToggle}
                 aria-haspopup="dialog"
                 aria-expanded={noticesOpen}
-                onClick={() => setNoticesOpen(true)}
+                onClick={() => {
+                  setNoticePage(0);
+                  setNoticeError(null);
+                  setNoticesOpen(true);
+                }}
               >
                 <span>Bildirişlər</span>
                 {notices.length ? <span className={styles.noticeCount}>{notices.length}</span> : null}
@@ -297,26 +338,58 @@ export function DashboardShell({ me, items, children }: Props) {
             {notices.length === 0 ? (
               <p className={styles.noticeEmpty}>Açıq müraciət yoxdur</p>
             ) : (
-              <ul className={styles.noticeList}>
-                {notices.map((n) => {
-                  const locale = pathname?.split("/").filter(Boolean)[0] || "az";
-                  const title = [n.course_code, n.subject_name_az].filter(Boolean).join(" — ") || "Fənn qrupu";
-                  const href = `/${locale}/dashboard/admin/journal?course_id=${encodeURIComponent(n.course_id)}&meeting_id=${encodeURIComponent(n.course_meeting_id)}`;
-                  return (
-                    <li key={n.id}>
-                      <Link href={href} className={styles.noticeItem} onClick={() => setNoticesOpen(false)}>
-                        <span className={styles.noticeTitle}>{title}</span>
+              <>
+                <div className={styles.noticePager}>
+                  <button
+                    type="button"
+                    className={styles.noticeClose}
+                    onClick={() => setNoticePage((p) => Math.max(0, p - 1))}
+                    disabled={noticePageSafe <= 0 || liftingId !== null}
+                  >
+                    Geri
+                  </button>
+                  <span className={styles.noticePageLabel}>
+                    {noticePageSafe * NOTICE_PAGE + 1}–{Math.min(notices.length, noticePageSafe * NOTICE_PAGE + noticeSlice.length)} / {notices.length}
+                  </span>
+                  <button
+                    type="button"
+                    className={styles.noticeClose}
+                    onClick={() => setNoticePage((p) => Math.min(noticePageCount - 1, p + 1))}
+                    disabled={noticePageSafe >= noticePageCount - 1 || liftingId !== null}
+                  >
+                    İrəli
+                  </button>
+                </div>
+                {noticeError ? <p className={styles.noticeError}>{noticeError}</p> : null}
+                <ul className={styles.noticeList}>
+                  {noticeSlice.map((n) => {
+                    const locale = pathname?.split("/").filter(Boolean)[0] || "az";
+                    const title = [n.course_code, n.subject_name_az].filter(Boolean).join(" — ") || "Fənn qrupu";
+                    const href = `/${locale}/dashboard/admin/journal?course_id=${encodeURIComponent(n.course_id)}&meeting_id=${encodeURIComponent(n.course_meeting_id)}`;
+                    return (
+                      <li key={n.id} className={styles.noticeItem}>
+                        <Link href={href} className={styles.noticeTitle} onClick={() => setNoticesOpen(false)}>
+                          {title}
+                        </Link>
                         <span className={styles.noticeMeta}>
                           {n.teacher_name || "Müəllim"}
                           {n.meeting_date ? ` · ${n.meeting_date}` : ""}
                           {` · ${n.confirmed ? "Təsdiq" : "Bağlı"}`}
                         </span>
                         <span className={styles.noticeMsg}>{n.message}</span>
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
+                        <button
+                          type="button"
+                          className={styles.noticeLift}
+                          disabled={liftingId !== null}
+                          onClick={() => void liftNotice(n)}
+                        >
+                          {liftingId === n.id ? "Qaldırılır…" : "Təsdiqi qaldır"}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
             )}
           </div>
         </div>
