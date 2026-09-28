@@ -373,6 +373,8 @@ export type TimetableAvailableLesson = {
   down_hours: number;
   remaining_up: number;
   remaining_down: number;
+  remaining_full?: number;
+  remaining_half?: number;
   remaining: number;
 };
 

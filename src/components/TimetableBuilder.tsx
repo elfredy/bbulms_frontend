@@ -59,6 +59,19 @@ function remainingOf(lesson: TimetableAvailableLesson | null | undefined) {
   return Number(lesson.remaining_up || 0) + Number(lesson.remaining_down || 0);
 }
 
+function slotBudget(lesson: TimetableAvailableLesson | null | undefined) {
+  const rem = remainingOf(lesson);
+  if (!lesson) return { full: 0, half: 0, rem };
+  if (typeof lesson.remaining_full === "number" || typeof lesson.remaining_half === "number") {
+    return {
+      full: Number(lesson.remaining_full || 0),
+      half: Number(lesson.remaining_half || 0),
+      rem,
+    };
+  }
+  return { full: rem >= 2 ? 1 : 0, half: rem % 2, rem };
+}
+
 function chipActive(lesson: TimetableAvailableLesson) {
   return remainingOf(lesson) > 0 || Boolean(lesson.can_join);
 }
@@ -444,18 +457,21 @@ export function TimetableBuilder() {
     const info = available.find(
       (a) => a.course_id === lesson.course_id && a.lesson_type_id === lesson.lesson_type_id && (a.course_group_id || "") === (lesson.course_group_id || "")
     );
-    const rem = remainingOf(info);
+    const budget = slotBudget(info);
     const joining = Boolean(
       info?.can_join &&
         [...list, ...upList, ...downList, ...fullList].some((x) => isSiblingHalf(x, lesson))
     );
-    if (weekType !== 3 && rem <= 0 && !joining && !list.some((x) => isSiblingHalf(x, lesson))) {
-      setError("Bu fənn üçün boş saat qalmayıb");
-      return;
-    }
-    if (weekType === 3 && rem < 2 && !joining && !list.some((x) => isSiblingHalf(x, lesson))) {
-      setError("Tam dərs üçün 2 saat lazımdır");
-      return;
+    const alreadyThere = list.some((x) => isSiblingHalf(x, lesson));
+    if (!joining && !alreadyThere) {
+      if (weekType === 3 && budget.full <= 0) {
+        setError(budget.half > 0 ? "Bu dərs yalnız üst və ya alt həftədə olur, tam dərs ola bilməz" : "Bu fənn üçün boş saat qalmayıb");
+        return;
+      }
+      if (weekType !== 3 && budget.half <= 0) {
+        setError(budget.full > 0 ? "Bu dərs hər həftə keçir, tam dərs xanasına qoyun" : "Bu fənn üçün boş saat qalmayıb");
+        return;
+      }
     }
     void place(weekDay, clockId, weekType, lesson);
   }
@@ -615,7 +631,7 @@ export function TimetableBuilder() {
                   const up = assignedMap.get(slotKey(d.week_day, clock.id, 1)) ?? [];
                   const down = assignedMap.get(slotKey(d.week_day, clock.id, 2)) ?? [];
                   const full = assignedMap.get(slotKey(d.week_day, clock.id, 3)) ?? [];
-                  const rem = remainingOf(selectedLesson);
+                  const budget = slotBudget(selectedLesson);
                   const joinable = Boolean(
                     selected?.course_group_id &&
                       [...up, ...down, ...full].some((x) => isSiblingHalf(x, selected))
@@ -625,16 +641,16 @@ export function TimetableBuilder() {
                   const canUp =
                     Boolean(selected) &&
                     !full.length &&
-                    ((up.length === 0 && (rem > 0 || joinable)) || canStack(up));
+                    ((up.length === 0 && (budget.half > 0 || joinable)) || canStack(up));
                   const canDown =
                     Boolean(selected) &&
                     !full.length &&
-                    ((down.length === 0 && (rem > 0 || joinable)) || canStack(down));
+                    ((down.length === 0 && (budget.half > 0 || joinable)) || canStack(down));
                   const canFull =
                     Boolean(selected) &&
-                    ((full.length === 0 && !up.length && !down.length && rem >= 2) ||
+                    ((full.length === 0 && !up.length && !down.length && budget.full > 0) ||
                       canStack(full) ||
-                      ((up.length > 0 || down.length > 0) && joinable));
+                      ((up.length > 0 || down.length > 0) && joinable && budget.full > 0));
                   return (
                     <td key={`${clock.id}-${d.week_day}`}>
                       <div className={styles.cell}>
@@ -774,7 +790,7 @@ export function TimetableBuilder() {
               ? "Bu cədvəl təsdiqlənib. Dəyişmək üçün Yenilə düyməsinə basın."
               : editing
                 ? "Redaktə rejimindəsiniz. Dərsi silin, yerini dəyişin və ya yeni xanaya qoyun."
-                : "Fənni seçib sol sütunda üst və ya alt həftəyə, sağda isə hər həftəki tam dərsə atın. Bitirdikdən sonra təsdiq edin."}
+                : "30 saat tam dərsdir. 15 saat — 45 və 75 saatlıq fənnin seminarı və ya qalığı — yalnız üst və ya yalnız alt həftəyə qoyulur, tam olmur."}
           </p>
         ) : null}
 
@@ -822,6 +838,11 @@ export function TimetableBuilder() {
                     selected?.lesson_type_id === lesson.lesson_type_id &&
                     (selected?.course_group_id || "") === (lesson.course_group_id || "");
                   const rem = remainingOf(lesson);
+                  const budget = slotBudget(lesson);
+                  const placeHint =
+                    budget.full > 0 && budget.half > 0 ? "tam + üst/alt" : budget.half > 0 ? "yalnız üst və ya alt" : budget.full > 0 ? "tam" : "";
+                  const placeTag =
+                    budget.full > 0 && budget.half > 0 ? "tam+yarım" : budget.half > 0 ? "üst/alt" : budget.full > 0 ? "tam" : "";
                   const done = !chipActive(lesson);
                   const label = [lesson.lesson_type_az ?? lesson.lesson_letter, lesson.half_group_az].filter(Boolean).join(" · ");
                   return (
@@ -843,14 +864,14 @@ export function TimetableBuilder() {
                       title={
                         locked
                           ? "Əvvəl Yenilə düyməsinə basın"
-                          : `${label}${lesson.teacher_fullname ? ` · ${lesson.teacher_fullname}` : ""} · qalan ${rem} saat`
+                          : `${label}${lesson.teacher_fullname ? ` · ${lesson.teacher_fullname}` : ""} · qalan ${rem} saat${placeHint ? ` · ${placeHint}` : ""}`
                       }
                     >
                       <span className={styles.chipName}>
                         <span className={styles.chipLetter}>{lesson.lesson_letter}</span>
                         {label}
                       </span>
-                      <span className={styles.chipHours}>{rem}</span>
+                      <span className={styles.chipHours}>{placeTag ? `${rem} · ${placeTag}` : rem}</span>
                     </button>
                   );
                 })}
