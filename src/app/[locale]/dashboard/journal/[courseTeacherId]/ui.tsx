@@ -280,20 +280,26 @@ function mondayOfIso(iso: string): string {
   return dt.toISOString().slice(0, 10);
 }
 
-function windowStartForToday(cols: MeetingColumn[], today: string, size: number): number {
-  const maxStart = Math.max(0, cols.length - size);
-  if (!cols.length) return 0;
-  const weekStart = mondayOfIso(today);
-  const firstThisWeek = cols.findIndex((c) => {
-    const d = dateOnly(c.m.meeting_date);
-    return Boolean(d) && d >= weekStart;
-  });
-  const idxToday = cols.findIndex((c) => dateOnly(c.m.meeting_date) === today);
-  let start = firstThisWeek >= 0 ? firstThisWeek : 0;
-  if (idxToday >= 0) {
-    start = Math.min(start, Math.max(0, idxToday - 2));
+function meetingColumnConfirmed(m: CourseMeetingItem, locked: Record<string, boolean>): boolean {
+  const mid = String(m.course_meeting_id);
+  return Boolean(locked[mid]) || isConfirmedStatus(m.point_status);
+}
+
+/** First full page of `size` columns that is not entirely confirmed. Advance only after that page is full and confirmed. */
+function firstUnconfirmedWindowStart(
+  cols: MeetingColumn[],
+  locked: Record<string, boolean>,
+  size: number,
+): number {
+  let start = 0;
+  while (start + size <= cols.length) {
+    const block = cols.slice(start, start + size);
+    if (!block.every((c) => meetingColumnConfirmed(c.m, locked))) return start;
+    const next = start + size;
+    if (next >= cols.length) return start;
+    start = next;
   }
-  return Math.min(maxStart, Math.max(0, start));
+  return start;
 }
 
 function buildMeetingColumns(meetings: CourseMeetingItem[], semesterStart: string | null): MeetingColumn[] {
@@ -384,6 +390,7 @@ export function JournalClient({
   const exercisePendingRef = useRef<Record<string, string>>({});
   const leaveAllowedRef = useRef(false);
   const needsLeaveWarnRef = useRef(false);
+  const userPagedRef = useRef(false);
 
   const [exerciseItemsByType, setExerciseItemsByType] = useState<Record<string, { items: any[] }>>({});
   const [exercisePointsByExerciseId, setExercisePointsByExerciseId] = useState<Record<string, Record<string, string>>>({});
@@ -910,7 +917,6 @@ export function JournalClient({
 
     const today = todayInBaku();
     const idxToday = meetingColumns.findIndex((c) => dateOnly(c.m.meeting_date) === today);
-    setMeetingWindowStart(windowStartForToday(meetingColumns, today, COLUMN_WINDOW_SIZE));
 
     const initialMeetingId =
       String(meetingColumns[idxToday >= 0 ? idxToday : 0]?.m.course_meeting_id ?? "") ||
@@ -956,11 +962,12 @@ export function JournalClient({
       if (prev && visibleMeetings.some((m) => String(m.course_meeting_id) === prev)) return prev;
       return String(meetingColumns[idxToday >= 0 ? idxToday : 0]?.m.course_meeting_id ?? visibleMeetings[0]?.course_meeting_id ?? "");
     });
-    setMeetingWindowStart((prev) => {
-      if (prev !== 0) return prev;
-      return windowStartForToday(meetingColumns, today, COLUMN_WINDOW_SIZE);
-    });
   }, [meetingColumns, visibleMeetings]);
+
+  useEffect(() => {
+    if (userPagedRef.current) return;
+    setMeetingWindowStart(firstUnconfirmedWindowStart(meetingColumns, meetingLockedById, COLUMN_WINDOW_SIZE));
+  }, [meetingColumns, meetingLockedById]);
 
   useEffect(() => {
     if (tab !== "attendance") {
@@ -1709,22 +1716,26 @@ export function JournalClient({
                       <button
                         type="button"
                         className={`${styles.btn} ${styles.btnNav}`}
-                        onClick={() => setMeetingWindowStart((s) => Math.max(0, s - COLUMN_WINDOW_STEP))}
+                        onClick={() => {
+                          userPagedRef.current = true;
+                          setMeetingWindowStart((s) => Math.max(0, s - COLUMN_WINDOW_STEP));
+                        }}
                         disabled={isPending || meetingWindowStart <= 0}
                       >
-                        Prev
+                        Əvvəl
                       </button>
                       <button
                         type="button"
                         className={`${styles.btn} ${styles.btnNav}`}
-                        onClick={() =>
+                        onClick={() => {
+                          userPagedRef.current = true;
                           setMeetingWindowStart((s) =>
                             Math.min(Math.max(0, meetingColumns.length - COLUMN_WINDOW_SIZE), s + COLUMN_WINDOW_STEP),
-                          )
-                        }
+                          );
+                        }}
                         disabled={isPending || meetingWindowStart + COLUMN_WINDOW_SIZE >= meetingColumns.length}
                       >
-                        Next
+                        Sonra
                       </button>
                     </div>
                     {columnWindow.length === 0 ? (
