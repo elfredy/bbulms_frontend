@@ -30,7 +30,6 @@ type Opt = {
   start_date?: string | null;
   org_name_az?: string | null;
   position_name_az?: string | null;
-  education_year_name?: string | null;
 };
 type SubjectOpt = Opt & {
   semester_id?: string | null;
