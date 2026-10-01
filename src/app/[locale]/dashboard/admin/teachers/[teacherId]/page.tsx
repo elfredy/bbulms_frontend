@@ -62,7 +62,7 @@ export default async function AdminTeacherDetailPage({ params }: Props) {
                   <li key={c.course_teacher_id}>
                     <div>{c.subject_name_az ?? c.course_id}</div>
                     <div className={formStyles.hint}>
-                      {[c.education_year_name, c.lesson_type_az, `CT:${c.course_teacher_id}`].filter(Boolean).join(" · ")}
+                      {[c.education_group_name, c.education_year_name, c.lesson_type_az].filter(Boolean).join(" · ")}
                     </div>
                   </li>
                 ))}

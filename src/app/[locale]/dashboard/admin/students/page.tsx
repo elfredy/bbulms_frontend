@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { AdminRowMenu } from "@/components/admin/AdminRowMenu";
+import { StudentRowMenu } from "@/components/admin/StudentRowMenu";
 import { adminInstitutionLookups, adminListStudents, pageList } from "@/lib/admin-org";
 import { getMe } from "@/lib/api";
 
@@ -133,10 +133,10 @@ export default async function AdminStudentsPage({ params, searchParams }: Props)
                     <td className={styles.td}>{[s.faculty_name_az, s.specialty_name_az].filter(Boolean).join(" / ") || "—"}</td>
                     <td className={styles.td}>{s.group_name ?? "—"}</td>
                     <td className={styles.td}>
-                      <AdminRowMenu
+                      <StudentRowMenu
+                        studentId={s.student_id}
                         editHref={`/${locale}/dashboard/admin/students/${s.student_id}`}
                         deleteUrl={`/api/admin/students/${s.student_id}`}
-                        deleteConfirm="Tələbəni silmək istəyirsiniz?"
                       />
                     </td>
                   </tr>

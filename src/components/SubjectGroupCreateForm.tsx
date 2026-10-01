@@ -20,6 +20,12 @@ type Opt = {
   education_level_ids?: string[] | null;
   education_type_id?: string | null;
   group_name?: string | null;
+  specialty_name?: string | null;
+  faculty_name?: string | null;
+  education_level_name?: string | null;
+  education_type_name?: string | null;
+  education_lang_name?: string | null;
+  education_year_name?: string | null;
   season_code?: string | null;
   start_date?: string | null;
   org_name_az?: string | null;
@@ -66,6 +72,108 @@ type Lookups = {
   half_groups: Opt[];
   course_work_options: Opt[];
 };
+
+function studentHintLines(student: Opt) {
+  const rows: [string, string][] = [
+    ["İxtisas", student.specialty_name || ""],
+    ["Qrup", student.group_name || ""],
+    ["Fakültə", student.faculty_name || ""],
+    ["Səviyyə", student.education_level_name || ""],
+    ["Forma", student.education_type_name || ""],
+    ["Dil", student.education_lang_name || ""],
+    ["Tədris ili", student.education_year_name || ""],
+  ];
+  return rows.filter(([, value]) => value.trim());
+}
+
+function StudentHint({ student }: { student: Opt }) {
+  const wrapRef = useRef<HTMLSpanElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const pinnedRef = useRef(false);
+  const hideTimer = useRef<number | null>(null);
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+  const lines = studentHintLines(student);
+
+  function place() {
+    const rect = btnRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const width = 240;
+    const left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8));
+    const estimated = Math.max(36, 16 + lines.length * 32);
+    const below = rect.bottom + 6;
+    const top = below + estimated > window.innerHeight - 8 ? Math.max(8, rect.top - estimated - 6) : below;
+    setPos({ top, left });
+  }
+
+  function show() {
+    if (hideTimer.current) window.clearTimeout(hideTimer.current);
+    place();
+    setOpen(true);
+  }
+
+  function scheduleHide() {
+    if (hideTimer.current) window.clearTimeout(hideTimer.current);
+    hideTimer.current = window.setTimeout(() => {
+      if (!pinnedRef.current) setOpen(false);
+    }, 140);
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    function close() {
+      pinnedRef.current = false;
+      setOpen(false);
+    }
+    function onDoc(event: MouseEvent) {
+      const target = event.target as Node;
+      if (!wrapRef.current?.contains(target)) close();
+    }
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    document.addEventListener("mousedown", onDoc);
+    return () => {
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+      document.removeEventListener("mousedown", onDoc);
+    };
+  }, [open]);
+
+  return (
+    <span className={styles.hintWrap} ref={wrapRef} onMouseEnter={show} onMouseLeave={scheduleHide}>
+      <button
+        ref={btnRef}
+        type="button"
+        className={styles.hintBtn}
+        aria-label="Tələbə məlumatı"
+        aria-expanded={open}
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          pinnedRef.current = !pinnedRef.current;
+          if (pinnedRef.current) show();
+          else setOpen(false);
+        }}
+      >
+        ⋯
+      </button>
+      {open ? (
+        <span className={styles.hintTip} role="tooltip" style={{ top: pos.top, left: pos.left }} onMouseEnter={show} onMouseLeave={scheduleHide}>
+          {lines.length ? (
+            lines.map(([label, value]) => (
+              <span key={label} className={styles.hintLine}>
+                <span className={styles.hintKey}>{label}</span>
+                <span>{value}</span>
+              </span>
+            ))
+          ) : (
+            <span>Əlavə məlumat yoxdur</span>
+          )}
+        </span>
+      ) : null}
+    </span>
+  );
+}
 
 function labelOf(o: Opt) {
   if (o.faculty_name_az) return [o.name_az, o.code, o.faculty_name_az].filter(Boolean).join(" — ");
@@ -723,6 +831,11 @@ export function SubjectGroupCreateForm({
       setError("Akademik qrup seçin.");
       return;
     }
+    const rosterIds = await withoutOverCredit(studentIds);
+    if (rosterIds.length !== studentIds.length) {
+      setStudentIds(rosterIds);
+      return;
+    }
     setSaving(true);
     const hoursVis = hoursForEval(evaluationType);
     const payload = {
@@ -757,10 +870,10 @@ export function SubjectGroupCreateForm({
         access_l: hoursVis.l ? row.access_l : false,
       })),
       teachers: teacherPicks.filter((t) => t.teacher_id && t.lesson_type_id),
-      student_ids: studentIds,
+      student_ids: rosterIds,
       half_groups: withAssignedHalfStudents(
         halfPicks.filter((h) => h.half_group_id && h.lesson_type_id),
-        studentIds,
+        rosterIds,
         students,
       ).map((h) => ({
         half_group_id: h.half_group_id,
@@ -804,6 +917,11 @@ export function SubjectGroupCreateForm({
       return;
     }
     setError(null);
+    const rosterIds = await withoutOverCredit(studentIds);
+    if (rosterIds.length !== studentIds.length) {
+      setStudentIds(rosterIds);
+      return;
+    }
     setSaving(true);
     const hoursVis = hoursForEval(evaluationType);
     try {
@@ -843,10 +961,10 @@ export function SubjectGroupCreateForm({
             access_l: hoursVis.l ? row.access_l : false,
           })),
           teachers: teacherPicks.filter((t) => t.teacher_id && t.lesson_type_id),
-          student_ids: studentIds,
+          student_ids: rosterIds,
           half_groups: withAssignedHalfStudents(
             halfPicks.filter((h) => h.half_group_id && h.lesson_type_id),
-            studentIds,
+            rosterIds,
             students,
           ).map((h) => ({
             half_group_id: h.half_group_id,
@@ -933,16 +1051,46 @@ export function SubjectGroupCreateForm({
     );
   }
 
+  async function withoutOverCredit(ids: string[]): Promise<string[]> {
+    if (!ids.length || !subjectId || !yearId || !semesterId) return ids;
+    try {
+      const res = await fetch("/api/admin/subject-groups/credit-check", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          student_ids: ids,
+          education_plan_subject_id: subjectId,
+          education_year_id: yearId,
+          semester_id: semesterId,
+          course_id: createdCourseId || null,
+        }),
+      });
+      if (!res.ok) return ids;
+      const data = await res.json();
+      const blocked = new Set<string>((data.blocked ?? []).map((b: { student_id: string }) => String(b.student_id)));
+      if (!blocked.size) return ids;
+      window.alert(data.message || "40 kredit limiti keçilir. Tələbə əlavə edilmədi.");
+      return ids.filter((id) => !blocked.has(id));
+    } catch {
+      return ids;
+    }
+  }
+
   const visibleStudents = students.filter((s) => {
     const q = studentSearch.trim().toLocaleLowerCase("az");
     if (!q) return true;
     return `${s.name || ""} ${s.group_name || ""} ${s.id}`.toLocaleLowerCase("az").includes(q);
   });
 
-  function selectAllVisibleStudents() {
+  async function selectAllVisibleStudents() {
+    const ids = visibleStudents.map((s) => s.id);
+    const allowed = new Set(await withoutOverCredit(ids));
     setStudentIds((prev) => {
       const next = new Set(prev);
-      for (const s of visibleStudents) next.add(s.id);
+      for (const id of ids) {
+        if (allowed.has(id)) next.add(id);
+      }
       return Array.from(next);
     });
   }
@@ -1372,23 +1520,36 @@ export function SubjectGroupCreateForm({
           />
           <div className={styles.checkList} style={{ maxHeight: 360 }}>
             {students.length === 0 ? <span className={styles.label}>Əvvəl akademik qrup seçin</span> : null}
-            {visibleStudents.map((s) => {
+            {visibleStudents.map((s, index) => {
                 const checked = studentIds.includes(s.id);
                 const selectedNames = new Set(groups.filter((g) => groupIds.includes(g.id)).map((g) => g.name || g.name_az));
                 const extra = Boolean(s.group_name) && selectedNames.size > 0 && !selectedNames.has(s.group_name || "");
                 return (
-                  <label key={s.id} className={styles.checkItem}>
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => setStudentIds((prev) => (checked ? prev.filter((x) => x !== s.id) : [...prev, s.id]))}
-                    />
-                    <span>
-                      {s.name || s.id}
-                      {s.group_name ? ` · ${s.group_name}` : ""}
-                      {extra ? " · alt qrup" : ""}
-                    </span>
-                  </label>
+                  <div key={s.id} className={styles.checkItem}>
+                    <span className={styles.studentIndex}>{index + 1}.</span>
+                    <StudentHint student={s} />
+                    <label className={styles.checkLabel}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => {
+                          if (checked) {
+                            setStudentIds((prev) => prev.filter((x) => x !== s.id));
+                            return;
+                          }
+                          void withoutOverCredit([s.id]).then((allowed) => {
+                            if (!allowed.includes(s.id)) return;
+                            setStudentIds((prev) => (prev.includes(s.id) ? prev : [...prev, s.id]));
+                          });
+                        }}
+                      />
+                      <span>
+                        {s.name || s.id}
+                        {s.group_name ? ` · ${s.group_name}` : ""}
+                        {extra ? " · alt qrup" : ""}
+                      </span>
+                    </label>
+                  </div>
                 );
               })}
           </div>
@@ -1606,17 +1767,20 @@ export function SubjectGroupCreateForm({
                 .map((s) => {
                   const checked = extraPicked.includes(s.id);
                   return (
-                    <label key={s.id} className={styles.checkItem}>
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => setExtraPicked((prev) => (checked ? prev.filter((x) => x !== s.id) : [...prev, s.id]))}
-                      />
-                      <span>
-                        {s.name || s.id}
-                        {s.group_name ? ` · ${s.group_name}` : ""}
-                      </span>
-                    </label>
+                    <div key={s.id} className={styles.checkItem}>
+                      <StudentHint student={s} />
+                      <label className={styles.checkLabel}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => setExtraPicked((prev) => (checked ? prev.filter((x) => x !== s.id) : [...prev, s.id]))}
+                        />
+                        <span>
+                          {s.name || s.id}
+                          {s.group_name ? ` · ${s.group_name}` : ""}
+                        </span>
+                      </label>
+                    </div>
                   );
                 })}
             </div>
@@ -1644,17 +1808,21 @@ export function SubjectGroupCreateForm({
                 className={styles.buttonAdd}
                 disabled={!extraPicked.length}
                 onClick={() => {
-                  const picked = extraStudents.filter((s) => extraPicked.includes(s.id));
-                  setStudents((prev) => {
-                    const map = new Map(prev.map((s) => [s.id, s]));
-                    for (const s of picked) map.set(s.id, s);
-                    return Array.from(map.values());
-                  });
-                  setStudentIds((prev) => [...new Set([...prev, ...extraPicked])]);
-                  setExtraOpen(false);
-                  setExtraGroupId("");
-                  setExtraPicked([]);
-                  setExtraStudentQuery("");
+                  void (async () => {
+                    const allowed = await withoutOverCredit(extraPicked);
+                    if (!allowed.length) return;
+                    const picked = extraStudents.filter((s) => allowed.includes(s.id));
+                    setStudents((prev) => {
+                      const map = new Map(prev.map((s) => [s.id, s]));
+                      for (const s of picked) map.set(s.id, s);
+                      return Array.from(map.values());
+                    });
+                    setStudentIds((prev) => [...new Set([...prev, ...allowed])]);
+                    setExtraOpen(false);
+                    setExtraGroupId("");
+                    setExtraPicked([]);
+                    setExtraStudentQuery("");
+                  })();
                 }}
               >
                 Seçilənləri əlavə et ({extraPicked.length})

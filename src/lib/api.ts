@@ -86,6 +86,7 @@ export type AdminTeacherCourseItem = {
   education_year_name: string | null;
   lesson_type_id: string | null;
   lesson_type_az: string | null;
+  education_group_name?: string | null;
   close_status: number;
 };
 
