@@ -301,7 +301,7 @@ function confirmableMeetingIds(
       if (past || pastTouched) return Boolean(touched[mid]);
       return true;
     })
-    .map((m) => mid);
+    .map((m) => String(m.course_meeting_id));
 }
 
 function readTouchedMeetings(courseId: string): Record<string, boolean> {
