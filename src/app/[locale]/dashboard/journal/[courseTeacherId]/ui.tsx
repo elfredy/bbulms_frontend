@@ -80,6 +80,7 @@ function meetingStartMs(m: CourseMeetingItem): number | null {
 }
 
 function isQbLocked(m: CourseMeetingItem, display: string, now: number): boolean {
+  if (m.admin_unlocked) return false;
   if (!isQbText(display)) return false;
   const start = meetingStartMs(m);
   if (start == null) return false;
@@ -270,6 +271,76 @@ function isLessonOpen(m: CourseMeetingItem, today: string): boolean {
   return Boolean(d) && d === today;
 }
 
+/**
+ * Təsdiqi qaldırılmış keçmiş dərs açıq qalır və köhnə qiymətləri saxlayır.
+ * Müəllim həmin dərsə qiymət yazıb təsdiq edəndə yalnız bu sessiyada dəyişdiyi tarixlər bağlanır.
+ * Keçmiş dərsə toxunulmayıbsa, bu günkü dərslər əvvəlki kimi təsdiqlənə bilir.
+ */
+function confirmableMeetingIds(
+  meetings: CourseMeetingItem[],
+  today: string,
+  locked: Record<string, boolean>,
+  touched: Record<string, boolean>,
+  hasValues: (mid: string) => boolean,
+): string[] {
+  const open = meetings.filter((m) => {
+    if (!isLessonOpen(m, today)) return false;
+    const mid = String(m.course_meeting_id);
+    if (locked[mid]) return false;
+    return hasValues(mid);
+  });
+  const pastTouched = open.some((m) => {
+    const d = dateOnly(m.meeting_date);
+    return Boolean(d) && d < today && touched[String(m.course_meeting_id)];
+  });
+  return open
+    .filter((m) => {
+      const mid = String(m.course_meeting_id);
+      const d = dateOnly(m.meeting_date);
+      const past = Boolean(d) && d < today;
+      if (past || pastTouched) return Boolean(touched[mid]);
+      return true;
+    })
+    .map((m) => mid);
+}
+
+function readTouchedMeetings(courseId: string): Record<string, boolean> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = sessionStorage.getItem(`journal-touched:${courseId}`);
+    const ids = raw ? (JSON.parse(raw) as unknown) : [];
+    if (!Array.isArray(ids)) return {};
+    const next: Record<string, boolean> = {};
+    for (const id of ids) {
+      const mid = String(id ?? "").trim();
+      if (mid) next[mid] = true;
+    }
+    return next;
+  } catch {
+    return {};
+  }
+}
+
+function writeTouchedMeetings(courseId: string, touched: Record<string, boolean>) {
+  try {
+    sessionStorage.setItem(
+      `journal-touched:${courseId}`,
+      JSON.stringify(Object.keys(touched).filter((id) => touched[id])),
+    );
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+function touchedWithPending(touched: Record<string, boolean>, pendingKeys: string[]): Record<string, boolean> {
+  const next = { ...touched };
+  for (const k of pendingKeys) {
+    const mid = k.split(":")[0];
+    if (mid) next[mid] = true;
+  }
+  return next;
+}
+
 function mondayOfIso(iso: string): string {
   const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!m) return iso;
@@ -359,6 +430,8 @@ export function JournalClient({
   const [meetingWindowStart, setMeetingWindowStart] = useState<number>(0);
   const [meetingWindowCellsByMeetingId, setMeetingWindowCellsByMeetingId] = useState<Record<string, Record<string, JournalCell>>>({});
   const [meetingLockedById, setMeetingLockedById] = useState<Record<string, boolean>>({});
+  const [touchedMeetingIds, setTouchedMeetingIds] = useState<Record<string, boolean>>({});
+  const [touchedReady, setTouchedReady] = useState(false);
   const [appealOpenId, setAppealOpenId] = useState<string | null>(null);
   const [appealDraft, setAppealDraft] = useState("");
   const [qbCountByStudentId, setQbCountByStudentId] = useState<Record<string, number>>({});
@@ -434,6 +507,36 @@ export function JournalClient({
   useEffect(() => {
     meetingPendingRef.current = meetingPendingByKey;
   }, [meetingPendingByKey]);
+
+  useEffect(() => {
+    setTouchedMeetingIds(readTouchedMeetings(courseId));
+    setTouchedReady(true);
+  }, [courseId]);
+
+  useEffect(() => {
+    if (!touchedReady) return;
+    writeTouchedMeetings(courseId, touchedMeetingIds);
+    // courseId is read from the render that applied touchedMeetingIds, so a course
+    // switch cannot write the previous course's ids under the new key.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [touchedMeetingIds, touchedReady]);
+
+  function markMeetingTouched(mid: string) {
+    setTouchedMeetingIds((prev) => (prev[mid] ? prev : { ...prev, [mid]: true }));
+  }
+
+  function unmarkMeetingsTouched(mids: string[]) {
+    setTouchedMeetingIds((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const id of mids) {
+        if (!next[id]) continue;
+        delete next[id];
+        changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }
 
   useEffect(() => {
     exercisePendingRef.current = exercisePendingByKey;
@@ -651,6 +754,7 @@ export function JournalClient({
       if (evaA) cells.push({ student_id: studentId, course_eva_id: evaA.course_eva_id, value: next });
       if (evaS) cells.push({ student_id: studentId, course_eva_id: evaS.course_eva_id, value: null });
     }
+    if (cells.length) markMeetingTouched(mid);
     queueMeetingCells(mid, cells);
     if (isQbText(next)) setNowMs(Date.now());
   }
@@ -725,6 +829,7 @@ export function JournalClient({
       }
     }
 
+    if (persistCells.length) markMeetingTouched(mid);
     queueMeetingCells(mid, persistCells);
     if (isQbText(raw)) setNowMs(Date.now());
   }
@@ -1099,15 +1204,15 @@ export function JournalClient({
   }, [exercisePendingByKey, tab]);
   const attendanceCanConfirm = useMemo(() => {
     const today = todayInBaku();
-    return meetingWindow.some((m) => {
-      if (!isLessonOpen(m, today)) return false;
-      const mid = String(m.course_meeting_id);
-      if (meetingLockedById[mid]) return false;
-      if (Object.keys(meetingPendingByKey).some((k) => k.startsWith(`${mid}:`))) return true;
-      const cellMap = meetingWindowCellsByMeetingId[mid] ?? {};
-      return Object.values(cellMap).some((c) => String(c.value ?? "").trim() !== "");
-    });
-  }, [meetingWindow, meetingLockedById, meetingPendingByKey, meetingWindowCellsByMeetingId]);
+    const touched = touchedWithPending(touchedMeetingIds, Object.keys(meetingPendingByKey));
+    return (
+      confirmableMeetingIds(meetingWindow, today, meetingLockedById, touched, (mid) => {
+        if (Object.keys(meetingPendingByKey).some((k) => k.startsWith(`${mid}:`))) return true;
+        const cellMap = meetingWindowCellsByMeetingId[mid] ?? {};
+        return Object.values(cellMap).some((c) => String(c.value ?? "").trim() !== "");
+      }).length > 0
+    );
+  }, [meetingWindow, meetingLockedById, meetingPendingByKey, meetingWindowCellsByMeetingId, touchedMeetingIds]);
   const exerciseCanConfirm = useMemo(() => {
     if (tab !== "referat" && tab !== "colloquium") return false;
     if (exercisePendingCount > 0) return true;
@@ -1253,16 +1358,18 @@ export function JournalClient({
 
   function confirmSaveAttendance() {
     const today = todayInBaku();
-    const futureIds = new Set(
-      meetingWindow.filter((m) => !isLessonOpen(m, today)).map((m) => String(m.course_meeting_id))
+    const touched = touchedWithPending(touchedMeetingIds, Object.keys(meetingPendingRef.current));
+    const confirmIds = confirmableMeetingIds(
+      meetingWindow,
+      today,
+      meetingLockedById,
+      touched,
+      meetingHasStoredValues,
     );
-    const mids = meetingWindow
-      .filter((m) => !futureIds.has(String(m.course_meeting_id)))
-      .map((m) => String(m.course_meeting_id))
-      .filter((mid) => !meetingLockedById[mid] && meetingHasStoredValues(mid));
-    if (mids.length === 0) return;
+    if (confirmIds.length === 0) return;
     if (!window.confirm("Qiymətləndirməni təsdiqləmək istəyirsiniz? Təsdiqdən sonra dəyişiklik mümkün olmayacaq və ümumi hesablamada nəzərə alınacaq.")) return;
 
+    const confirmSet = new Set(confirmIds);
     setErr(null);
     startTransition(async () => {
       if (!(await flushAllMeetingQueues())) return;
@@ -1273,8 +1380,7 @@ export function JournalClient({
         const mid = parts[0];
         const studentId = parts[1];
         const courseEvaId = parts[2];
-        if (!mid || !studentId || !courseEvaId) continue;
-        if (meetingLockedById[mid] || futureIds.has(mid)) continue;
+        if (!mid || !studentId || !courseEvaId || !confirmSet.has(mid)) continue;
         (pendingByMeeting[mid] ??= []).push({
           student_id: studentId,
           course_eva_id: courseEvaId,
@@ -1282,9 +1388,6 @@ export function JournalClient({
         });
       }
 
-      const confirmIds = Array.from(new Set([...mids, ...Object.keys(pendingByMeeting)])).filter(
-        (mid) => !futureIds.has(mid)
-      );
       for (const mid of confirmIds) {
         const cells = pendingByMeeting[mid];
         if (cells?.length) {
@@ -1306,6 +1409,7 @@ export function JournalClient({
         for (const c of confirmed.cells) map[key(c.student_id, c.course_eva_id)] = c;
         setMeetingWindowCellsByMeetingId((prev) => ({ ...prev, [mid]: map }));
         setMeetingLockedById((prev) => ({ ...prev, [mid]: true }));
+        unmarkMeetingsTouched([mid]);
       }
 
       setMeetingPendingByKey({});

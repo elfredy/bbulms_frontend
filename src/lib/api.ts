@@ -401,6 +401,7 @@ export type CourseMeetingItem = {
   week_day?: number | null;
   unlock_request?: string | null;
   calendar_active?: boolean;
+  admin_unlocked?: boolean;
 };
 
 export type CourseMeetingListResponse = {
