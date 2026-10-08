@@ -272,34 +272,21 @@ function isLessonOpen(m: CourseMeetingItem, today: string): boolean {
 }
 
 /**
- * Təsdiqi qaldırılmış keçmiş dərs açıq qalır və köhnə qiymətləri saxlayır.
- * Müəllim həmin dərsə qiymət yazıb təsdiq edəndə yalnız bu sessiyada dəyişdiyi tarixlər bağlanır.
- * Keçmiş dərsə toxunulmayıbsa, bu günkü dərslər əvvəlki kimi təsdiqlənə bilir.
+ * Təsdiq yalnız yuxarıdan seçilmiş dərsə aiddir.
+ * Bu günün dərsi və təsdiqi qaldırılmış keçmiş dərs açıq sayılır; qiyməti varsa təsdiqlənir.
  */
 function confirmableMeetingIds(
   meetings: CourseMeetingItem[],
   today: string,
   locked: Record<string, boolean>,
-  touched: Record<string, boolean>,
   hasValues: (mid: string) => boolean,
 ): string[] {
-  const open = meetings.filter((m) => {
-    if (!isLessonOpen(m, today)) return false;
-    const mid = String(m.course_meeting_id);
-    if (locked[mid]) return false;
-    return hasValues(mid);
-  });
-  const pastTouched = open.some((m) => {
-    const d = dateOnly(m.meeting_date);
-    return Boolean(d) && d < today && touched[String(m.course_meeting_id)];
-  });
-  return open
+  return meetings
     .filter((m) => {
+      if (!isLessonOpen(m, today)) return false;
       const mid = String(m.course_meeting_id);
-      const d = dateOnly(m.meeting_date);
-      const past = Boolean(d) && d < today;
-      if (past || pastTouched) return Boolean(touched[mid]);
-      return true;
+      if (locked[mid]) return false;
+      return hasValues(mid);
     })
     .map((m) => String(m.course_meeting_id));
 }
@@ -330,15 +317,6 @@ function writeTouchedMeetings(courseId: string, touched: Record<string, boolean>
   } catch {
     /* ignore quota / private mode */
   }
-}
-
-function touchedWithPending(touched: Record<string, boolean>, pendingKeys: string[]): Record<string, boolean> {
-  const next = { ...touched };
-  for (const k of pendingKeys) {
-    const mid = k.split(":")[0];
-    if (mid) next[mid] = true;
-  }
-  return next;
 }
 
 function mondayOfIso(iso: string): string {
@@ -1084,13 +1062,14 @@ export function JournalClient({
       await flushAllMeetingQueues();
       if (cancelled) return;
       const mids = meetingWindow.map((m) => String(m.course_meeting_id));
+      if (meetingId && !mids.includes(meetingId)) mids.push(meetingId);
       loadMeetingWindowGrids(mids);
     })();
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, meetingWindowStart, meetingColumns.length]);
+  }, [tab, meetingWindowStart, meetingColumns.length, meetingId]);
 
   function isMeetingEval(courseEvaId: string): boolean {
     return (evaById.get(courseEvaId)?.evaluation_code ?? "").trim() === "EVA_01";
@@ -1202,17 +1181,20 @@ export function JournalClient({
     const prefix = `${tab}:`;
     return Object.keys(exercisePendingByKey).filter((k) => k.startsWith(prefix)).length;
   }, [exercisePendingByKey, tab]);
+  const selectedMeeting = useMemo(
+    () => visibleMeetings.find((m) => String(m.course_meeting_id) === meetingId) ?? null,
+    [visibleMeetings, meetingId],
+  );
   const attendanceCanConfirm = useMemo(() => {
     const today = todayInBaku();
-    const touched = touchedWithPending(touchedMeetingIds, Object.keys(meetingPendingByKey));
     return (
-      confirmableMeetingIds(meetingWindow, today, meetingLockedById, touched, (mid) => {
+      confirmableMeetingIds(selectedMeeting ? [selectedMeeting] : [], today, meetingLockedById, (mid) => {
         if (Object.keys(meetingPendingByKey).some((k) => k.startsWith(`${mid}:`))) return true;
         const cellMap = meetingWindowCellsByMeetingId[mid] ?? {};
         return Object.values(cellMap).some((c) => String(c.value ?? "").trim() !== "");
       }).length > 0
     );
-  }, [meetingWindow, meetingLockedById, meetingPendingByKey, meetingWindowCellsByMeetingId, touchedMeetingIds]);
+  }, [selectedMeeting, meetingLockedById, meetingPendingByKey, meetingWindowCellsByMeetingId]);
   const exerciseCanConfirm = useMemo(() => {
     if (tab !== "referat" && tab !== "colloquium") return false;
     if (exercisePendingCount > 0) return true;
@@ -1358,16 +1340,20 @@ export function JournalClient({
 
   function confirmSaveAttendance() {
     const today = todayInBaku();
-    const touched = touchedWithPending(touchedMeetingIds, Object.keys(meetingPendingRef.current));
     const confirmIds = confirmableMeetingIds(
-      meetingWindow,
+      selectedMeeting ? [selectedMeeting] : [],
       today,
       meetingLockedById,
-      touched,
       meetingHasStoredValues,
     );
     if (confirmIds.length === 0) return;
-    if (!window.confirm("Qiymətləndirməni təsdiqləmək istəyirsiniz? Təsdiqdən sonra dəyişiklik mümkün olmayacaq və ümumi hesablamada nəzərə alınacaq.")) return;
+    const when = selectedMeeting ? fmtMeeting(selectedMeeting) : "Seçilmiş dərs";
+    if (
+      !window.confirm(
+        `${when} dərsini təsdiqləmək istəyirsiniz? Təsdiqdən sonra dəyişiklik mümkün olmayacaq və ümumi hesablamada nəzərə alınacaq.`,
+      )
+    )
+      return;
 
     const confirmSet = new Set(confirmIds);
     setErr(null);
@@ -1542,7 +1528,15 @@ export function JournalClient({
                 onChange={(e) => {
                   const mid = String(e.target.value);
                   setMeetingId(mid);
-                  if (mid) loadMeetingGrid(mid);
+                  if (!mid) return;
+                  const idx = meetingColumns.findIndex((c) => String(c.m.course_meeting_id) === mid);
+                  if (idx >= 0 && (idx < meetingWindowStart || idx >= meetingWindowStart + COLUMN_WINDOW_SIZE)) {
+                    userPagedRef.current = true;
+                    const maxStart = Math.max(0, meetingColumns.length - COLUMN_WINDOW_SIZE);
+                    setMeetingWindowStart(Math.min(idx, maxStart));
+                  }
+                  loadMeetingGrid(mid);
+                  loadMeetingWindowGrids([mid]);
                 }}
                 disabled={visibleMeetings.length === 0}
               >
@@ -1615,8 +1609,8 @@ export function JournalClient({
                 ? savingHint
                 : meetingPendingCount
                   ? `${meetingPendingCount} dəyişiklik yadda saxlanır`
-                  : attendanceCanConfirm
-                    ? "Qiymətlər yadda saxlanılıb. Ümumi hesablama üçün təsdiq edin."
+                  : attendanceCanConfirm && selectedMeeting
+                    ? `${fmtMeeting(selectedMeeting)} təsdiqlənəcək.`
                     : "Dəyişiklik yoxdur"}
             </div>
             {incompleteStudentIds.size > 0 ? (
@@ -1626,7 +1620,7 @@ export function JournalClient({
               </p>
             ) : null}
             <div className={styles.actionHint}>
-              Üst və alt həftə tarix sırası ilə göstərilir. Yalnız bu günün dərsi aktivdir. Növbəti günlərə qiymət yazmaq və təsdiq etmək olmaz.
+              Üst və alt həftə tarix sırası ilə göstərilir. Təsdiq et düyməsi yuxarıdan seçilmiş dərs tarixini bağlayır. Gələcək dərslərə qiymət yazmaq olmaz.
             </div>
             {!evalAttendance[0] && !evalSeminar[0] ? (
               <div className={`${styles.actionHint} ${styles.actionHintWarn}`}>
