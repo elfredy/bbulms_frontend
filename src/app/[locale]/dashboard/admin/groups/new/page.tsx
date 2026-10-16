@@ -16,7 +16,7 @@ export default async function NewGroupPage({ params }: Props) {
   if (!lookups) redirect(`/${locale}/dashboard/admin/groups`);
 
   return (
-    <AdminFormPage wide title="Qrup əlavə et" hint="Səviyyə, ixtisas, ad və təhsil forması mütləqdir." backHref={`/${locale}/dashboard/admin/groups`}>
+    <AdminFormPage wide title="Qrup əlavə et" hint="Səviyyə, ixtisas, ad və təhsil forması mütləqdir. Yadda saxladıqdan sonra bazadakı tələbələri axtarıb qrupa əlavə edə bilərsiniz." backHref={`/${locale}/dashboard/admin/groups`}>
       <GroupForm lookups={lookups} locale={locale} />
     </AdminFormPage>
   );

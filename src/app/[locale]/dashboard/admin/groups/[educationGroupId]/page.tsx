@@ -342,6 +342,7 @@ export default async function AdminGroupDetailPage({ params, searchParams }: Pro
           <h2 style={{ margin: "0 0 8px", fontSize: 16 }}>{t("students")}</h2>
           <GroupStudentsPanel
             locale={locale}
+            educationGroupId={educationGroupId}
             students={data.students}
             hideOrders={hideOrders?.items ?? []}
             restoreOrders={restoreOrders?.items ?? []}

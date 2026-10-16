@@ -145,7 +145,7 @@ export default async function DashboardPage({ params }: Props) {
         ) : null}
 
         {isStudent && studentCourses ? (
-          <StudentDashboardTabs yearHint={yearStudent} tabs={studentTabs} unnamedCourse={unnamed} />
+          <StudentDashboardTabs yearHint={yearStudent} tabs={studentTabs} unnamedCourse={unnamed} locale={locale} />
         ) : null}
 
         {!isTeacher && !isStudent && !isDepartmentUser ? <p className={styles.alertMuted}>{t("nonTeacher")}</p> : null}

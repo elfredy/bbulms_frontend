@@ -364,6 +364,54 @@ export type StudentCoursesResponse = {
   practice: StudentCourseItem[];
 };
 
+export type StudentCourseScore = {
+  code: string | null;
+  name_az: string | null;
+  point: string | null;
+};
+
+export type StudentCourseLesson = {
+  course_meeting_id: string;
+  meeting_date: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  lesson_type_az: string | null;
+  teacher_fullname: string | null;
+  room_name: string | null;
+  attendance: string | null;
+  grade: string | null;
+};
+
+export type StudentCourseExercise = {
+  course_execises_id: string;
+  type_name_az: string | null;
+  start_date: string | null;
+  point: string | null;
+};
+
+export type StudentCourseDetail = {
+  course_id: string;
+  course_code: string | null;
+  subject_name_az: string | null;
+  education_year_name: string | null;
+  semester_name_az: string | null;
+  education_group_name: string | null;
+  teachers: { lesson_type_az: string | null; fullname: string | null }[];
+  credit: string | null;
+  m_hours: number | null;
+  s_hours: number | null;
+  l_hours: number | null;
+  fm_hours: number | null;
+  in_hours: number | null;
+  before_point: string | null;
+  exam_point: string | null;
+  end_point: string | null;
+  scores: StudentCourseScore[];
+  qb_count: number;
+  lessons: StudentCourseLesson[];
+  exercises: StudentCourseExercise[];
+};
+
 export type StudentScheduleSlot = {
   course_id: string;
   course_meeting_id: string | null;
@@ -544,6 +592,7 @@ export type CourseExerciseItem = {
   end_date: string | null;
   editable: boolean;
   confirmed?: boolean;
+  unlock_request?: string | null;
 };
 
 export type CourseExerciseListResponse = {
@@ -644,6 +693,19 @@ export const getStudentCourses = cache(async (): Promise<StudentCoursesResponse 
   if (!res.ok) {
     return null;
   }
+  return res.json();
+});
+
+export const getStudentCourseDetail = cache(async (courseId: string): Promise<StudentCourseDetail | null> => {
+  const cookieStore = await cookies();
+  const header = cookieStore.toString();
+  if (!header) return null;
+  const origin = serverApiBase();
+  const res = await fetch(`${origin}/api/student/courses/${encodeURIComponent(courseId)}`, {
+    headers: { cookie: header },
+    cache: "no-store",
+  });
+  if (res.status === 403 || res.status === 404 || !res.ok) return null;
   return res.json();
 });
 

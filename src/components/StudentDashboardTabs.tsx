@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 import type { StudentCourseItem } from "@/lib/api";
@@ -18,6 +19,7 @@ type Props = {
   yearHint: string;
   tabs: StudentDashboardTabSpec[];
   unnamedCourse: string;
+  locale: string;
 };
 
 function displayName(c: StudentCourseItem, fallback: string): string {
@@ -29,10 +31,12 @@ function CourseRows({
   items,
   empty,
   unnamedCourse,
+  locale,
 }: {
   items: StudentCourseItem[];
   empty: string;
   unnamedCourse: string;
+  locale: string;
 }) {
   if (items.length === 0) {
     return <p className={styles.empty}>{empty}</p>;
@@ -42,15 +46,18 @@ function CourseRows({
     <ul className={styles.courseList}>
       {items.map((c) => (
         <li key={c.course_student_id} className={styles.courseCard}>
-          <h3 className={styles.courseName}>{displayName(c, unnamedCourse)}</h3>
-          <p className={styles.courseMeta}>{c.education_year_name || "\u00a0"}</p>
+          <Link href={`/${locale}/dashboard/courses/${encodeURIComponent(c.course_id)}`} className={styles.courseCardLink}>
+            <h3 className={styles.courseName}>{displayName(c, unnamedCourse)}</h3>
+            <p className={styles.courseMeta}>{c.education_year_name || "\u00a0"}</p>
+            <span className={styles.linkButton}>Ətraflı</span>
+          </Link>
         </li>
       ))}
     </ul>
   );
 }
 
-export function StudentDashboardTabs({ yearHint, tabs, unnamedCourse }: Props) {
+export function StudentDashboardTabs({ yearHint, tabs, unnamedCourse, locale }: Props) {
   const [active, setActive] = useState(tabs[0]?.id ?? "current");
   const current = tabs.find((t) => t.id === active) ?? tabs[0];
 
@@ -87,7 +94,7 @@ export function StudentDashboardTabs({ yearHint, tabs, unnamedCourse }: Props) {
 
       <div className={styles.panel} role="tabpanel">
         <p className={styles.panelSubtitle}>{current.subtitle}</p>
-        <CourseRows items={current.items} empty={current.empty} unnamedCourse={unnamedCourse} />
+        <CourseRows items={current.items} empty={current.empty} unnamedCourse={unnamedCourse} locale={locale} />
       </div>
     </div>
   );

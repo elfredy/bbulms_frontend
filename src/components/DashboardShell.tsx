@@ -30,8 +30,11 @@ export type DashboardMe = {
 
 type UnlockNotice = {
   id: string;
+  kind?: "meeting" | "exercise" | null;
   course_id: string;
-  course_meeting_id: string;
+  course_meeting_id?: string | null;
+  course_execises_id?: string | null;
+  exercise_label?: string | null;
   message: string;
   meeting_date?: string | null;
   course_code?: string | null;
@@ -113,14 +116,18 @@ export function DashboardShell({ me, items, children }: Props) {
   async function liftNotice(notice: UnlockNotice) {
     const title = [notice.course_code, notice.subject_name_az].filter(Boolean).join(" — ") || "Fənn qrupu";
     const when = notice.meeting_date ? ` (${notice.meeting_date})` : "";
-    if (!window.confirm(`${title}${when} üçün təsdiq qaldırılsın? Müraciət siyahıdan çıxacaq.`)) return;
+    const what = notice.exercise_label || "dərs";
+    if (!window.confirm(`${title}${when} üçün ${what} üzrə təsdiq qaldırılsın? Müraciət siyahıdan çıxacaq.`)) return;
     setLiftingId(notice.id);
     setNoticeError(null);
+    const exerciseId = String(notice.course_execises_id ?? "").trim();
+    const meetingId = String(notice.course_meeting_id ?? "").trim();
+    const url =
+      notice.kind === "exercise" && exerciseId
+        ? `/api/admin/journal/courses/${encodeURIComponent(notice.course_id)}/exercises/${encodeURIComponent(exerciseId)}/unconfirm`
+        : `/api/admin/journal/courses/${encodeURIComponent(notice.course_id)}/meetings/${encodeURIComponent(meetingId)}/unconfirm`;
     try {
-      const res = await fetch(
-        `/api/admin/journal/courses/${encodeURIComponent(notice.course_id)}/meetings/${encodeURIComponent(notice.course_meeting_id)}/unconfirm`,
-        { method: "POST", credentials: "include" },
-      );
+      const res = await fetch(url, { method: "POST", credentials: "include" });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
         setNoticeError(typeof data?.detail === "string" ? data.detail : "Təsdiq qaldırılmadı");
@@ -365,7 +372,10 @@ export function DashboardShell({ me, items, children }: Props) {
                   {noticeSlice.map((n) => {
                     const locale = pathname?.split("/").filter(Boolean)[0] || "az";
                     const title = [n.course_code, n.subject_name_az].filter(Boolean).join(" — ") || "Fənn qrupu";
-                    const href = `/${locale}/dashboard/admin/journal?course_id=${encodeURIComponent(n.course_id)}&meeting_id=${encodeURIComponent(n.course_meeting_id)}`;
+                    const href =
+                      n.kind === "exercise"
+                        ? `/${locale}/dashboard/admin/journal?course_id=${encodeURIComponent(n.course_id)}`
+                        : `/${locale}/dashboard/admin/journal?course_id=${encodeURIComponent(n.course_id)}&meeting_id=${encodeURIComponent(n.course_meeting_id || "")}`;
                     return (
                       <li key={n.id} className={styles.noticeItem}>
                         <Link href={href} className={styles.noticeTitle} onClick={() => setNoticesOpen(false)}>
@@ -373,6 +383,7 @@ export function DashboardShell({ me, items, children }: Props) {
                         </Link>
                         <span className={styles.noticeMeta}>
                           {n.teacher_name || "Müəllim"}
+                          {n.exercise_label ? ` · ${n.exercise_label}` : ""}
                           {n.meeting_date ? ` · ${n.meeting_date}` : ""}
                           {` · ${n.confirmed ? "Təsdiq" : "Bağlı"}`}
                         </span>

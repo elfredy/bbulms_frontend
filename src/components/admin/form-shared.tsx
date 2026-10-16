@@ -211,7 +211,7 @@ export function AdminFormFrame({
   );
 }
 
-export function useAdminSave(successHref: string) {
+export function useAdminSave(successHref: string | ((data: { id?: string }) => string)) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -230,7 +230,8 @@ export function useAdminSave(successHref: string) {
         setError(await readDetail(res, "Yadda saxlanılmadı"));
         return false;
       }
-      router.push(successHref);
+      const data = (await res.json().catch(() => ({}))) as { id?: string };
+      router.push(typeof successHref === "function" ? successHref(data) : successHref);
       router.refresh();
       return true;
     } catch {

@@ -9,6 +9,7 @@ import { fmtClockRange, fmtClockTime } from "@/lib/clock-time";
 import {
   confirmTeacherCourseExercise,
   confirmTeacherJournalMeeting,
+  requestTeacherExerciseUnlock,
   requestTeacherJournalUnlock,
   createTeacherCourseExercise,
   getTeacherCourseExerciseAllPoints,
@@ -1400,6 +1401,7 @@ export function JournalClient({
 
       setMeetingPendingByKey({});
       loadResult();
+      loadQbCounts();
     });
   }
 
@@ -1419,6 +1421,36 @@ export function JournalClient({
       setLiveMeetings((prev) =>
         prev.map((item) => (String(item.course_meeting_id) === mid ? { ...item, unlock_request: res.message } : item))
       );
+      setAppealOpenId(null);
+      setAppealDraft("");
+    });
+  }
+
+  function sendExerciseAppeal(exerciseId: string, exType: "colloquium" | "referat") {
+    const message = appealDraft.trim();
+    if (message.length < 3) {
+      setErr("Müraciəti bir az ətraflı yazın");
+      return;
+    }
+    setErr(null);
+    startTransition(async () => {
+      const res = await requestTeacherExerciseUnlock(courseId, exerciseId, exType, { message });
+      if (!res.ok) {
+        setErr(res.error);
+        return;
+      }
+      setExerciseItemsByType((prev) => {
+        const pack = prev[exType];
+        if (!pack) return prev;
+        return {
+          ...prev,
+          [exType]: {
+            items: pack.items.map((item) =>
+              String(item.course_execises_id) === exerciseId ? { ...item, unlock_request: res.message } : item
+            ),
+          },
+        };
+      });
       setAppealOpenId(null);
       setAppealDraft("");
     });
@@ -1966,7 +1998,7 @@ export function JournalClient({
                         </button>
                       </div>
                       <div className={styles.muted} style={{ alignSelf: "end" }}>
-                        Qaydalar: referat 1 dəfə; kollokvium sayı birdən çox ola bilər; hər tarix 1 həftə aktivdir.
+                        Qaydalar: referat 1 dəfə; kollokvium sayı birdən çox ola bilər; hər tarix 1 həftə aktivdir. Bağlı və ya təsdiqlənmiş tarixdə müraciət ikonu açılır.
                       </div>
                     </div>
 
@@ -1974,14 +2006,75 @@ export function JournalClient({
                       <thead>
                         <tr>
                           <th className={`${styles.th} ${styles.nameCol}`}>Tələbə</th>
-                          {items.map((it) => (
-                            <th key={it.course_execises_id} className={`${styles.th} ${styles.thCell}`}>
-                              <div>{fmtDateLabel(it.start_date)}</div>
-                              <div className={styles.muted} style={{ fontSize: 12 }}>
-                                {it.confirmed ? "Təsdiqlənib" : it.editable ? "Aktiv" : "Bağlı"}
+                          {items.map((it) => {
+                            const eid = String(it.course_execises_id);
+                            const appealKey = `ex:${eid}`;
+                            const appeal = String(it.unlock_request ?? "").trim();
+                            const canAppeal = !it.editable;
+                            return (
+                            <th key={eid} className={`${styles.th} ${styles.thCell}`}>
+                              <div className={styles.halfHead}>
+                                <div className={styles.halfMeta}>
+                                  <span className={styles.halfDate}>{fmtDateLabel(it.start_date)}</span>
+                                  {canAppeal ? (
+                                    <button
+                                      type="button"
+                                      className={`${styles.mailBtn} ${appeal ? styles.mailBtnSent : ""}`}
+                                      title={
+                                        appeal
+                                          ? "Müraciət göndərilib. Mətni dəyişmək üçün açın."
+                                          : it.confirmed
+                                            ? "Təsdiqin qaldırılması üçün müraciət yazın"
+                                            : "Bağlı tarix üçün müraciət yazın"
+                                      }
+                                      aria-label="Müraciət"
+                                      aria-expanded={appealOpenId === appealKey}
+                                      onClick={() => {
+                                        setAppealOpenId((cur) => (cur === appealKey ? null : appealKey));
+                                        setAppealDraft(appeal);
+                                      }}
+                                    >
+                                      <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+                                        <path
+                                          fill="currentColor"
+                                          d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 4-8 5L4 8V6l8 5 8-5v2z"
+                                        />
+                                      </svg>
+                                    </button>
+                                  ) : null}
+                                </div>
+                                {canAppeal && appealOpenId === appealKey ? (
+                                  <form
+                                    className={styles.appealBox}
+                                    onSubmit={(ev) => {
+                                      ev.preventDefault();
+                                      sendExerciseAppeal(eid, exType);
+                                    }}
+                                  >
+                                    <textarea
+                                      className={styles.appealInput}
+                                      rows={3}
+                                      maxLength={500}
+                                      placeholder="Nəyi dəyişmək lazımdır?"
+                                      value={appealDraft}
+                                      onChange={(ev) => setAppealDraft(ev.target.value)}
+                                      disabled={isPending}
+                                    />
+                                    <button type="submit" className={styles.appealSend} disabled={isPending}>
+                                      Göndər
+                                    </button>
+                                  </form>
+                                ) : null}
+                                {canAppeal && appeal && appealOpenId !== appealKey ? (
+                                  <div className={styles.appealNote}>Müraciət göndərilib</div>
+                                ) : null}
+                                <div className={styles.muted} style={{ fontSize: 12 }}>
+                                  {it.confirmed ? "Təsdiqlənib" : it.editable ? "Aktiv" : "Bağlı"}
+                                </div>
                               </div>
                             </th>
-                          ))}
+                            );
+                          })}
                           {exType === "colloquium" ? <th className={`${styles.th} ${styles.thCell}`}>Orta</th> : null}
                         </tr>
                       </thead>

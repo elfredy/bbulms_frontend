@@ -402,6 +402,59 @@
   min-width: 180px;
 }
 
+.picker {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card);
+}
+
+.picker .input {
+  width: 100%;
+  min-width: 0;
+}
+
+.pickerList {
+  display: grid;
+  gap: 6px;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.pickerItem {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  cursor: pointer;
+}
+
+.pickerItem input {
+  margin-top: 3px;
+}
+
+.pickerItem .tdMuted {
+  display: block;
+}
+
+.pickerItemDisabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.pickerName {
+  display: block;
+  font-weight: 650;
+  color: var(--text);
+  line-height: 1.35;
+}
+
 .pager {
   display: flex;
   gap: 6px;

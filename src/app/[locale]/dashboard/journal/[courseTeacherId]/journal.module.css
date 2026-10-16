@@ -54,16 +54,6 @@
   font-weight: 700;
 }
 
-.controls {
-  padding: 0.7rem 0.9rem;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
 .actionBar {
   display: flex;
   flex-wrap: wrap;
@@ -86,6 +76,37 @@
 .field {
   display: grid;
   gap: 4px;
+}
+
+.exerciseAdd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 12px;
+  padding: 10px 12px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.exerciseDate {
+  flex: 1 1 160px;
+  max-width: 220px;
+  min-width: 150px;
+}
+
+.addButton {
+  flex: 0 0 auto;
+  align-self: flex-end;
+  height: 38px;
+  white-space: nowrap;
+}
+
+.exerciseHint {
+  flex: 1 1 220px;
+  margin: 0;
+  padding: 0 0 6px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.35;
 }
 
 .label {
@@ -129,13 +150,12 @@
 
 .tabsWrap {
   border-bottom: 1px solid var(--border);
-  overflow-x: auto;
 }
 
 .tabsList {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.25rem;
-  min-width: min-content;
 }
 
 .tab {

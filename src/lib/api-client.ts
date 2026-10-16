@@ -84,6 +84,26 @@ export async function getTeacherJournalQbCounts(courseId: string): Promise<{ ite
   return jsonOrNull(res);
 }
 
+export async function requestTeacherExerciseUnlock(
+  courseId: string,
+  courseExecisesId: string,
+  type: string,
+  body: { message: string }
+): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
+  const res = await fetch(
+    `/api/teacher/courses/${courseId}/course-exercises/${encodeURIComponent(courseExecisesId)}/unlock-request?type=${encodeURIComponent(type)}`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    }
+  );
+  if (!res.ok) return { ok: false, error: (await readErrorDetail(res)) || "Müraciət göndərilmədi" };
+  const data = (await res.json()) as { message?: string };
+  return { ok: true, message: String(data.message ?? body.message) };
+}
+
 export async function requestTeacherJournalUnlock(
   courseId: string,
   body: { course_meeting_id: string; message: string }

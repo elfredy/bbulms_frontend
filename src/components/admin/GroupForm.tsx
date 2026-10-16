@@ -16,7 +16,9 @@ export function GroupForm({
   locale: string;
 }) {
   const isEdit = Boolean(initial?.education_group_id);
-  const { error, saving, save } = useAdminSave(`/${locale}/dashboard/admin/groups`);
+  const { error, saving, save } = useAdminSave((data) =>
+    !isEdit && data.id ? `/${locale}/dashboard/admin/groups/${data.id}` : `/${locale}/dashboard/admin/groups`
+  );
   const [name, setName] = useState(initial?.education_group_name ?? "");
   const [organizationId, setOrganizationId] = useState(initial?.organization_id ?? "");
   const [levelId, setLevelId] = useState(initial?.education_level_id ?? "");

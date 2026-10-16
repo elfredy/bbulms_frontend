@@ -55,7 +55,7 @@ export default async function AdminGroupsPage({ params, searchParams }: Props) {
       <header className={styles.headerCard}>
         <div>
           <h1 className={styles.title}>Tələbə qrupları</h1>
-          <p className={styles.meta}>Tələbələr qrupa bağlanır. Qrup detallarında tələbə siyahısı və dərs cədvəli var.</p>
+          <p className={styles.meta}>Tələbələr qrupa bağlanır. Qrupun səhifəsində bazadakı tələbələri axtarıb əlavə etmək olar.</p>
         </div>
         <div className={styles.headerActions}>
           <Link href={`/${locale}/dashboard/admin/groups/new`} className={styles.actionLinkPrimary}>
