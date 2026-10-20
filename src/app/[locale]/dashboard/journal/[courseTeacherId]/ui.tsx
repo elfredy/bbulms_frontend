@@ -4,7 +4,14 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import styles from "./journal.module.css";
 
-import type { CourseEvaluationItem, CourseMeetingItem, JournalCell, StudentRosterItem } from "@/lib/api";
+import type {
+  CourseEvaluationItem,
+  CourseMeetingItem,
+  JournalCell,
+  JournalMeetingGrid,
+  JournalMeetingsResponse,
+  StudentRosterItem,
+} from "@/lib/api";
 import { fmtClockRange, fmtClockTime } from "@/lib/clock-time";
 import {
   confirmTeacherCourseExercise,
@@ -12,13 +19,16 @@ import {
   requestTeacherExerciseUnlock,
   requestTeacherJournalUnlock,
   createTeacherCourseExercise,
+  deleteTeacherCourseExercise,
   getTeacherCourseExerciseAllPoints,
   getTeacherCourseExercises,
   getTeacherJournalGrid,
+  getTeacherJournalMeetings,
   getTeacherJournalPointsGrid,
   getTeacherJournalQbCounts,
   getTeacherJournalResultSimple,
   upsertTeacherCourseExercisePointsBulk,
+  updateTeacherCourseExercise,
   upsertTeacherJournalCell,
   upsertTeacherJournalCellsBulk,
   upsertTeacherJournalPoint,
@@ -352,6 +362,40 @@ function firstUnconfirmedWindowStart(
   return start;
 }
 
+function cellsFromMeetingGrids(items: JournalMeetingGrid[]): {
+  cells: Record<string, Record<string, JournalCell>>;
+  locked: Record<string, boolean>;
+} {
+  const cells: Record<string, Record<string, JournalCell>> = {};
+  const locked: Record<string, boolean> = {};
+  for (const item of items) {
+    const mid = String(item.course_meeting_id);
+    const map: Record<string, JournalCell> = {};
+    for (const c of item.cells) map[key(c.student_id, c.course_eva_id)] = c;
+    cells[mid] = map;
+    if (item.meeting_confirmed || item.editable === false) locked[mid] = true;
+  }
+  return { cells, locked };
+}
+
+function lockedFromMeetings(
+  meetings: CourseMeetingItem[],
+  grids: JournalMeetingGrid[] | null,
+): Record<string, boolean> {
+  const locked = grids ? cellsFromMeetingGrids(grids).locked : {};
+  for (const m of meetings) {
+    if (isConfirmedStatus(m.point_status)) locked[String(m.course_meeting_id)] = true;
+  }
+  return locked;
+}
+
+function initialMeetingId(meetings: CourseMeetingItem[], semesterStart: string | null): string {
+  const cols = buildMeetingColumns(meetings, semesterStart);
+  const today = todayInBaku();
+  const idxToday = cols.findIndex((c) => dateOnly(c.m.meeting_date) === today);
+  return String(cols[idxToday >= 0 ? idxToday : 0]?.m.course_meeting_id ?? "");
+}
+
 function buildMeetingColumns(meetings: CourseMeetingItem[], semesterStart: string | null): MeetingColumn[] {
   const cols = meetings
     .filter((m) => Boolean(dateOnly(m.meeting_date)))
@@ -372,6 +416,7 @@ export function JournalClient({
   meetings,
   roster,
   evaluations,
+  initialMeetingGrids = null,
   initialTab,
 }: {
   locale: string;
@@ -385,6 +430,7 @@ export function JournalClient({
   meetings: CourseMeetingItem[];
   roster: StudentRosterItem[];
   evaluations: CourseEvaluationItem[];
+  initialMeetingGrids?: JournalMeetingsResponse | null;
   initialTab?: TabId;
 }) {
   const [liveMeetings, setLiveMeetings] = useState(meetings);
@@ -400,15 +446,25 @@ export function JournalClient({
   );
 
   const [tab, setTab] = useState<TabId>(initialTab ?? "attendance");
-  const [meetingId, setMeetingId] = useState<string>("");
+  const [meetingId, setMeetingId] = useState<string>(() => initialMeetingId(meetings, semesterStart ?? null));
   const [cells, setCells] = useState<Record<string, JournalCell>>({});
   const [pointCells, setPointCells] = useState<Record<string, JournalCell>>({});
   const [pendingByKey, setPendingByKey] = useState<Record<string, string>>({});
   const [exercisePendingByKey, setExercisePendingByKey] = useState<Record<string, string>>({});
   const [meetingPendingByKey, setMeetingPendingByKey] = useState<Record<string, string>>({});
-  const [meetingWindowStart, setMeetingWindowStart] = useState<number>(0);
-  const [meetingWindowCellsByMeetingId, setMeetingWindowCellsByMeetingId] = useState<Record<string, Record<string, JournalCell>>>({});
-  const [meetingLockedById, setMeetingLockedById] = useState<Record<string, boolean>>({});
+  const [meetingWindowStart, setMeetingWindowStart] = useState<number>(() =>
+    firstUnconfirmedWindowStart(
+      buildMeetingColumns(meetings, semesterStart ?? null),
+      lockedFromMeetings(meetings, initialMeetingGrids?.meetings ?? null),
+      COLUMN_WINDOW_SIZE,
+    ),
+  );
+  const [meetingWindowCellsByMeetingId, setMeetingWindowCellsByMeetingId] = useState<Record<string, Record<string, JournalCell>>>(() =>
+    initialMeetingGrids ? cellsFromMeetingGrids(initialMeetingGrids.meetings).cells : {},
+  );
+  const [meetingLockedById, setMeetingLockedById] = useState<Record<string, boolean>>(() =>
+    lockedFromMeetings(meetings, initialMeetingGrids?.meetings ?? null),
+  );
   const [touchedMeetingIds, setTouchedMeetingIds] = useState<Record<string, boolean>>({});
   const [touchedReady, setTouchedReady] = useState(false);
   const [appealOpenId, setAppealOpenId] = useState<string | null>(null);
@@ -443,6 +499,9 @@ export function JournalClient({
   const leaveAllowedRef = useRef(false);
   const needsLeaveWarnRef = useRef(false);
   const userPagedRef = useRef(false);
+  const loadedMeetingIdsRef = useRef<Set<string>>(
+    new Set(initialMeetingGrids ? meetings.map((m) => String(m.course_meeting_id)) : []),
+  );
 
   const [exerciseItemsByType, setExerciseItemsByType] = useState<Record<string, { items: any[] }>>({});
   const [exercisePointsByExerciseId, setExercisePointsByExerciseId] = useState<Record<string, Record<string, string>>>({});
@@ -596,7 +655,7 @@ export function JournalClient({
         setSavingHint("Yadda saxlanılır…");
         const res = await upsertTeacherCourseExercisePointsBulk(courseId, exType, exerciseId, { cells });
         if (!res) {
-          setErr("Yadda saxlanmadı (1 həftə limiti bitmiş və ya təsdiqlənmiş ola bilər)");
+          setErr("Yadda saxlanmadı (tarix bağlı və ya təsdiqlənmiş ola bilər)");
           exerciseSaveQueueRef.current[qk] = { type: exType, cells: [...cells, ...(exerciseSaveQueueRef.current[qk]?.cells ?? [])] };
           ok = false;
           break;
@@ -813,48 +872,55 @@ export function JournalClient({
     if (isQbText(raw)) setNowMs(Date.now());
   }
 
-  function loadMeetingWindowGrids(mids: string[]) {
+  async function loadMeetingWindowGrids(mids: string[]) {
     const uniq = Array.from(new Set(mids.filter(Boolean)));
     if (uniq.length === 0) return;
     setErr(null);
-    startTransition(async () => {
-      const results = await Promise.all(uniq.map((mid) => getTeacherJournalGrid(courseId, mid)));
-      const next: Record<string, Record<string, JournalCell>> = {};
-      const locked: Record<string, boolean> = {};
-      for (let i = 0; i < uniq.length; i++) {
-        const mid = uniq[i];
-        const res = results[i];
-        if (!res) continue;
-        const map: Record<string, JournalCell> = {};
-        for (const c of res.cells) map[key(c.student_id, c.course_eva_id)] = c;
-        next[mid] = map;
-        locked[mid] = Boolean(res.meeting_confirmed) || res.editable === false || isConfirmedStatus(
-          liveMeetings.find((m) => String(m.course_meeting_id) === mid)?.point_status
-        );
+    let res: Awaited<ReturnType<typeof getTeacherJournalMeetings>>;
+    try {
+      res = await getTeacherJournalMeetings(courseId, uniq);
+    } catch {
+      setErr("Qiymətlər yüklənmədi");
+      return;
+    }
+    if (!res) {
+      setErr("Qiymətlər yüklənmədi");
+      return;
+    }
+    const parsed = cellsFromMeetingGrids(res.meetings);
+    const next = { ...parsed.cells };
+    const locked = { ...parsed.locked };
+    for (const mid of uniq) {
+      if (!next[mid]) next[mid] = {};
+      if (
+        isConfirmedStatus(liveMeetings.find((m) => String(m.course_meeting_id) === mid)?.point_status)
+      ) {
+        locked[mid] = true;
       }
-      setMeetingWindowCellsByMeetingId((prev) => {
-        const merged = { ...prev, ...next };
-        const pending = meetingPendingRef.current;
-        for (const [k, v] of Object.entries(pending)) {
-          const parts = k.split(":");
-          const pmid = parts[0];
-          const studentId = parts[1];
-          const courseEvaId = parts[2];
-          if (!pmid || !studentId || !courseEvaId || !merged[pmid]) continue;
-          merged[pmid] = {
-            ...merged[pmid],
-            [key(studentId, courseEvaId)]: { student_id: studentId, course_eva_id: courseEvaId, value: v || null },
-          };
-        }
-        return merged;
-      });
-      setMeetingLockedById((prev) => ({ ...prev, ...locked }));
+    }
+    setMeetingWindowCellsByMeetingId((prev) => {
+      const merged = { ...prev, ...next };
+      const pending = meetingPendingRef.current;
+      for (const [k, v] of Object.entries(pending)) {
+        const parts = k.split(":");
+        const pmid = parts[0];
+        const studentId = parts[1];
+        const courseEvaId = parts[2];
+        if (!pmid || !studentId || !courseEvaId || !merged[pmid]) continue;
+        merged[pmid] = {
+          ...merged[pmid],
+          [key(studentId, courseEvaId)]: { student_id: studentId, course_eva_id: courseEvaId, value: v || null },
+        };
+      }
+      return merged;
     });
+    setMeetingLockedById((prev) => ({ ...prev, ...locked }));
+    for (const mid of uniq) loadedMeetingIdsRef.current.add(mid);
   }
 
   function loadMeetingGrid(mid: string) {
     setErr(null);
-    startTransition(async () => {
+    void (async () => {
       const res = await getTeacherJournalGrid(courseId, mid);
       if (!res) {
         setErr("Jurnal yüklənmədi");
@@ -866,12 +932,12 @@ export function JournalClient({
       }
       setCells(map);
       setPendingByKey({});
-    });
+    })();
   }
 
   function loadPointsGrid() {
     setErr(null);
-    startTransition(async () => {
+    void (async () => {
       const res = await getTeacherJournalPointsGrid(courseId);
       if (!res) {
         setErr("Qiymətlər yüklənmədi");
@@ -883,12 +949,12 @@ export function JournalClient({
       }
       setPointCells(map);
       setPendingByKey({});
-    });
+    })();
   }
 
   function loadResult() {
     setErr(null);
-    startTransition(async () => {
+    void (async () => {
       const res = await getTeacherJournalResultSimple(courseId);
       if (!res) {
         // don't block the rest of the page if this fails
@@ -907,7 +973,7 @@ export function JournalClient({
         };
       }
       setResultByStudentId(map);
-    });
+    })();
   }
 
   function loadQbCounts() {
@@ -920,7 +986,7 @@ export function JournalClient({
   }
 
   function loadExercises(type: "colloquium" | "referat") {
-    startTransition(async () => {
+    void (async () => {
       const [list, allPts] = await Promise.all([
         getTeacherCourseExercises(courseId, type),
         getTeacherCourseExerciseAllPoints(courseId, type),
@@ -971,6 +1037,53 @@ export function JournalClient({
     });
   }
 
+  function forgetExerciseDrafts(exType: "colloquium" | "referat", exerciseId: string) {
+    const prefix = `${exType}:${exerciseId}:`;
+    delete exerciseSaveQueueRef.current[`${exType}:${exerciseId}`];
+    const nextPending: Record<string, string> = {};
+    for (const [k, v] of Object.entries(exercisePendingRef.current)) {
+      if (!k.startsWith(prefix)) nextPending[k] = v;
+    }
+    exercisePendingRef.current = nextPending;
+    setExercisePendingByKey(nextPending);
+  }
+
+  function changeExerciseDate(exType: "colloquium" | "referat", exerciseId: string, startDate: string) {
+    const next = startDate.trim();
+    if (!next) return;
+    const current = (exerciseItemsByType[exType]?.items ?? []).find((it) => String(it.course_execises_id) === exerciseId);
+    if (current && dateOnly(current.start_date) === next) return;
+    setErr(null);
+    startTransition(async () => {
+      const res = await updateTeacherCourseExercise(courseId, exerciseId, exType, next);
+      if (!res.ok) {
+        setErr(res.error);
+        return;
+      }
+      loadExercises(exType);
+    });
+  }
+
+  function removeExercise(exType: "colloquium" | "referat", exerciseId: string, label: string) {
+    if (!window.confirm(`${label} tarixini silmək istəyirsiniz? Bu tarixə yazılmış qiymətlər də silinəcək.`)) return;
+    setErr(null);
+    startTransition(async () => {
+      const res = await deleteTeacherCourseExercise(courseId, exerciseId, exType);
+      if (!res.ok) {
+        setErr(res.error);
+        return;
+      }
+      forgetExerciseDrafts(exType, exerciseId);
+      setExercisePointsByExerciseId((prev) => {
+        const next = { ...prev };
+        delete next[exerciseId];
+        return next;
+      });
+      loadExercises(exType);
+      loadResult();
+    });
+  }
+
   function stageExercisePoint(type: "colloquium" | "referat", exerciseId: string, studentId: string, value: string) {
     setErr(null);
     const next = value.trim();
@@ -990,31 +1103,19 @@ export function JournalClient({
     queueExerciseCells(type, exerciseId, [{ student_id: studentId, value: next || null }]);
   }
 
-  // initial load
+  // Davamiyyət xanaları server cavabındadır. Ümumi bal və kollokvium
+  // cədvəli kilidləməsin deyə boyandıqdan sonra yüklənir.
   useEffect(() => {
-    const initialLocked: Record<string, boolean> = {};
-    for (const m of meetings) {
-      const mid = String(m.course_meeting_id);
-      if (isConfirmedStatus(m.point_status)) initialLocked[mid] = true;
-    }
-    if (Object.keys(initialLocked).length) setMeetingLockedById(initialLocked);
-
-    const today = todayInBaku();
-    const idxToday = meetingColumns.findIndex((c) => dateOnly(c.m.meeting_date) === today);
-
-    const initialMeetingId =
-      String(meetingColumns[idxToday >= 0 ? idxToday : 0]?.m.course_meeting_id ?? "") ||
-      String(visibleMeetings[0]?.course_meeting_id ?? "") ||
-      String(meetings[0]?.course_meeting_id ?? "");
-    setMeetingId(initialMeetingId);
-    if (initialMeetingId) loadMeetingGrid(initialMeetingId);
-    loadPointsGrid();
-    loadResult();
     loadQbCounts();
-    loadExercises("colloquium");
-    loadExercises("referat");
+    const timer = window.setTimeout(() => {
+      loadResult();
+      loadPointsGrid();
+      loadExercises("colloquium");
+      loadExercises("referat");
+    }, 0);
+    return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [courseId]);
 
   useEffect(() => {
     setLiveMeetings(meetings);
@@ -1058,19 +1159,22 @@ export function JournalClient({
       void flushAllMeetingQueues();
       return;
     }
+    const mids = meetingColumns.map((c) => String(c.m.course_meeting_id));
+    const missing = mids.filter((id) => !loadedMeetingIdsRef.current?.has(id));
+    if (!missing.length) return;
     let cancelled = false;
     void (async () => {
       await flushAllMeetingQueues();
       if (cancelled) return;
-      const mids = meetingWindow.map((m) => String(m.course_meeting_id));
-      if (meetingId && !mids.includes(meetingId)) mids.push(meetingId);
-      loadMeetingWindowGrids(mids);
+      const still = missing.filter((id) => !loadedMeetingIdsRef.current?.has(id));
+      if (!still.length) return;
+      await loadMeetingWindowGrids(still);
     })();
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, meetingWindowStart, meetingColumns.length, meetingId]);
+  }, [tab, courseId, meetingColumns.length]);
 
   function isMeetingEval(courseEvaId: string): boolean {
     return (evaById.get(courseEvaId)?.evaluation_code ?? "").trim() === "EVA_01";
@@ -1489,7 +1593,7 @@ export function JournalClient({
         if (pendingCells.length) {
           const res = await upsertTeacherCourseExercisePointsBulk(courseId, exType, exerciseId, { cells: pendingCells });
           if (!res) {
-            setErr("Yadda saxlanmadı (1 həftə limiti bitmiş və ya təsdiqlənmiş ola bilər)");
+            setErr("Yadda saxlanmadı (tarix bağlı və ya təsdiqlənmiş ola bilər)");
             return;
           }
         }
@@ -1567,8 +1671,6 @@ export function JournalClient({
                     const maxStart = Math.max(0, meetingColumns.length - COLUMN_WINDOW_SIZE);
                     setMeetingWindowStart(Math.min(idx, maxStart));
                   }
-                  loadMeetingGrid(mid);
-                  loadMeetingWindowGrids([mid]);
                 }}
                 disabled={visibleMeetings.length === 0}
               >
@@ -1998,7 +2100,9 @@ export function JournalClient({
                         </button>
                       </div>
                       <div className={styles.muted} style={{ alignSelf: "end" }}>
-                        Qaydalar: referat 1 dəfə; kollokvium sayı birdən çox ola bilər; hər tarix 1 həftə aktivdir. Bağlı və ya təsdiqlənmiş tarixdə müraciət ikonu açılır.
+                        {exType === "colloquium"
+                          ? "Kollokvium sayı birdən çox ola bilər. Tarix limiti müvəqqəti dayandırılıb: açılmış tarixi dəyişmək və silmək olar. Təsdiqlənmiş tarix bağlı qalır."
+                          : "Referat 1 dəfə yazılır və hər tarix 1 həftə aktivdir. Bağlı və ya təsdiqlənmiş tarixdə müraciət ikonu açılır."}
                       </div>
                     </div>
 
@@ -2011,11 +2115,23 @@ export function JournalClient({
                             const appealKey = `ex:${eid}`;
                             const appeal = String(it.unlock_request ?? "").trim();
                             const canAppeal = !it.editable;
+                            const canEditDate = exType === "colloquium" && Boolean(it.editable) && !it.confirmed;
                             return (
                             <th key={eid} className={`${styles.th} ${styles.thCell}`}>
                               <div className={styles.halfHead}>
                                 <div className={styles.halfMeta}>
-                                  <span className={styles.halfDate}>{fmtDateLabel(it.start_date)}</span>
+                                  {canEditDate ? (
+                                    <input
+                                      className={styles.exerciseDateInput}
+                                      type="date"
+                                      value={dateOnly(it.start_date)}
+                                      aria-label="Kollokvium tarixi"
+                                      disabled={isPending}
+                                      onChange={(ev) => changeExerciseDate(exType, eid, ev.target.value)}
+                                    />
+                                  ) : (
+                                    <span className={styles.halfDate}>{fmtDateLabel(it.start_date)}</span>
+                                  )}
                                   {canAppeal ? (
                                     <button
                                       type="button"
@@ -2067,6 +2183,16 @@ export function JournalClient({
                                 ) : null}
                                 {canAppeal && appeal && appealOpenId !== appealKey ? (
                                   <div className={styles.appealNote}>Müraciət göndərilib</div>
+                                ) : null}
+                                {canEditDate ? (
+                                  <button
+                                    type="button"
+                                    className={styles.exerciseDeleteBtn}
+                                    disabled={isPending}
+                                    onClick={() => removeExercise(exType, eid, fmtDateLabel(it.start_date))}
+                                  >
+                                    Sil
+                                  </button>
                                 ) : null}
                                 <div className={styles.muted} style={{ fontSize: 12 }}>
                                   {it.confirmed ? "Təsdiqlənib" : it.editable ? "Aktiv" : "Bağlı"}

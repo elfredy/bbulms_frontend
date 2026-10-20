@@ -10,6 +10,7 @@ import type {
   JournalBulkUpsertRequest,
   JournalConfirmRequest,
   JournalGridResponse,
+  JournalMeetingsResponse,
   JournalPointsGridResponse,
   JournalResultResponse,
   JournalUpsertRequest,
@@ -32,6 +33,22 @@ async function readErrorDetail(res: Response): Promise<string | null> {
     /* ignore */
   }
   return null;
+}
+
+export async function getTeacherJournalMeetings(
+  courseId: string,
+  meetingIds: string[]
+): Promise<JournalMeetingsResponse | null> {
+  const ids = Array.from(new Set(meetingIds.map((id) => String(id).trim()).filter(Boolean)));
+  if (!ids.length) return { course_id: courseId, meetings: [] };
+  const res = await fetch(
+    `/api/teacher/courses/${courseId}/journal-meetings?meeting_ids=${encodeURIComponent(ids.join(","))}`,
+    {
+      credentials: "include",
+      cache: "no-store",
+    }
+  );
+  return jsonOrNull(res);
 }
 
 export async function getTeacherJournalGrid(courseId: string, meetingId: string): Promise<JournalGridResponse | null> {
@@ -179,6 +196,39 @@ export async function createTeacherCourseExercise(courseId: string, body: Course
     body: JSON.stringify(body),
   });
   return jsonOrNull(res);
+}
+
+export async function updateTeacherCourseExercise(
+  courseId: string,
+  courseExecisesId: string,
+  type: string,
+  startDate: string,
+): Promise<{ ok: true; item: CourseExerciseItem } | { ok: false; error: string }> {
+  const res = await fetch(
+    `/api/teacher/courses/${courseId}/course-exercises/${encodeURIComponent(courseExecisesId)}?type=${encodeURIComponent(type)}`,
+    {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ start_date: startDate }),
+    },
+  );
+  if (!res.ok) return { ok: false, error: (await readErrorDetail(res)) || "Tarix dəyişmədi" };
+  const item = (await res.json()) as CourseExerciseItem;
+  return { ok: true, item };
+}
+
+export async function deleteTeacherCourseExercise(
+  courseId: string,
+  courseExecisesId: string,
+  type: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const res = await fetch(
+    `/api/teacher/courses/${courseId}/course-exercises/${encodeURIComponent(courseExecisesId)}?type=${encodeURIComponent(type)}`,
+    { method: "DELETE", credentials: "include" },
+  );
+  if (!res.ok) return { ok: false, error: (await readErrorDetail(res)) || "Tarix silinmədi" };
+  return { ok: true };
 }
 
 export async function getTeacherCourseExerciseAllPoints(

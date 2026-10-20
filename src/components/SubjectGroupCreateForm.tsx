@@ -203,8 +203,14 @@ function subjectLabel(o: SubjectOpt) {
     .join(" ");
 }
 
+function teacherPersonName(name: string | null | undefined, id: string) {
+  const value = (name || "").trim();
+  if (!value || value === id) return null;
+  return value;
+}
+
 function teacherSearchLabel(t: { id: string; name?: string | null; org_name_az?: string | null; position_name_az?: string | null }) {
-  return [t.position_name_az, t.name || t.id, t.org_name_az].filter(Boolean).join(" · ");
+  return [t.position_name_az, teacherPersonName(t.name, t.id) || t.id, t.org_name_az].filter(Boolean).join(" · ");
 }
 
 function n0(v: number | null | undefined) {
@@ -346,6 +352,7 @@ export function SubjectGroupCreateForm({
   const [subjects, setSubjects] = useState<SubjectOpt[]>([]);
   const [groups, setGroups] = useState<Opt[]>([]);
   const [teachers, setTeachers] = useState<Opt[]>([]);
+  const [knownTeachers, setKnownTeachers] = useState<Opt[]>([]);
   const [teacherQuery, setTeacherQuery] = useState("");
   const [teacherPicks, setTeacherPicks] = useState<TeacherPick[]>([{ teacher_id: "", lesson_type_id: "" }]);
   const [students, setStudents] = useState<Opt[]>([]);
@@ -369,6 +376,29 @@ export function SubjectGroupCreateForm({
     startDate: Boolean(initialCourseId),
     evas: Boolean(initialCourseId),
   });
+
+  function rememberTeachers(rows: Array<{ id?: string | null; name?: string | null; org_name_az?: string | null; position_name_az?: string | null }>) {
+    const incoming = rows.flatMap((row) => {
+      const id = String(row.id ?? "").trim();
+      const name = teacherPersonName(row.name, id);
+      if (!id || !name) return [];
+      return [{ id, name, org_name_az: row.org_name_az ?? null, position_name_az: row.position_name_az ?? null }];
+    });
+    if (!incoming.length) return;
+    setKnownTeachers((prev) => {
+      const map = new Map(prev.map((t) => [t.id, t]));
+      for (const row of incoming) {
+        const old = map.get(row.id);
+        map.set(row.id, {
+          id: row.id,
+          name: row.name || old?.name || null,
+          org_name_az: row.org_name_az || old?.org_name_az || null,
+          position_name_az: row.position_name_az || old?.position_name_az || null,
+        });
+      }
+      return Array.from(map.values());
+    });
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -446,13 +476,18 @@ export function SubjectGroupCreateForm({
           access_l: Boolean(row.access_l),
         }));
         if (evaRows.length) setEvas(evaRows);
-        const tch = (d.teachers ?? []) as TeacherPick[];
+        const tch = (d.teachers ?? []) as Array<TeacherPick & { name?: string | null }>;
         setTeacherPicks(tch.length ? tch.map((t) => ({ teacher_id: String(t.teacher_id), lesson_type_id: String(t.lesson_type_id) })) : [{ teacher_id: "", lesson_type_id: "" }]);
+        const halves = (d.half_groups ?? []) as Array<HalfPick & { teacher_name?: string | null }>;
+        rememberTeachers([
+          ...tch.map((t) => ({ id: String(t.teacher_id ?? ""), name: t.name })),
+          ...halves.map((h) => ({ id: h.teacher_id ? String(h.teacher_id) : "", name: h.teacher_name })),
+        ]);
         const studs = (d.students ?? []) as Opt[];
         if (studs.length) setStudents(studs);
         setStudentIds((d.student_ids ?? []).map(String));
         setHalfPicks(
-          ((d.half_groups ?? []) as HalfPick[]).map((h) => ({
+          halves.map((h) => ({
             half_group_id: String(h.half_group_id),
             lesson_type_id: String(h.lesson_type_id),
             teacher_id: h.teacher_id ? String(h.teacher_id) : "",
@@ -615,9 +650,16 @@ export function SubjectGroupCreateForm({
       });
   }, [subjectId, evaluationType]);
 
+  const pinnedTeacherIds = useMemo(() => {
+    const ids = [...teacherPicks.map((t) => t.teacher_id), ...halfPicks.map((h) => h.teacher_id)]
+      .map((id) => id.trim())
+      .filter(Boolean);
+    return Array.from(new Set(ids)).sort().join(",");
+  }, [teacherPicks, halfPicks]);
+
   useEffect(() => {
     const q = teacherQuery.trim();
-    if (!orgId && q.length < 2) {
+    if (!orgId && q.length < 2 && !pinnedTeacherIds) {
       setTeachers([]);
       return;
     }
@@ -625,11 +667,24 @@ export function SubjectGroupCreateForm({
     if (orgId) params.set("organization_id", orgId);
     if (subjectId) params.set("education_plan_subject_id", subjectId);
     if (q.length >= 2) params.set("q", q);
+    if (pinnedTeacherIds) params.set("ids", pinnedTeacherIds);
+    let cancelled = false;
     fetch(`/api/admin/education-plans/lookups/teachers?${params}`, { credentials: "include", cache: "no-store" })
       .then((r) => (r.ok ? r.json() : { items: [] }))
-      .then((d) => setTeachers(d.items ?? []))
-      .catch(() => setTeachers([]));
-  }, [orgId, subjectId, teacherQuery]);
+      .then((d) => {
+        if (cancelled) return;
+        const items = (d.items ?? []) as Opt[];
+        setTeachers(items);
+        const pinned = new Set(pinnedTeacherIds.split(",").filter(Boolean));
+        rememberTeachers(items.filter((t) => pinned.has(t.id)));
+      })
+      .catch(() => {
+        if (!cancelled) setTeachers([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [orgId, subjectId, teacherQuery, pinnedTeacherIds]);
 
   useEffect(() => {
     if (!groupIds.length) {
@@ -1021,12 +1076,31 @@ export function SubjectGroupCreateForm({
     "";
   const selectedTeacherIds = [...teacherPicks.map((t) => t.teacher_id), ...halfPicks.map((h) => h.teacher_id)].filter(Boolean);
   const teacherOptions = (() => {
-    const map = new Map(teachers.map((t) => [t.id, t]));
+    const map = new Map<string, Opt>();
+    for (const t of knownTeachers) {
+      if (t.id) map.set(t.id, t);
+    }
+    for (const t of teachers) {
+      if (!t.id) continue;
+      const prev = map.get(t.id);
+      map.set(t.id, {
+        ...t,
+        name: teacherPersonName(t.name, t.id) || prev?.name || null,
+        org_name_az: t.org_name_az || prev?.org_name_az || null,
+        position_name_az: t.position_name_az || prev?.position_name_az || null,
+      });
+    }
     for (const id of selectedTeacherIds) {
-      if (!map.has(id)) map.set(id, { id, name: id });
+      if (!map.has(id)) map.set(id, { id });
     }
     return Array.from(map.values());
   })();
+
+  function selectTeacher(id: string) {
+    const picked = teacherOptions.find((t) => t.id === id);
+    if (picked) rememberTeachers([picked]);
+    return id;
+  }
 
   function studentLabel(sid: string) {
     const st = students.find((s) => s.id === sid);
@@ -1449,7 +1523,10 @@ export function SubjectGroupCreateForm({
                 <span className={styles.label}>Müəllim</span>
                 <SearchableSelect
                   value={row.teacher_id}
-                  onChange={(id) => setTeacherPicks((prev) => prev.map((x, i) => (i === idx ? { ...x, teacher_id: id } : x)))}
+                  onChange={(id) => {
+                    selectTeacher(id);
+                    setTeacherPicks((prev) => prev.map((x, i) => (i === idx ? { ...x, teacher_id: id } : x)));
+                  }}
                   placeholder="— seç —"
                   searchPlaceholder="Axtar…"
                   onQueryChange={setTeacherQuery}
@@ -1623,7 +1700,10 @@ export function SubjectGroupCreateForm({
                   <SearchableSelect
                     disabled={!picked}
                     value={picked?.teacher_id ?? ""}
-                    onChange={(id) => setHalfPicks((prev) => prev.map((x) => (x.half_group_id === hg.id ? { ...x, teacher_id: id } : x)))}
+                    onChange={(id) => {
+                      selectTeacher(id);
+                      setHalfPicks((prev) => prev.map((x) => (x.half_group_id === hg.id ? { ...x, teacher_id: id } : x)));
+                    }}
                     placeholder="Müəllim (istəyə bağlı)"
                     searchPlaceholder="Axtar…"
                     onQueryChange={setTeacherQuery}

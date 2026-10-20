@@ -530,6 +530,18 @@ export type JournalGridResponse = {
   editable?: boolean;
 };
 
+export type JournalMeetingGrid = {
+  course_meeting_id: string;
+  cells: JournalCell[];
+  meeting_confirmed?: boolean;
+  editable?: boolean;
+};
+
+export type JournalMeetingsResponse = {
+  course_id: string;
+  meetings: JournalMeetingGrid[];
+};
+
 export type JournalUpsertRequest = {
   student_id: string;
   course_eva_id: string;
@@ -1083,6 +1095,26 @@ export async function getTeacherCourseEvaluations(courseId: string): Promise<Cou
   if (!header) return null;
   const origin = serverApiBase();
   const res = await fetch(`${origin}/api/teacher/courses/${courseId}/evaluations`, {
+    headers: { cookie: header },
+    cache: "no-store",
+  });
+  if (res.status === 403) return null;
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function getTeacherJournalMeetings(
+  courseId: string,
+  meetingIds: string[]
+): Promise<JournalMeetingsResponse | null> {
+  const ids = Array.from(new Set(meetingIds.map((id) => String(id).trim()).filter(Boolean)));
+  if (!ids.length) return { course_id: courseId, meetings: [] };
+  const cookieStore = await cookies();
+  const header = cookieStore.toString();
+  if (!header) return null;
+  const origin = serverApiBase();
+  const qs = encodeURIComponent(ids.join(","));
+  const res = await fetch(`${origin}/api/teacher/courses/${courseId}/journal-meetings?meeting_ids=${qs}`, {
     headers: { cookie: header },
     cache: "no-store",
   });

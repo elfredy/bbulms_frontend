@@ -9,6 +9,7 @@ import {
   getTeacherCourseMeetings,
   getTeacherCourseRoster,
   getTeacherCourses,
+  getTeacherJournalMeetings,
   type TeacherCourseItem,
 } from "@/lib/api";
 
@@ -93,10 +94,12 @@ export default async function JournalPage({ params, searchParams }: Props) {
     return String(a.course_meeting_id).localeCompare(String(b.course_meeting_id));
   });
 
-  const [roster, evals, teacherCourses] = await Promise.all([
+  const meetingIds = meetings.map((m) => String(m.course_meeting_id));
+  const [roster, evals, teacherCourses, gradeBundle] = await Promise.all([
     getTeacherCourseRoster(courseId, ctIds),
     getTeacherCourseEvaluations(courseId),
     getTeacherCourses(),
+    getTeacherJournalMeetings(courseId, meetingIds),
   ]);
   if (!roster || !evals) {
     return <p>{t("loadError")}</p>;
@@ -124,6 +127,7 @@ export default async function JournalPage({ params, searchParams }: Props) {
       meetings={meetings}
       roster={roster.students}
       evaluations={evals.evaluations}
+      initialMeetingGrids={gradeBundle}
       initialTab={initialTab}
     />
   );

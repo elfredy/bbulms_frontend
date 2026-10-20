@@ -446,6 +446,37 @@
   white-space: nowrap;
 }
 
+.exerciseDateInput {
+  width: 8.4rem;
+  height: 26px;
+  padding: 0 0.2rem;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #0f172a;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.exerciseDeleteBtn {
+  margin-top: 2px;
+  padding: 2px 8px;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  background: #fff;
+  color: #b91c1c;
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.exerciseDeleteBtn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
 .lockedNote {
   font-size: 0.68rem;
   font-weight: 700;
