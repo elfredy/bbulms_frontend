@@ -188,14 +188,19 @@ export async function getTeacherCourseExercises(courseId: string, type: string):
   return jsonOrNull(res);
 }
 
-export async function createTeacherCourseExercise(courseId: string, body: CourseExerciseCreateRequest): Promise<CourseExerciseItem | null> {
+export async function createTeacherCourseExercise(
+  courseId: string,
+  body: CourseExerciseCreateRequest,
+): Promise<{ ok: true; item: CourseExerciseItem } | { ok: false; error: string }> {
   const res = await fetch(`/api/teacher/courses/${courseId}/course-exercises`, {
     method: "POST",
     credentials: "include",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
-  return jsonOrNull(res);
+  if (!res.ok) return { ok: false, error: (await readErrorDetail(res)) || "Yeni tarix əlavə olunmadı" };
+  const item = (await res.json()) as CourseExerciseItem;
+  return { ok: true, item };
 }
 
 export async function updateTeacherCourseExercise(

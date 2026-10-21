@@ -496,6 +496,7 @@ export function JournalClient({
   const exerciseSavingRef = useRef<Record<string, boolean>>({});
   const meetingPendingRef = useRef<Record<string, string>>({});
   const exercisePendingRef = useRef<Record<string, string>>({});
+  const exerciseLoadGen = useRef<Record<string, number>>({});
   const leaveAllowedRef = useRef(false);
   const needsLeaveWarnRef = useRef(false);
   const userPagedRef = useRef(false);
@@ -509,6 +510,7 @@ export function JournalClient({
     colloquium: "",
     referat: "",
   });
+  const [exerciseBusy, setExerciseBusy] = useState(false);
 
   const evalAttendance = useMemo(() => byCode(evaluations, "EVA_01"), [evaluations]);
   const evalSeminar = useMemo(() => byCode(evaluations, "EVA_02"), [evaluations]);
@@ -986,12 +988,18 @@ export function JournalClient({
   }
 
   function loadExercises(type: "colloquium" | "referat") {
+    const gen = (exerciseLoadGen.current[type] ?? 0) + 1;
+    exerciseLoadGen.current[type] = gen;
     void (async () => {
       const [list, allPts] = await Promise.all([
         getTeacherCourseExercises(courseId, type),
         getTeacherCourseExerciseAllPoints(courseId, type),
       ]);
-      if (!list) return;
+      if (exerciseLoadGen.current[type] !== gen) return;
+      if (!list) {
+        setErr(type === "colloquium" ? "Kollokvium tarixləri yüklənmədi" : "Referat tarixləri yüklənmədi");
+        return;
+      }
       setExerciseItemsByType((prev) => ({ ...prev, [type]: { items: list.items } }));
 
       const pointsMapByExerciseId: Record<string, Record<string, string>> = {};
@@ -1025,16 +1033,28 @@ export function JournalClient({
       return;
     }
     setErr(null);
-    startTransition(async () => {
+    setExerciseBusy(true);
+    try {
       const created = await createTeacherCourseExercise(courseId, { type, start_date: d });
-      if (!created) {
-        setErr("Yeni tarix əlavə olunmadı");
+      if (!created.ok) {
+        setErr(created.error);
         return;
       }
+      exerciseLoadGen.current[type] = (exerciseLoadGen.current[type] ?? 0) + 1;
+      setExerciseItemsByType((prev) => {
+        const items = [...(prev[type]?.items ?? [])];
+        const id = String(created.item.course_execises_id);
+        if (!items.some((it) => String(it.course_execises_id) === id)) items.push(created.item);
+        return { ...prev, [type]: { items } };
+      });
       setNewExerciseDateByType((prev) => ({ ...prev, [type]: "" }));
       loadExercises(type);
       loadResult();
-    });
+    } catch {
+      setErr("Yeni tarix əlavə olunmadı");
+    } finally {
+      setExerciseBusy(false);
+    }
   }
 
   function forgetExerciseDrafts(exType: "colloquium" | "referat", exerciseId: string) {
@@ -2082,28 +2102,34 @@ export function JournalClient({
                       ) : null}
                     </div>
 
-                    <div className={styles.controls} style={{ marginBottom: 12 }}>
-                      <div className={styles.field}>
+                    <div className={styles.exerciseAdd}>
+                      <div className={`${styles.field} ${styles.exerciseDate}`}>
                         <div className={styles.label}>Tarix</div>
                         <input
                           className={styles.select}
                           type="date"
                           value={newExerciseDateByType[exType] ?? ""}
-                          onChange={(e) => setNewExerciseDateByType((prev) => ({ ...prev, [exType]: String(e.target.value) }))}
-                          disabled={isPending}
+                          onChange={(e) => {
+                            setNewExerciseDateByType((prev) => ({ ...prev, [exType]: String(e.target.value) }));
+                            setErr(null);
+                          }}
+                          disabled={exerciseBusy}
                         />
                       </div>
-                      <div className={styles.field}>
-                        <div className={styles.label}>&nbsp;</div>
-                        <button type="button" className={styles.bulkButton} onClick={() => addExercise(exType as any)} disabled={isPending}>
-                          Əlavə et
-                        </button>
-                      </div>
-                      <div className={styles.muted} style={{ alignSelf: "end" }}>
+                      <button
+                        type="button"
+                        className={`${styles.btn} ${styles.btnPrimary} ${styles.addButton}`}
+                        onClick={() => void addExercise(exType)}
+                        disabled={exerciseBusy}
+                      >
+                        {exerciseBusy ? "Əlavə olunur…" : "Əlavə et"}
+                      </button>
+                      <p className={styles.exerciseHint}>
                         {exType === "colloquium"
-                          ? "Kollokvium sayı birdən çox ola bilər. Tarix limiti müvəqqəti dayandırılıb: açılmış tarixi dəyişmək və silmək olar. Təsdiqlənmiş tarix bağlı qalır."
-                          : "Referat 1 dəfə yazılır və hər tarix 1 həftə aktivdir. Bağlı və ya təsdiqlənmiş tarixdə müraciət ikonu açılır."}
-                      </div>
+                          ? "Tarix limiti dayandırılıb. Açılmış tarixi dəyişmək və silmək olar. Təsdiqlənmiş tarix bağlı qalır."
+                          : "Referat 1 dəfə yazılır və hər tarix 1 həftə aktivdir."}
+                      </p>
+                      {err ? <p className={styles.exerciseError}>{err}</p> : null}
                     </div>
 
                     <table className={styles.table}>
@@ -2115,7 +2141,7 @@ export function JournalClient({
                             const appealKey = `ex:${eid}`;
                             const appeal = String(it.unlock_request ?? "").trim();
                             const canAppeal = !it.editable;
-                            const canEditDate = exType === "colloquium" && Boolean(it.editable) && !it.confirmed;
+                            const canEditDate = exType === "colloquium" && !it.confirmed;
                             return (
                             <th key={eid} className={`${styles.th} ${styles.thCell}`}>
                               <div className={styles.halfHead}>
@@ -2216,9 +2242,9 @@ export function JournalClient({
                               </td>
                               {items.map((it) => {
                                 const current = exercisePointDisplay(exercisePointsByExerciseId[it.course_execises_id]?.[s.student_id]);
+                                const cellLocked = exType === "colloquium" ? Boolean(it.confirmed) : !it.editable;
                                 const started =
-                                  !it.confirmed &&
-                                  it.editable &&
+                                  !cellLocked &&
                                   roster.some((x) =>
                                     exercisePointDisplay(exercisePointsByExerciseId[it.course_execises_id]?.[x.student_id]).trim() !== "",
                                   );
@@ -2237,7 +2263,7 @@ export function JournalClient({
                                         }));
                                         stageExercisePoint(exType as any, it.course_execises_id, s.student_id, next);
                                       }}
-                                      disabled={isPending || !it.editable}
+                                      disabled={cellLocked}
                                       title={cellMissing ? "Qiymət yazılmayıb" : undefined}
                                     >
                                       <option value="">—</option>

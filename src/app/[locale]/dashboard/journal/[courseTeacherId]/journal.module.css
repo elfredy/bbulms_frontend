@@ -83,8 +83,11 @@
   flex-wrap: wrap;
   align-items: flex-end;
   gap: 10px 12px;
+  width: max-content;
+  max-width: 100%;
   padding: 10px 12px 12px;
   border-bottom: 1px solid var(--border);
+  box-sizing: border-box;
 }
 
 .exerciseDate {
@@ -95,17 +98,28 @@
 
 .addButton {
   flex: 0 0 auto;
+  width: auto;
   align-self: flex-end;
   height: 38px;
+  padding: 0 0.9rem;
   white-space: nowrap;
 }
 
 .exerciseHint {
   flex: 1 1 220px;
   margin: 0;
-  padding: 0 0 6px;
+  padding: 0 0 8px;
   color: var(--muted);
   font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.exerciseError {
+  flex: 1 1 100%;
+  margin: 0;
+  color: #7a0a1a;
+  font-size: 0.8rem;
+  font-weight: 700;
   line-height: 1.35;
 }
 
