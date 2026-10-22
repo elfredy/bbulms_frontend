@@ -329,7 +329,7 @@ export function TimetableBuilder() {
 
   function startEdit() {
     const ok = window.confirm(
-      "Təsdiqlənmiş cədvəl yenilənsin? Bundan sonra dərsi silə, yerini dəyişə və yeni xanaya qoya bilərsiniz. Dəyişiklik dərhal cədvələ yazılır."
+      "Təsdiqlənmiş cədvəl yenilənsin? Bundan sonra dərsi silə, yerini dəyişə və yeni xanaya qoya bilərsiniz. Bu günə qədər təsdiqlənmiş dərslər köhnə tarixində qalır. Yeni gün yalnız bu gündən sonraya yazılır."
     );
     if (!ok) return;
     setError(null);
@@ -374,7 +374,7 @@ export function TimetableBuilder() {
     if (locked || !groupId) return;
     const ok = window.confirm(
       editing
-        ? "Bu dərs təsdiqlənmiş cədvəldən silinsin? Dəyişiklik dərhal yazılacaq."
+        ? "Bu dərs bu gündən sonra cədvəldən silinsin? Bu günə qədər təsdiqlənmiş dərslər köhnə tarixində qalır."
         : "Bu dərs xanadan silinsin?"
     );
     if (!ok) return;

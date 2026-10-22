@@ -1226,6 +1226,23 @@ export async function getTeacherCourseExercises(courseId: string, type: string):
   return res.json();
 }
 
+export async function getTeacherCourseExerciseAllPoints(
+  courseId: string,
+  type: string,
+): Promise<CourseExerciseAllPointsResponse | null> {
+  const cookieStore = await cookies();
+  const header = cookieStore.toString();
+  if (!header) return null;
+  const origin = serverApiBase();
+  const res = await fetch(
+    `${origin}/api/teacher/courses/${courseId}/course-exercise-points?type=${encodeURIComponent(type)}`,
+    { headers: { cookie: header }, cache: "no-store" },
+  );
+  if (res.status === 403) return null;
+  if (!res.ok) return null;
+  return res.json();
+}
+
 export async function createTeacherCourseExercise(courseId: string, body: CourseExerciseCreateRequest): Promise<CourseExerciseItem | null> {
   const cookieStore = await cookies();
   const header = cookieStore.toString();

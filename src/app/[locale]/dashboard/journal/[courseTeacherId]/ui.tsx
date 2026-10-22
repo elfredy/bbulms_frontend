@@ -6,6 +6,8 @@ import styles from "./journal.module.css";
 
 import type {
   CourseEvaluationItem,
+  CourseExerciseItem,
+  CourseExercisePointCell,
   CourseMeetingItem,
   JournalCell,
   JournalMeetingGrid,
@@ -176,6 +178,29 @@ function exercisePointDisplay(v: string | null | undefined): string {
   if (n == null) return s;
   if (n >= 0 && n <= 100) return String(n);
   return "";
+}
+
+function seedExerciseState(
+  lists: { colloquium: CourseExerciseItem[]; referat: CourseExerciseItem[] } | undefined,
+  points: { colloquium: CourseExercisePointCell[]; referat: CourseExercisePointCell[] } | undefined,
+): {
+  itemsByType: Record<string, { items: CourseExerciseItem[] }>;
+  pointsById: Record<string, Record<string, string>>;
+} {
+  const itemsByType: Record<string, { items: CourseExerciseItem[] }> = {
+    colloquium: { items: lists?.colloquium ?? [] },
+    referat: { items: lists?.referat ?? [] },
+  };
+  const pointsById: Record<string, Record<string, string>> = {};
+  for (const type of ["colloquium", "referat"] as const) {
+    for (const it of itemsByType[type].items) pointsById[String(it.course_execises_id)] = {};
+    for (const cell of points?.[type] ?? []) {
+      const eid = String(cell.course_execises_id);
+      if (!pointsById[eid]) pointsById[eid] = {};
+      pointsById[eid][String(cell.student_id)] = exercisePointDisplay(cell.value);
+    }
+  }
+  return { itemsByType, pointsById };
 }
 
 function fmtDateShort(d: string | null | undefined): string {
@@ -417,6 +442,8 @@ export function JournalClient({
   roster,
   evaluations,
   initialMeetingGrids = null,
+  initialExerciseLists,
+  initialExercisePoints,
   initialTab,
 }: {
   locale: string;
@@ -431,6 +458,8 @@ export function JournalClient({
   roster: StudentRosterItem[];
   evaluations: CourseEvaluationItem[];
   initialMeetingGrids?: JournalMeetingsResponse | null;
+  initialExerciseLists?: { colloquium: CourseExerciseItem[]; referat: CourseExerciseItem[] };
+  initialExercisePoints?: { colloquium: CourseExercisePointCell[]; referat: CourseExercisePointCell[] };
   initialTab?: TabId;
 }) {
   const [liveMeetings, setLiveMeetings] = useState(meetings);
@@ -504,8 +533,12 @@ export function JournalClient({
     new Set(initialMeetingGrids ? meetings.map((m) => String(m.course_meeting_id)) : []),
   );
 
-  const [exerciseItemsByType, setExerciseItemsByType] = useState<Record<string, { items: any[] }>>({});
-  const [exercisePointsByExerciseId, setExercisePointsByExerciseId] = useState<Record<string, Record<string, string>>>({});
+  const [exerciseItemsByType, setExerciseItemsByType] = useState(() =>
+    seedExerciseState(initialExerciseLists, initialExercisePoints).itemsByType,
+  );
+  const [exercisePointsByExerciseId, setExercisePointsByExerciseId] = useState(() =>
+    seedExerciseState(initialExerciseLists, initialExercisePoints).pointsById,
+  );
   const [newExerciseDateByType, setNewExerciseDateByType] = useState<Record<string, string>>({
     colloquium: "",
     referat: "",
@@ -991,10 +1024,18 @@ export function JournalClient({
     const gen = (exerciseLoadGen.current[type] ?? 0) + 1;
     exerciseLoadGen.current[type] = gen;
     void (async () => {
-      const [list, allPts] = await Promise.all([
-        getTeacherCourseExercises(courseId, type),
-        getTeacherCourseExerciseAllPoints(courseId, type),
-      ]);
+      let list;
+      let allPts;
+      try {
+        [list, allPts] = await Promise.all([
+          getTeacherCourseExercises(courseId, type),
+          getTeacherCourseExerciseAllPoints(courseId, type),
+        ]);
+      } catch {
+        if (exerciseLoadGen.current[type] !== gen) return;
+        setErr(type === "colloquium" ? "Kollokvium tarixləri yüklənmədi" : "Referat tarixləri yüklənmədi");
+        return;
+      }
       if (exerciseLoadGen.current[type] !== gen) return;
       if (!list) {
         setErr(type === "colloquium" ? "Kollokvium tarixləri yüklənmədi" : "Referat tarixləri yüklənmədi");
@@ -1122,6 +1163,15 @@ export function JournalClient({
     setExercisePendingByKey((prev) => ({ ...prev, [k]: next }));
     queueExerciseCells(type, exerciseId, [{ student_id: studentId, value: next || null }]);
   }
+
+  // Server artıq kollokvium/referat ballarını göndərir. Kurs dəyişəndə
+  // köhnə sütun qalmasın deyə state həmin məlumatla yenilənir.
+  useEffect(() => {
+    const seeded = seedExerciseState(initialExerciseLists, initialExercisePoints);
+    setExerciseItemsByType(seeded.itemsByType);
+    setExercisePointsByExerciseId(seeded.pointsById);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [courseId]);
 
   // Davamiyyət xanaları server cavabındadır. Ümumi bal və kollokvium
   // cədvəli kilidləməsin deyə boyandıqdan sonra yüklənir.
@@ -1351,10 +1401,10 @@ export function JournalClient({
         if (it.confirmed || !it.editable) continue;
         const eid = String(it.course_execises_id);
         const pts = exercisePointsByExerciseId[eid] ?? {};
-        const started = roster.some((s) => exercisePointDisplay(pts[s.student_id]).trim() !== "");
+        const started = roster.some((s) => exercisePointDisplay(pts[String(s.student_id)]).trim() !== "");
         if (!started) continue;
         for (const s of roster) {
-          if (!exercisePointDisplay(pts[s.student_id]).trim()) ids.add(s.student_id);
+          if (!exercisePointDisplay(pts[String(s.student_id)]).trim()) ids.add(s.student_id);
         }
       }
     }
@@ -2232,7 +2282,7 @@ export function JournalClient({
                       </thead>
                       <tbody>
                         {roster.map((s, idx) => {
-                          const vals = items.map((it) => parseNum(exercisePointDisplay(exercisePointsByExerciseId[it.course_execises_id]?.[s.student_id])) ?? 0);
+                          const vals = items.map((it) => parseNum(exercisePointDisplay(exercisePointsByExerciseId[String(it.course_execises_id)]?.[String(s.student_id)])) ?? 0);
                           const avg = exType === "colloquium" ? (items.length ? vals.reduce((a, b) => a + b, 0) / items.length : 0) : 0;
                           const rowMissing = incompleteStudentIds.has(s.student_id);
                           return (
@@ -2241,12 +2291,12 @@ export function JournalClient({
                                 {idx + 1}. {s.person_fullname}
                               </td>
                               {items.map((it) => {
-                                const current = exercisePointDisplay(exercisePointsByExerciseId[it.course_execises_id]?.[s.student_id]);
+                                const current = exercisePointDisplay(exercisePointsByExerciseId[String(it.course_execises_id)]?.[String(s.student_id)]);
                                 const cellLocked = exType === "colloquium" ? Boolean(it.confirmed) : !it.editable;
                                 const started =
                                   !cellLocked &&
                                   roster.some((x) =>
-                                    exercisePointDisplay(exercisePointsByExerciseId[it.course_execises_id]?.[x.student_id]).trim() !== "",
+                                    exercisePointDisplay(exercisePointsByExerciseId[String(it.course_execises_id)]?.[String(x.student_id)]).trim() !== "",
                                   );
                                 const cellMissing = started && !current.trim();
                                 const tone = cellMissing ? styles.cellMissing : cellToneClass(styles, current, false);

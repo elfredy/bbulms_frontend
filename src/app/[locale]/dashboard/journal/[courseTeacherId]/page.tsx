@@ -6,6 +6,8 @@ import { JournalClient } from "./ui";
 import {
   getMe,
   getTeacherCourseEvaluations,
+  getTeacherCourseExerciseAllPoints,
+  getTeacherCourseExercises,
   getTeacherCourseMeetings,
   getTeacherCourseRoster,
   getTeacherCourses,
@@ -95,12 +97,17 @@ export default async function JournalPage({ params, searchParams }: Props) {
   });
 
   const meetingIds = meetings.map((m) => String(m.course_meeting_id));
-  const [roster, evals, teacherCourses, gradeBundle] = await Promise.all([
-    getTeacherCourseRoster(courseId, ctIds),
-    getTeacherCourseEvaluations(courseId),
-    getTeacherCourses(),
-    getTeacherJournalMeetings(courseId, meetingIds),
-  ]);
+  const [roster, evals, teacherCourses, gradeBundle, colloquiumList, colloquiumPoints, referatList, referatPoints] =
+    await Promise.all([
+      getTeacherCourseRoster(courseId, ctIds),
+      getTeacherCourseEvaluations(courseId),
+      getTeacherCourses(),
+      getTeacherJournalMeetings(courseId, meetingIds),
+      getTeacherCourseExercises(courseId, "colloquium"),
+      getTeacherCourseExerciseAllPoints(courseId, "colloquium"),
+      getTeacherCourseExercises(courseId, "referat"),
+      getTeacherCourseExerciseAllPoints(courseId, "referat"),
+    ]);
   if (!roster || !evals) {
     return <p>{t("loadError")}</p>;
   }
@@ -128,6 +135,14 @@ export default async function JournalPage({ params, searchParams }: Props) {
       roster={roster.students}
       evaluations={evals.evaluations}
       initialMeetingGrids={gradeBundle}
+      initialExerciseLists={{
+        colloquium: colloquiumList?.items ?? [],
+        referat: referatList?.items ?? [],
+      }}
+      initialExercisePoints={{
+        colloquium: colloquiumPoints?.cells ?? [],
+        referat: referatPoints?.cells ?? [],
+      }}
       initialTab={initialTab}
     />
   );
