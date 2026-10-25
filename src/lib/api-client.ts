@@ -471,6 +471,10 @@ export type TimetableAssignedSlot = {
   course_group_id?: string | null;
   half_group_id?: string | null;
   half_group_az?: string | null;
+  pattern_from?: string | null;
+  pattern_until?: string | null;
+  occupies_now?: boolean;
+  pattern_limited?: boolean;
 };
 
 export type TimetableOccupiedRoom = {
@@ -548,6 +552,7 @@ export async function adminTimetablePlace(body: {
   week_type: number;
   room_id?: string | null;
   course_group_id?: string | null;
+  until_date?: string | null;
 }): Promise<{ ok: true; created_count: number } | { ok: false; error: string }> {
   const res = await fetch("/api/admin/timetable/place", {
     method: "POST",
@@ -568,6 +573,7 @@ export async function adminTimetableUnplace(body: {
   week_day: number;
   week_type: number;
   course_group_id?: string | null;
+  until_date?: string | null;
 }): Promise<{ ok: true; removed_count: number } | { ok: false; error: string }> {
   const res = await fetch("/api/admin/timetable/unplace", {
     method: "POST",
@@ -589,6 +595,7 @@ export async function adminTimetableSetRoom(body: {
   week_type: number;
   room_id: string | null;
   course_group_id?: string | null;
+  until_date?: string | null;
 }): Promise<{ ok: true; updated_count: number } | { ok: false; error: string }> {
   const res = await fetch("/api/admin/timetable/room", {
     method: "POST",

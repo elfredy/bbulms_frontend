@@ -96,8 +96,37 @@ function isSiblingHalf(
   );
 }
 
+function fmtDot(iso?: string | null) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || "");
+  if (!m) return "";
+  return `${m[3]}.${m[2]}.${m[1]}`;
+}
+
+function slotWhen(occ: TimetableAssignedSlot) {
+  const from = fmtDot(occ.pattern_from);
+  const until = fmtDot(occ.pattern_until);
+  if (occ.occupies_now === false && occ.pattern_limited && from && until) return `${from} – ${until}`;
+  if (occ.occupies_now === false && from) return `${from}-dən`;
+  if (occ.pattern_limited && until) return `${until}-dək`;
+  return "";
+}
+
 function slotTooltip(occ: TimetableAssignedSlot) {
-  return [occ.teacher_fullname || occ.subject_name_az, occ.half_group_az, "silmək üçün klik"].filter(Boolean).join(" · ");
+  const range = fmtDot(occ.pattern_from) && fmtDot(occ.pattern_until) ? `${fmtDot(occ.pattern_from)} – ${fmtDot(occ.pattern_until)}` : "";
+  return [occ.teacher_fullname || occ.subject_name_az, occ.half_group_az, range, slotWhen(occ), "silmək üçün klik"].filter(Boolean).join(" · ");
+}
+
+function isoTomorrow() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+function scopeText(until: string | null) {
+  if (!until) return "semestr sonuna qədər";
+  const label = fmtDot(until);
+  return label ? `${label} tarixinə qədər` : "seçilən tarixə qədər";
 }
 
 function weekTypesOverlap(a: number, b: number) {
@@ -151,7 +180,18 @@ export function TimetableBuilder() {
     confirmed: false,
   });
   const [editing, setEditing] = useState(false);
+  const [editScope, setEditScope] = useState<"semester" | "until">("semester");
+  const [untilDate, setUntilDate] = useState("");
   const locked = confirmInfo.confirmed && !editing;
+
+  function chosenUntil(): { ok: true; until_date: string | null } | { ok: false } {
+    if (editScope !== "until") return { ok: true, until_date: null };
+    if (!untilDate) {
+      setError("Tarix seçin");
+      return { ok: false };
+    }
+    return { ok: true, until_date: untilDate };
+  }
 
   useEffect(() => {
     let alive = true;
@@ -329,7 +369,7 @@ export function TimetableBuilder() {
 
   function startEdit() {
     const ok = window.confirm(
-      "Təsdiqlənmiş cədvəl yenilənsin? Bundan sonra dərsi silə, yerini dəyişə və yeni xanaya qoya bilərsiniz. Bu günə qədər təsdiqlənmiş dərslər köhnə tarixində qalır. Yeni gün yalnız bu gündən sonraya yazılır."
+      "Təsdiqlənmiş cədvəl yenilənsin? Bundan sonra dərsi silə, yerini dəyişə və yeni xanaya qoya bilərsiniz. Bu günə qədər təsdiqlənmiş dərslər köhnə tarixində qalır. Dəyişiklik bu gündən sonra, semestr sonuna və ya seçdiyiniz tarixə qədər yazılır."
     );
     if (!ok) return;
     setError(null);
@@ -349,6 +389,8 @@ export function TimetableBuilder() {
 
   async function place(weekDay: number, clockId: string, weekType: 1 | 2 | 3, lesson: SelectedLesson) {
     if (locked || !groupId || !yearId || !semesterId) return;
+    const scope = chosenUntil();
+    if (!scope.ok) return;
     setBusy(true);
     setError(null);
     const res = await adminTimetablePlace({
@@ -361,6 +403,7 @@ export function TimetableBuilder() {
       week_day: weekDay,
       week_type: weekType,
       course_group_id: lesson.course_group_id || null,
+      until_date: scope.until_date,
     });
     setBusy(false);
     if (!res.ok) {
@@ -372,10 +415,15 @@ export function TimetableBuilder() {
 
   async function unplace(slot: TimetableAssignedSlot) {
     if (locked || !groupId) return;
+    const scope = chosenUntil();
+    if (!scope.ok) return;
+    const bound = scopeText(scope.until_date);
     const ok = window.confirm(
       editing
-        ? "Bu dərs bu gündən sonra cədvəldən silinsin? Bu günə qədər təsdiqlənmiş dərslər köhnə tarixində qalır."
-        : "Bu dərs xanadan silinsin?"
+        ? `Bu dərs ${bound} cədvəldən silinsin? Bu günə qədər təsdiqlənmiş dərslər köhnə tarixində qalır. Seçilmiş tarixdən sonrakı dərslər öz yerində qalır.`
+        : scope.until_date
+          ? `Bu dərs ${bound} silinsin?`
+          : "Bu dərs xanadan silinsin?"
     );
     if (!ok) return;
     setBusy(true);
@@ -388,6 +436,7 @@ export function TimetableBuilder() {
       week_day: Number(slot.week_day),
       week_type: Number(slot.week_type),
       course_group_id: slot.course_group_id || null,
+      until_date: scope.until_date,
     });
     setBusy(false);
     if (!res.ok) {
@@ -399,6 +448,8 @@ export function TimetableBuilder() {
 
   async function setRoom(slot: TimetableAssignedSlot, roomId: string | null) {
     if (locked || !groupId) return;
+    const scope = chosenUntil();
+    if (!scope.ok) return;
     setBusy(true);
     setError(null);
     const res = await adminTimetableSetRoom({
@@ -410,6 +461,7 @@ export function TimetableBuilder() {
       week_type: Number(slot.week_type),
       room_id: roomId,
       course_group_id: slot.course_group_id || null,
+      until_date: scope.until_date,
     });
     setBusy(false);
     if (!res.ok) {
@@ -583,6 +635,7 @@ export function TimetableBuilder() {
                     {item.subject_name_az}
                     {item.half_group_az ? ` · ${item.half_group_az}` : ""}
                   </span>
+                  {slotWhen(item) ? <span className={styles.slotWhen}>{slotWhen(item)}</span> : null}
                   <span className={styles.letter}>{item.lesson_letter}</span>
                 </button>
               </div>
@@ -782,14 +835,50 @@ export function TimetableBuilder() {
           ) : null}
         </label>
 
+        {!locked && groupId ? (
+          <fieldset className={styles.scopeBox}>
+            <legend className={styles.scopeLabel}>Dəyişiklik</legend>
+            <label className={styles.scopeOption}>
+              <input
+                type="radio"
+                name="timetable-edit-scope"
+                checked={editScope === "semester"}
+                onChange={() => setEditScope("semester")}
+              />
+              Semestr sonuna qədər
+            </label>
+            <label className={styles.scopeOption}>
+              <input
+                type="radio"
+                name="timetable-edit-scope"
+                checked={editScope === "until"}
+                onChange={() => setEditScope("until")}
+              />
+              Tarixə qədər
+              <input
+                type="date"
+                className={styles.scopeDate}
+                value={untilDate}
+                min={editing ? isoTomorrow() : undefined}
+                disabled={editScope !== "until"}
+                onChange={(e) => {
+                  setUntilDate(e.target.value);
+                  setEditScope("until");
+                }}
+                onClick={() => setEditScope("until")}
+              />
+            </label>
+          </fieldset>
+        ) : null}
+
         {error ? <p className={styles.error}>{error}</p> : null}
         {okMsg ? <p className={styles.okMsg}>{okMsg}</p> : null}
         {!error && !okMsg ? (
           <p className={styles.hint}>
             {locked
               ? "Bu cədvəl təsdiqlənib. Dəyişmək üçün Yenilə düyməsinə basın."
-              : editing
-                ? "Redaktə rejimindəsiniz. Dərsi silin, yerini dəyişin və ya yeni xanaya qoyun."
+                : editing
+                ? "Redaktə rejimindəsiniz. Dəyişiklik semestr sonuna və ya seçdiyiniz tarixə qədər yazılır. Bu günə qədər təsdiqlənmiş dərslər köhnə tarixində qalır."
                 : "30 saat tam dərsdir. 15 saat — 45 və 75 saatlıq fənnin seminarı və ya qalığı — yalnız üst və ya yalnız alt həftəyə qoyulur, tam olmur."}
           </p>
         ) : null}

@@ -250,6 +250,15 @@
   font-weight: 600;
 }
 
+.slotWhen {
+  display: block;
+  margin-top: 1px;
+  font-size: 0.58rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: #9a3412;
+}
+
 .slotHalf .slotName {
   -webkit-line-clamp: 1;
 }
@@ -367,6 +376,45 @@
   font-size: 0.8rem;
   font-weight: 700;
   color: var(--text);
+}
+
+.scopeBox {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line, #e5e7eb);
+  border-radius: 8px;
+}
+
+.scopeLabel {
+  padding: 0 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.scopeOption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.84rem;
+  cursor: pointer;
+}
+
+.scopeDate {
+  margin-left: auto;
+  min-width: 0;
+  padding: 4px 6px;
+  border: 1px solid var(--line, #d0d5dd);
+  border-radius: 6px;
+  background: #fff;
+  font: inherit;
+  font-size: 0.78rem;
+}
+
+.scopeDate:disabled {
+  opacity: 0.55;
 }
 
 .hint,
