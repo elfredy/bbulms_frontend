@@ -447,8 +447,8 @@ export function TimetableBuilder() {
   }
 
   async function setRoom(slot: TimetableAssignedSlot, roomId: string | null) {
-    if (locked || !groupId) return;
-    const scope = chosenUntil();
+    if (!groupId) return;
+    const scope: ReturnType<typeof chosenUntil> = locked ? { ok: true, until_date: null } : chosenUntil();
     if (!scope.ok) return;
     setBusy(true);
     setError(null);
@@ -610,7 +610,7 @@ export function TimetableBuilder() {
                   <SearchableSelect
                     compact
                     value={item.room_id ?? ""}
-                    disabled={busy || locked}
+                    disabled={busy}
                     placeholder="Otaq"
                     searchPlaceholder="Otaq axtar…"
                     triggerClassName={styles.slotRoom}

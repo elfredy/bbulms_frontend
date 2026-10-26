@@ -491,6 +491,19 @@
   cursor: default;
 }
 
+.exerciseConfirmBtn {
+  margin-top: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+.exerciseConfirmBtn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
 .lockedNote {
   font-size: 0.68rem;
   font-weight: 700;

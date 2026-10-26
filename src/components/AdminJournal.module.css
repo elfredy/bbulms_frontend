@@ -99,6 +99,21 @@
   color: #1e3a8a;
 }
 
+.exCol {
+  min-width: 92px;
+  border-left: 1px solid rgba(2, 6, 23, 0.1);
+}
+
+.th.exColloquium {
+  background: #ede9fe;
+  color: #4c1d95;
+}
+
+.th.exReferat {
+  background: #dcfce7;
+  color: #14532d;
+}
+
 .row:nth-child(even) .td {
   background: #fafbfc;
 }

@@ -1630,23 +1630,23 @@ export function JournalClient({
     });
   }
 
-  function confirmSaveExercises(exType: "colloquium" | "referat") {
-    const prefix = `${exType}:`;
-    const items = (exerciseItemsByType[exType]?.items ?? []) as any[];
-    const idsFromPending = Object.keys(exercisePendingRef.current)
-      .filter((k) => k.startsWith(prefix))
-      .map((k) => k.split(":")[1])
-      .filter(Boolean);
-    const idsFromSaved = items
-      .filter((it) => !it.confirmed && it.editable)
-      .map((it) => String(it.course_execises_id))
-      .filter((eid) => {
-        const pts = exercisePointsByExerciseId[eid] ?? {};
-        return Object.values(pts).some((v) => String(v ?? "").trim() !== "");
-      });
-    const touchedExerciseIds = Array.from(new Set([...idsFromPending, ...idsFromSaved]));
-    if (touchedExerciseIds.length === 0) return;
-    if (!window.confirm("Qiymətləndirməni təsdiqləmək istəyirsiniz? Təsdiqdən sonra dəyişiklik mümkün olmayacaq və ümumi hesablamada nəzərə alınacaq.")) return;
+  function exerciseHasEntries(exType: "colloquium" | "referat", exerciseId: string): boolean {
+    if (Object.keys(exercisePendingByKey).some((k) => k.startsWith(`${exType}:${exerciseId}:`))) return true;
+    const pts = exercisePointsByExerciseId[exerciseId] ?? {};
+    return Object.values(pts).some((v) => String(v ?? "").trim() !== "");
+  }
+
+  function confirmSaveExercises(exType: "colloquium" | "referat", exerciseId: string) {
+    const item = ((exerciseItemsByType[exType]?.items ?? []) as any[]).find((it) => String(it.course_execises_id) === exerciseId);
+    if (!item || item.confirmed || !item.editable || !exerciseHasEntries(exType, exerciseId)) return;
+    const touchedExerciseIds = [exerciseId];
+    const label = item.start_date ? fmtDateLabel(item.start_date) : "";
+    if (
+      !window.confirm(
+        `${label ? `${label} tarixinin` : "Bu tarixin"} qiymətləri təsdiqlənsin? Təsdiqdən sonra bu tarixdə dəyişiklik mümkün olmayacaq və ümumi hesablamada nəzərə alınacaq.`,
+      )
+    )
+      return;
 
     setErr(null);
     startTransition(async () => {
@@ -1680,7 +1680,7 @@ export function JournalClient({
       setExercisePendingByKey((prev) => {
         const next: Record<string, string> = {};
         for (const [k, v] of Object.entries(prev)) {
-          if (!k.startsWith(prefix)) next[k] = v;
+          if (!touchedExerciseIds.some((eid) => k.startsWith(`${exType}:${eid}:`))) next[k] = v;
         }
         return next;
       });
@@ -2121,14 +2121,6 @@ export function JournalClient({
                     <div className={styles.actionBar}>
                       <button
                         type="button"
-                        className={`${styles.btn} ${styles.btnPrimary}`}
-                        onClick={() => confirmSaveExercises(exType as any)}
-                        disabled={isPending || !exerciseCanConfirm}
-                      >
-                        Təsdiq et
-                      </button>
-                      <button
-                        type="button"
                         className={`${styles.btn} ${styles.btnDanger}`}
                         onClick={() => cancelPendingForExercises(exType as any)}
                         disabled={isPending || exercisePendingCount === 0}
@@ -2141,7 +2133,7 @@ export function JournalClient({
                           : exercisePendingCount
                             ? `${exercisePendingCount} dəyişiklik yadda saxlanır`
                             : exerciseCanConfirm
-                              ? "Qiymətlər yadda saxlanılıb. Ümumi hesablama üçün təsdiq edin."
+                              ? "Qiymətlər yadda saxlanılıb. Ümumi hesablama üçün hər tarixi öz sütunundakı Təsdiq et düyməsi ilə təsdiqləyin."
                               : "Dəyişiklik yoxdur"}
                       </div>
                       {incompleteStudentIds.size > 0 ? (
@@ -2192,6 +2184,7 @@ export function JournalClient({
                             const appeal = String(it.unlock_request ?? "").trim();
                             const canAppeal = !it.editable;
                             const canEditDate = exType === "colloquium" && !it.confirmed;
+                            const canConfirmDate = !it.confirmed && Boolean(it.editable) && exerciseHasEntries(exType, eid);
                             return (
                             <th key={eid} className={`${styles.th} ${styles.thCell}`}>
                               <div className={styles.halfHead}>
@@ -2268,6 +2261,17 @@ export function JournalClient({
                                     onClick={() => removeExercise(exType, eid, fmtDateLabel(it.start_date))}
                                   >
                                     Sil
+                                  </button>
+                                ) : null}
+                                {!it.confirmed && it.editable ? (
+                                  <button
+                                    type="button"
+                                    className={`${styles.btn} ${styles.btnPrimary} ${styles.exerciseConfirmBtn}`}
+                                    disabled={isPending || !canConfirmDate}
+                                    title={canConfirmDate ? "Bu tarixin qiymətlərini təsdiqlə" : "Əvvəl bu tarixə qiymət yazın"}
+                                    onClick={() => confirmSaveExercises(exType, eid)}
+                                  >
+                                    Təsdiq et
                                   </button>
                                 ) : null}
                                 <div className={styles.muted} style={{ fontSize: 12 }}>

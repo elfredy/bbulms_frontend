@@ -35,6 +35,14 @@ type Cell = {
   evaluation_code: string | null;
   value: string | null;
 };
+type Exercise = {
+  course_execises_id: string;
+  type: "colloquium" | "referat";
+  start_date: string | null;
+  confirmed?: boolean;
+  unlock_request?: string | null;
+};
+type ExerciseCell = { student_id: string; course_execises_id: string; value: string | null };
 type Grid = {
   course: {
     id: string;
@@ -47,6 +55,8 @@ type Grid = {
   meetings: Meeting[];
   evaluations: Eva[];
   cells: Cell[];
+  exercises?: Exercise[];
+  exercise_cells?: ExerciseCell[];
 };
 
 const WINDOW_SIZE = 7;
@@ -99,6 +109,11 @@ function todayInBaku(): string {
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
+}
+
+function fmtDot(iso: string | null | undefined): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso ?? ""));
+  return m ? `${m[3]}.${m[2]}.${m[1]}` : String(iso ?? "");
 }
 
 function courseLabel(c: CourseOpt): string {
@@ -328,6 +343,23 @@ export function AdminJournalClient({
     return String(fallback?.value ?? "").trim();
   }
 
+  const exerciseColumns = useMemo(() => {
+    const counters = { colloquium: 0, referat: 0 };
+    return (grid?.exercises ?? []).map((ex) => {
+      counters[ex.type] += 1;
+      return { ...ex, label: `${ex.type === "colloquium" ? "Kollokvium" : "Referat"} ${counters[ex.type]}` };
+    });
+  }, [grid]);
+
+  const exerciseValueMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const c of grid?.exercise_cells ?? []) {
+      const v = String(c.value ?? "").trim();
+      if (v) m.set(`${c.course_execises_id}:${c.student_id}`, v);
+    }
+    return m;
+  }, [grid]);
+
   const meetings = grid?.meetings ?? [];
   const windowMeetings = meetings.slice(windowStart, windowStart + WINDOW_SIZE);
   const maxStart = Math.max(0, meetings.length - WINDOW_SIZE);
@@ -351,6 +383,30 @@ export function AdminJournalClient({
       setOkMsg("Təsdiq qaldırıldı. Müəllim dəyişiklik edə bilər.");
       window.dispatchEvent(new Event("bbu-journal-unlocks-changed"));
       await loadGrid(courseId, meetingId);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function liftExerciseConfirm(exerciseId: string) {
+    if (!courseId) return;
+    if (!window.confirm("Bu kollokvium/referat tarixinin təsdiqi qaldırılsın? Müəllim qiymətləri yenidən dəyişə biləcək.")) return;
+    setBusy(true);
+    setError(null);
+    setOkMsg(null);
+    try {
+      const res = await fetch(
+        `/api/admin/journal/courses/${encodeURIComponent(courseId)}/exercises/${encodeURIComponent(exerciseId)}/unconfirm`,
+        { method: "POST", credentials: "include" }
+      );
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError(typeof data?.detail === "string" ? data.detail : "Təsdiq qaldırılmadı");
+        return;
+      }
+      setOkMsg("Təsdiq qaldırıldı. Müəllim dəyişiklik edə bilər.");
+      window.dispatchEvent(new Event("bbu-journal-unlocks-changed"));
+      await loadGrid(courseId, focusMeetingId || undefined);
     } finally {
       setBusy(false);
     }
@@ -481,13 +537,41 @@ export function AdminJournalClient({
                       </th>
                     );
                   })}
+                  {exerciseColumns.map((ex) => {
+                    const request = String(ex.unlock_request ?? "").trim();
+                    return (
+                      <th
+                        key={ex.course_execises_id}
+                        className={`${styles.th} ${styles.exCol} ${ex.type === "colloquium" ? styles.exColloquium : styles.exReferat} ${request ? styles.thFocus : ""}`}
+                      >
+                        <div className={styles.headDate}>{ex.label}</div>
+                        <span className={styles.headTime}>{fmtDot(ex.start_date) || " "}</span>
+                        <span className={styles.headStatus}>{ex.confirmed ? "Təsdiq olunub" : " "}</span>
+                        {request ? (
+                          <div className={styles.requestBox}>
+                            <span className={styles.requestText} title={request}>
+                              {request}
+                            </span>
+                            <button
+                              type="button"
+                              className={styles.liftBtn}
+                              disabled={busy}
+                              onClick={() => void liftExerciseConfirm(ex.course_execises_id)}
+                            >
+                              Təsdiqi qaldır
+                            </button>
+                          </div>
+                        ) : null}
+                      </th>
+                    );
+                  })}
                   <th className={`${styles.th} ${styles.qbCol}`}>q.b</th>
                 </tr>
               </thead>
               <tbody>
                 {visibleStudents.length === 0 ? (
                   <tr>
-                    <td className={`${styles.td} ${styles.nameCol}`} colSpan={windowMeetings.length + 2}>
+                    <td className={`${styles.td} ${styles.nameCol}`} colSpan={windowMeetings.length + exerciseColumns.length + 2}>
                       Bu fənn qrupunda{halfFilter ? " bu yarımqrup üçün" : ""} tələbə yoxdur.
                     </td>
                   </tr>
@@ -503,6 +587,14 @@ export function AdminJournalClient({
                         return (
                           <td key={m.course_meeting_id} className={styles.td}>
                             <span className={`${styles.cell} ${cellTone(value)}`}>{value || "—"}</span>
+                          </td>
+                        );
+                      })}
+                      {exerciseColumns.map((ex) => {
+                        const value = exerciseValueMap.get(`${ex.course_execises_id}:${s.student_id}`) ?? "";
+                        return (
+                          <td key={ex.course_execises_id} className={`${styles.td} ${styles.exCol}`}>
+                            <span className={`${styles.cell} ${value ? styles.cellNeutral : styles.cellEmpty}`}>{value || "—"}</span>
                           </td>
                         );
                       })}
