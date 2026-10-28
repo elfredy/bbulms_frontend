@@ -299,15 +299,20 @@ export async function confirmTeacherCourseExercise(
   courseId: string,
   type: string,
   courseExecisesId: string
-): Promise<CourseExercisePointsResponse | null> {
-  const res = await fetch(
-    `/api/teacher/courses/${courseId}/course-exercises/${courseExecisesId}/confirm?type=${encodeURIComponent(type)}`,
-    {
-      method: "POST",
-      credentials: "include",
-    }
-  );
-  return jsonOrNull(res);
+): Promise<{ ok: true; data: CourseExercisePointsResponse } | { ok: false; error: string }> {
+  try {
+    const res = await fetch(
+      `/api/teacher/courses/${courseId}/course-exercises/${courseExecisesId}/confirm?type=${encodeURIComponent(type)}`,
+      {
+        method: "POST",
+        credentials: "include",
+      }
+    );
+    if (!res.ok) return { ok: false, error: (await readErrorDetail(res)) ?? "Təsdiq alınmadı" };
+    return { ok: true, data: await res.json() };
+  } catch {
+    return { ok: false, error: "Təsdiq alınmadı. İnternet bağlantısını yoxlayın." };
+  }
 }
 
 export async function getTeacherCourseLessons(courseId: string): Promise<{ course_id: string; meetings: LessonMeetingItem[] } | null> {

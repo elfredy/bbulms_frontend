@@ -1650,7 +1650,9 @@ export function JournalClient({
 
     setErr(null);
     startTransition(async () => {
-      if (!(await flushAllExerciseQueues())) return;
+      const qk = `${exType}:${exerciseId}`;
+      while (exerciseSavingRef.current[qk]) await new Promise((resolve) => setTimeout(resolve, 100));
+      if (!(await flushExerciseQueue(exType, exerciseId))) return;
 
       for (const exerciseId of touchedExerciseIds) {
         const pendingCells: { student_id: string; value: string | null }[] = [];
@@ -1668,12 +1670,12 @@ export function JournalClient({
           }
         }
         const confirmed = await confirmTeacherCourseExercise(courseId, exType, exerciseId);
-        if (!confirmed) {
-          setErr("Təsdiq alınmadı");
+        if (!confirmed.ok) {
+          setErr(confirmed.error);
           return;
         }
         const m: Record<string, string> = {};
-        for (const c of confirmed.cells) m[String(c.student_id)] = exercisePointDisplay(c.value);
+        for (const c of confirmed.data.cells) m[String(c.student_id)] = exercisePointDisplay(c.value);
         setExercisePointsByExerciseId((prev) => ({ ...prev, [exerciseId]: m }));
       }
 
