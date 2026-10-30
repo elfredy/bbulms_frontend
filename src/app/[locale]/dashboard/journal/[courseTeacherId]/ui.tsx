@@ -439,7 +439,7 @@ export function JournalClient({
   lessonTypeId,
   semesterStart = null,
   meetings,
-  roster,
+  roster: rosterAll,
   evaluations,
   initialMeetingGrids = null,
   initialExerciseLists,
@@ -468,6 +468,30 @@ export function JournalClient({
       .filter((m) => Boolean(dateOnly(m.meeting_date)))
       .sort(compareMeetings);
   }, [liveMeetings]);
+
+  const meetingScopeById = useMemo(() => {
+    const out: Record<string, Set<string> | null> = {};
+    for (const m of liveMeetings) {
+      out[String(m.course_meeting_id)] = Array.isArray(m.student_ids) ? new Set(m.student_ids.map(String)) : null;
+    }
+    return out;
+  }, [liveMeetings]);
+
+  /** Yarımqrup dərslərində siyahıya yalnız müəllimin öz yarımqrup tələbələri düşür. */
+  const roster = useMemo(() => {
+    if (!liveMeetings.length) return rosterAll;
+    const union = new Set<string>();
+    for (const m of liveMeetings) {
+      if (!Array.isArray(m.student_ids)) return rosterAll;
+      for (const sid of m.student_ids) union.add(String(sid));
+    }
+    return rosterAll.filter((s) => union.has(String(s.student_id)));
+  }, [liveMeetings, rosterAll]);
+
+  function inMeetingScope(mid: string, studentId: string): boolean {
+    const scope = meetingScopeById[mid];
+    return !scope || scope.has(String(studentId));
+  }
 
   const meetingColumns = useMemo(
     () => buildMeetingColumns(visibleMeetings, semesterStart ?? null),
@@ -768,6 +792,7 @@ export function JournalClient({
   /** Bir select: rəqəm → EVA_02 (+ i.e), davamiyyət kodu → EVA_01 (aktivlik silinir). */
   function setMeetingCombined(mid: string, studentId: string, rawNext: string, meeting: CourseMeetingItem) {
     if (meetingLockedById[mid] || !isLessonOpen(meeting, todayInBaku())) return;
+    if (!inMeetingScope(mid, studentId)) return;
     const evaA = evalAttendance[0];
     const evaS = evalSeminar[0];
     if (!evaA && !evaS) return;
@@ -844,11 +869,12 @@ export function JournalClient({
     setErr(null);
     const persistCells: { student_id: string; course_eva_id: string; value: string | null }[] = [];
     const currentMap = meetingWindowCellsByMeetingId[mid] ?? {};
+    const students = roster.filter((s) => inMeetingScope(mid, s.student_id));
 
     setMeetingWindowCellsByMeetingId((prev) => {
       const source = prev[mid] ?? {};
       const cellMap = { ...source };
-      for (const s of roster) {
+      for (const s of students) {
         const display = meetingCombinedDisplay(source, s.student_id);
         if (isQbLocked(meeting, display, nowMs)) continue;
         const write = (evaId: string, value: string | null) => {
@@ -870,7 +896,7 @@ export function JournalClient({
 
     setMeetingPendingByKey((prev) => {
       const p = { ...prev };
-      for (const s of roster) {
+      for (const s of students) {
         const display = meetingCombinedDisplay(currentMap, s.student_id);
         if (isQbLocked(meeting, display, nowMs)) continue;
         if (!raw) {
@@ -887,7 +913,7 @@ export function JournalClient({
       return p;
     });
 
-    for (const s of roster) {
+    for (const s of students) {
       const display = meetingCombinedDisplay(currentMap, s.student_id);
       if (isQbLocked(meeting, display, nowMs)) continue;
       if (!raw) {
@@ -1389,9 +1415,10 @@ export function JournalClient({
       const mid = String(m.course_meeting_id);
       if (meetingLockedById[mid]) continue;
       const cellMap = meetingWindowCellsByMeetingId[mid] ?? {};
-      const started = roster.some((s) => meetingCombinedDisplay(cellMap, s.student_id).trim() !== "");
+      const students = roster.filter((s) => inMeetingScope(mid, s.student_id));
+      const started = students.some((s) => meetingCombinedDisplay(cellMap, s.student_id).trim() !== "");
       if (!started) continue;
-      for (const s of roster) {
+      for (const s of students) {
         if (!meetingCombinedDisplay(cellMap, s.student_id).trim()) ids.add(s.student_id);
       }
     }
@@ -1413,6 +1440,7 @@ export function JournalClient({
     visibleMeetings,
     meetingLockedById,
     meetingWindowCellsByMeetingId,
+    meetingScopeById,
     roster,
     exerciseItemsByType,
     exercisePointsByExerciseId,
@@ -1972,9 +2000,25 @@ export function JournalClient({
                       const today = todayInBaku();
                       const future = isFutureLesson(m, today);
                       const closed = !isLessonOpen(m, today);
+                      if (!inMeetingScope(mid, s.student_id)) {
+                        return (
+                          <td
+                            key={mid}
+                            className={`${styles.td} ${styles.tdCell} ${styles.muted}`}
+                            title="Tələbə bu dərsin yarımqrupunda deyil"
+                          >
+                            —
+                          </td>
+                        );
+                      }
                       const cellMap = meetingWindowCellsByMeetingId[mid] ?? {};
                       const display = meetingCombinedDisplay(cellMap, s.student_id);
-                      const started = !locked && !closed && roster.some((x) => meetingCombinedDisplay(cellMap, x.student_id).trim() !== "");
+                      const started =
+                        !locked &&
+                        !closed &&
+                        roster.some(
+                          (x) => inMeetingScope(mid, x.student_id) && meetingCombinedDisplay(cellMap, x.student_id).trim() !== "",
+                        );
                       const cellMissing = started && !display.trim();
                       const tone = cellMissing ? styles.cellMissing : cellToneClass(styles, display, isAttendanceValue(display));
                       const qbLocked = isQbLocked(m, display, nowMs);

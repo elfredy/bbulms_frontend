@@ -450,6 +450,8 @@ export type CourseMeetingItem = {
   unlock_request?: string | null;
   calendar_active?: boolean;
   admin_unlocked?: boolean;
+  /** Yarımqrup dərsi: yalnız bu tələbələr qiymətləndirilir. null — bütün siyahı. */
+  student_ids?: string[] | null;
 };
 
 export type CourseMeetingListResponse = {
