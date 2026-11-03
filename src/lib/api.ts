@@ -613,6 +613,7 @@ export type CourseExerciseListResponse = {
   course_id: string;
   type: string;
   items: CourseExerciseItem[];
+  allowed?: boolean;
 };
 
 export type CourseExerciseCreateRequest = {

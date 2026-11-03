@@ -444,6 +444,7 @@ export function JournalClient({
   initialMeetingGrids = null,
   initialExerciseLists,
   initialExercisePoints,
+  colloquiumAllowed = true,
   initialTab,
 }: {
   locale: string;
@@ -460,6 +461,8 @@ export function JournalClient({
   initialMeetingGrids?: JournalMeetingsResponse | null;
   initialExerciseLists?: { colloquium: CourseExerciseItem[]; referat: CourseExerciseItem[] };
   initialExercisePoints?: { colloquium: CourseExercisePointCell[]; referat: CourseExercisePointCell[] };
+  /** Kollokvium yalnız tam qrup (mühazirə) müəllimindədir; yarımqrup müəllimindən gizlədilir. */
+  colloquiumAllowed?: boolean;
   initialTab?: TabId;
 }) {
   const [liveMeetings, setLiveMeetings] = useState(meetings);
@@ -498,7 +501,10 @@ export function JournalClient({
     [visibleMeetings, semesterStart],
   );
 
-  const [tab, setTab] = useState<TabId>(initialTab ?? "attendance");
+  const tabs = useMemo(() => TABS.filter((t) => colloquiumAllowed || t.id !== "colloquium"), [colloquiumAllowed]);
+  const [tab, setTab] = useState<TabId>(
+    initialTab && (colloquiumAllowed || initialTab !== "colloquium") ? initialTab : "attendance",
+  );
   const [meetingId, setMeetingId] = useState<string>(() => initialMeetingId(meetings, semesterStart ?? null));
   const [cells, setCells] = useState<Record<string, JournalCell>>({});
   const [pointCells, setPointCells] = useState<Record<string, JournalCell>>({});
@@ -1206,7 +1212,7 @@ export function JournalClient({
     const timer = window.setTimeout(() => {
       loadResult();
       loadPointsGrid();
-      loadExercises("colloquium");
+      if (colloquiumAllowed) loadExercises("colloquium");
       loadExercises("referat");
     }, 0);
     return () => window.clearTimeout(timer);
@@ -1794,7 +1800,7 @@ export function JournalClient({
 
       <div className={styles.tabsWrap}>
         <div className={styles.tabsList} role="tablist" aria-label="Jurnal bölmələri">
-          {TABS.map((t) => (
+          {tabs.map((t) => (
             <button
               key={t.id}
               type="button"

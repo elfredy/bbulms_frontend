@@ -143,6 +143,7 @@ export default async function JournalPage({ params, searchParams }: Props) {
         colloquium: colloquiumPoints?.cells ?? [],
         referat: referatPoints?.cells ?? [],
       }}
+      colloquiumAllowed={colloquiumList?.allowed !== false}
       initialTab={initialTab}
     />
   );
