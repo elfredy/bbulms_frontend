@@ -507,6 +507,9 @@ export type TimetableBoard = {
   teacher_count?: number;
   confirmed?: boolean;
   column_dates?: Record<string, string>;
+  teaching_start?: string | null;
+  semester_end?: string | null;
+  end_date?: string | null;
 };
 
 export async function adminTimetableLookups(): Promise<TimetableLookups | null> {
@@ -611,6 +614,31 @@ export async function adminTimetableSetRoom(body: {
   if (!res.ok) return { ok: false, error: (await readErrorDetail(res)) || "Otaq dəyişdirilmədi" };
   const data = (await res.json()) as { updated_count?: number };
   return { ok: true, updated_count: Number(data.updated_count ?? 0) };
+}
+
+export async function adminTimetableSetEndDate(body: {
+  education_group_id: string;
+  education_year_id: string;
+  semester_id: string;
+  end_date: string | null;
+}): Promise<
+  | { ok: true; removed_count: number; added_count: number; kept_count: number }
+  | { ok: false; error: string }
+> {
+  const res = await fetch("/api/admin/timetable/end-date", {
+    method: "POST",
+    credentials: "include",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) return { ok: false, error: (await readErrorDetail(res)) || "Bitmə tarixi yazılmadı" };
+  const data = (await res.json()) as { removed_count?: number; added_count?: number; kept_count?: number };
+  return {
+    ok: true,
+    removed_count: Number(data.removed_count ?? 0),
+    added_count: Number(data.added_count ?? 0),
+    kept_count: Number(data.kept_count ?? 0),
+  };
 }
 
 export async function adminTimetableConfirm(body: {

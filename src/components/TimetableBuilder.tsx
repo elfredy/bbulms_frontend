@@ -11,6 +11,7 @@ import {
   adminTimetableGroups,
   adminTimetableLookups,
   adminTimetablePlace,
+  adminTimetableSetEndDate,
   adminTimetableSetRoom,
   adminTimetableUnplace,
   type TimetableAssignedSlot,
@@ -167,6 +168,12 @@ export function TimetableBuilder() {
   const [assigned, setAssigned] = useState<TimetableAssignedSlot[]>([]);
   const [occupiedRooms, setOccupiedRooms] = useState<TimetableOccupiedRoom[]>([]);
   const [columnDates, setColumnDates] = useState<Record<string, string>>({});
+  const [lessonDates, setLessonDates] = useState<{ teaching_start: string | null; semester_end: string | null; end_date: string | null }>({
+    teaching_start: null,
+    semester_end: null,
+    end_date: null,
+  });
+  const [endDraft, setEndDraft] = useState("");
   const [hoursRemaining, setHoursRemaining] = useState(0);
   const [selected, setSelected] = useState<SelectedLesson | null>(null);
   const [busy, setBusy] = useState(false);
@@ -234,6 +241,8 @@ export function TimetableBuilder() {
       setAvailable([]);
       setOccupiedRooms([]);
       setColumnDates({});
+      setLessonDates({ teaching_start: null, semester_end: null, end_date: null });
+      setEndDraft("");
       setHoursRemaining(0);
       setConfirmInfo({ meeting_count: 0, pending_count: 0, confirmed_count: 0, teacher_count: 0, confirmed: false });
       return;
@@ -253,6 +262,12 @@ export function TimetableBuilder() {
     setAvailable(data.available);
     setOccupiedRooms(data.occupied_rooms ?? []);
     setColumnDates(data.column_dates ?? {});
+    setLessonDates({
+      teaching_start: data.teaching_start ?? null,
+      semester_end: data.semester_end ?? null,
+      end_date: data.end_date ?? null,
+    });
+    setEndDraft(data.end_date ?? "");
     setHoursRemaining(Number(data.hours_remaining ?? 0));
     setConfirmInfo({
       meeting_count: Number(data.meeting_count ?? 0),
@@ -385,6 +400,42 @@ export function TimetableBuilder() {
     setError(null);
     setOkMsg("Cədvəl yeniləndi.");
     setEditing(false);
+  }
+
+  async function saveEndDate(endDate: string | null) {
+    if (!groupId || !yearId || !semesterId) return;
+    if (endDate && lessonDates.teaching_start && endDate < lessonDates.teaching_start) {
+      setError(`Bitmə tarixi başlama tarixindən (${fmtDot(lessonDates.teaching_start)}) əvvəl ola bilməz`);
+      return;
+    }
+    const ok = window.confirm(
+      endDate
+        ? `Bu qrupun bütün dərsləri ${fmtDot(endDate)} tarixində bitsin? Bu tarixdən sonrakı dərslər cədvəldən və jurnaldan silinəcək (qiymət yazılmış dərslər qalır).`
+        : `Bitmə tarixi silinsin? Dərslər yenə saata görə, ən gec semestr sonuna (${fmtDot(lessonDates.semester_end)}) qədər davam edəcək.`
+    );
+    if (!ok) return;
+    setBusy(true);
+    setError(null);
+    setOkMsg(null);
+    const res = await adminTimetableSetEndDate({
+      education_group_id: groupId,
+      education_year_id: yearId,
+      semester_id: semesterId,
+      end_date: endDate,
+    });
+    setBusy(false);
+    if (!res.ok) {
+      setError(res.error);
+      return;
+    }
+    const parts = [
+      endDate ? `Dərslər ${fmtDot(endDate)} tarixində bitir.` : "Bitmə tarixi silindi.",
+      res.removed_count > 0 ? `${res.removed_count} dərs silindi.` : "",
+      res.added_count > 0 ? `${res.added_count} dərs əlavə olundu.` : "",
+      res.kept_count > 0 ? `Qiymət yazılmış ${res.kept_count} dərs saxlanıldı.` : "",
+    ];
+    setOkMsg(parts.filter(Boolean).join(" "));
+    await loadBoard();
   }
 
   async function place(weekDay: number, clockId: string, weekType: 1 | 2 | 3, lesson: SelectedLesson) {
@@ -834,6 +885,54 @@ export function TimetableBuilder() {
             </span>
           ) : null}
         </label>
+
+        {groupId && lessonDates.teaching_start ? (
+          <fieldset className={styles.scopeBox}>
+            <legend className={styles.scopeLabel}>Dərslərin tarixi</legend>
+            <div className={styles.datesRow}>
+              Başlama
+              <span className={styles.scopeDate} title="Fənn qrupunun başlama tarixi">
+                {fmtDot(lessonDates.teaching_start)}
+              </span>
+            </div>
+            <label className={styles.datesRow}>
+              Bitmə
+              <input
+                type="date"
+                className={styles.scopeDate}
+                value={endDraft}
+                min={lessonDates.teaching_start}
+                disabled={busy}
+                onChange={(e) => setEndDraft(e.target.value)}
+              />
+            </label>
+            <div className={styles.datesActions}>
+              <button
+                type="button"
+                className={styles.datesBtn}
+                disabled={busy || !endDraft || endDraft === (lessonDates.end_date ?? "")}
+                onClick={() => void saveEndDate(endDraft)}
+              >
+                Tətbiq et
+              </button>
+              {lessonDates.end_date ? (
+                <button
+                  type="button"
+                  className={`${styles.datesBtn} ${styles.datesBtnGhost}`}
+                  disabled={busy}
+                  onClick={() => void saveEndDate(null)}
+                >
+                  Semestr sonuna qaytar
+                </button>
+              ) : null}
+            </div>
+            <span className={styles.hint}>
+              {lessonDates.end_date
+                ? `Dərslər ${fmtDot(lessonDates.end_date)} tarixində bitir.`
+                : `Başlama fənn qrupundan götürülür. Bitmə seçilməyibsə, dərslər saata görə, ən gec semestr sonuna (${fmtDot(lessonDates.semester_end)}) qədər gedir.`}
+            </span>
+          </fieldset>
+        ) : null}
 
         {!locked && groupId ? (
           <fieldset className={styles.scopeBox}>

@@ -417,6 +417,41 @@
   opacity: 0.55;
 }
 
+.datesRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.84rem;
+}
+
+.datesActions {
+  display: flex;
+  gap: 6px;
+}
+
+.datesBtn {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid #0b5cab;
+  border-radius: 6px;
+  background: #0b5cab;
+  color: #fff;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.datesBtnGhost {
+  background: #fff;
+  color: #0b5cab;
+}
+
+.datesBtn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
 .hint,
 .error {
   margin: 0;
