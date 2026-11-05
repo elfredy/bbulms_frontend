@@ -73,6 +73,11 @@ function slotBudget(lesson: TimetableAvailableLesson | null | undefined) {
   return { full: rem >= 2 ? 1 : 0, half: rem % 2, rem };
 }
 
+/** Bölünmüş tam dərsin hər saatı üst və ya alt həftənin yarım xanasına düşə bilər. */
+function halfAvailable(budget: { full: number; half: number }, split: boolean) {
+  return budget.half > 0 || (split && budget.full > 0);
+}
+
 function chipActive(lesson: TimetableAvailableLesson) {
   return remainingOf(lesson) > 0 || Boolean(lesson.can_join);
 }
@@ -176,6 +181,9 @@ export function TimetableBuilder() {
   const [endDraft, setEndDraft] = useState("");
   const [hoursRemaining, setHoursRemaining] = useState(0);
   const [selected, setSelected] = useState<SelectedLesson | null>(null);
+  const [splitKeys, setSplitKeys] = useState<Record<string, boolean>>({});
+  const isSplit = (lesson: SelectedLesson | null | undefined) =>
+    Boolean(lesson && splitKeys[lessonKey(lesson.course_id, lesson.lesson_type_id, lesson.course_group_id)]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
@@ -455,6 +463,7 @@ export function TimetableBuilder() {
       week_type: weekType,
       course_group_id: lesson.course_group_id || null,
       until_date: scope.until_date,
+      split_full: weekType !== 3 && isSplit(lesson),
     });
     setBusy(false);
     if (!res.ok) {
@@ -571,8 +580,12 @@ export function TimetableBuilder() {
         setError(budget.half > 0 ? "Bu dərs yalnız üst və ya alt həftədə olur, tam dərs ola bilməz" : "Bu fənn üçün boş saat qalmayıb");
         return;
       }
-      if (weekType !== 3 && budget.half <= 0) {
-        setError(budget.full > 0 ? "Bu dərs hər həftə keçir, tam dərs xanasına qoyun" : "Bu fənn üçün boş saat qalmayıb");
+      if (weekType !== 3 && !halfAvailable(budget, isSplit(lesson))) {
+        setError(
+          budget.full > 0
+            ? "Bu dərs hər həftə keçir. Tam xanaya qoyun və ya «Tam dərsi böl» seçin"
+            : "Bu fənn üçün boş saat qalmayıb",
+        );
         return;
       }
     }
@@ -736,6 +749,7 @@ export function TimetableBuilder() {
                   const down = assignedMap.get(slotKey(d.week_day, clock.id, 2)) ?? [];
                   const full = assignedMap.get(slotKey(d.week_day, clock.id, 3)) ?? [];
                   const budget = slotBudget(selectedLesson);
+                  const halfOk = halfAvailable(budget, isSplit(selected));
                   const joinable = Boolean(
                     selected?.course_group_id &&
                       [...up, ...down, ...full].some((x) => isSiblingHalf(x, selected))
@@ -745,11 +759,11 @@ export function TimetableBuilder() {
                   const canUp =
                     Boolean(selected) &&
                     !full.length &&
-                    ((up.length === 0 && (budget.half > 0 || joinable)) || canStack(up));
+                    ((up.length === 0 && (halfOk || joinable)) || canStack(up));
                   const canDown =
                     Boolean(selected) &&
                     !full.length &&
-                    ((down.length === 0 && (budget.half > 0 || joinable)) || canStack(down));
+                    ((down.length === 0 && (halfOk || joinable)) || canStack(down));
                   const canFull =
                     Boolean(selected) &&
                     ((full.length === 0 && !up.length && !down.length && budget.full > 0) ||
@@ -978,7 +992,7 @@ export function TimetableBuilder() {
               ? "Bu cədvəl təsdiqlənib. Dəyişmək üçün Yenilə düyməsinə basın."
                 : editing
                 ? "Redaktə rejimindəsiniz. Dəyişiklik semestr sonuna və ya seçdiyiniz tarixə qədər yazılır. Bu günə qədər təsdiqlənmiş dərslər köhnə tarixində qalır."
-                : "30 saat tam dərsdir. 15 saat — 45 və 75 saatlıq fənnin seminarı və ya qalığı — yalnız üst və ya yalnız alt həftəyə qoyulur, tam olmur."}
+                : "30 saat tam dərsdir. 15 saat — 45 və 75 saatlıq fənnin seminarı və ya qalığı — yalnız üst və ya yalnız alt həftəyə qoyulur, tam olmur. Tam dərsi üst/alt həftəyə bölmək üçün fənni seçib «Tam dərsi böl» işarələyin."}
           </p>
         ) : null}
 
@@ -1011,6 +1025,27 @@ export function TimetableBuilder() {
           </p>
         ) : null}
 
+        {!locked && selected && selectedLesson && slotBudget(selectedLesson).full > 0 ? (
+          <fieldset className={styles.scopeBox}>
+            <legend className={styles.scopeLabel}>Seçilmiş fənn</legend>
+            <label className={styles.scopeOption}>
+              <input
+                type="checkbox"
+                checked={isSplit(selected)}
+                onChange={(e) => {
+                  const k = lessonKey(selected.course_id, selected.lesson_type_id, selected.course_group_id);
+                  setSplitKeys((prev) => ({ ...prev, [k]: e.target.checked }));
+                  setError(null);
+                }}
+              />
+              Tam dərsi böl
+            </label>
+            <span className={styles.hint}>
+              Hər tam dərs iki yarıma bölünür və üst/alt həftə xanalarına fərqli gün və saatda qoyula bilər.
+            </span>
+          </fieldset>
+        ) : null}
+
         <div className={styles.chips}>
           {!groupId ? (
             <div className={styles.emptyChips}>Qrup seçəndən sonra fənnlər burada görünəcək.</div>
@@ -1027,10 +1062,13 @@ export function TimetableBuilder() {
                     (selected?.course_group_id || "") === (lesson.course_group_id || "");
                   const rem = remainingOf(lesson);
                   const budget = slotBudget(lesson);
-                  const placeHint =
-                    budget.full > 0 && budget.half > 0 ? "tam + üst/alt" : budget.half > 0 ? "yalnız üst və ya alt" : budget.full > 0 ? "tam" : "";
-                  const placeTag =
-                    budget.full > 0 && budget.half > 0 ? "tam+yarım" : budget.half > 0 ? "üst/alt" : budget.full > 0 ? "tam" : "";
+                  const split = budget.full > 0 && isSplit(lesson);
+                  const placeHint = split
+                    ? "tam dərs üst/alt həftəyə bölünür"
+                    : budget.full > 0 && budget.half > 0 ? "tam + üst/alt" : budget.half > 0 ? "yalnız üst və ya alt" : budget.full > 0 ? "tam" : "";
+                  const placeTag = split
+                    ? "bölünür"
+                    : budget.full > 0 && budget.half > 0 ? "tam+yarım" : budget.half > 0 ? "üst/alt" : budget.full > 0 ? "tam" : "";
                   const done = !chipActive(lesson);
                   const label = [lesson.lesson_type_az ?? lesson.lesson_letter, lesson.half_group_az].filter(Boolean).join(" · ");
                   return (

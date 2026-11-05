@@ -561,6 +561,7 @@ export async function adminTimetablePlace(body: {
   room_id?: string | null;
   course_group_id?: string | null;
   until_date?: string | null;
+  split_full?: boolean;
 }): Promise<{ ok: true; created_count: number } | { ok: false; error: string }> {
   const res = await fetch("/api/admin/timetable/place", {
     method: "POST",

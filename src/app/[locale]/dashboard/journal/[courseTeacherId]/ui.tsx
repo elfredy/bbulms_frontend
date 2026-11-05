@@ -444,7 +444,6 @@ export function JournalClient({
   initialMeetingGrids = null,
   initialExerciseLists,
   initialExercisePoints,
-  colloquiumAllowed = true,
   initialTab,
 }: {
   locale: string;
@@ -461,8 +460,6 @@ export function JournalClient({
   initialMeetingGrids?: JournalMeetingsResponse | null;
   initialExerciseLists?: { colloquium: CourseExerciseItem[]; referat: CourseExerciseItem[] };
   initialExercisePoints?: { colloquium: CourseExercisePointCell[]; referat: CourseExercisePointCell[] };
-  /** Kollokvium yalnız tam qrup (mühazirə) müəllimindədir; yarımqrup müəllimindən gizlədilir. */
-  colloquiumAllowed?: boolean;
   initialTab?: TabId;
 }) {
   const [liveMeetings, setLiveMeetings] = useState(meetings);
@@ -501,10 +498,7 @@ export function JournalClient({
     [visibleMeetings, semesterStart],
   );
 
-  const tabs = useMemo(() => TABS.filter((t) => colloquiumAllowed || t.id !== "colloquium"), [colloquiumAllowed]);
-  const [tab, setTab] = useState<TabId>(
-    initialTab && (colloquiumAllowed || initialTab !== "colloquium") ? initialTab : "attendance",
-  );
+  const [tab, setTab] = useState<TabId>(initialTab ?? "attendance");
   const [meetingId, setMeetingId] = useState<string>(() => initialMeetingId(meetings, semesterStart ?? null));
   const [cells, setCells] = useState<Record<string, JournalCell>>({});
   const [pointCells, setPointCells] = useState<Record<string, JournalCell>>({});
@@ -1212,7 +1206,7 @@ export function JournalClient({
     const timer = window.setTimeout(() => {
       loadResult();
       loadPointsGrid();
-      if (colloquiumAllowed) loadExercises("colloquium");
+      loadExercises("colloquium");
       loadExercises("referat");
     }, 0);
     return () => window.clearTimeout(timer);
@@ -1402,16 +1396,20 @@ export function JournalClient({
       }).length > 0
     );
   }, [selectedMeeting, meetingLockedById, meetingPendingByKey, meetingWindowCellsByMeetingId]);
+  /** Kollokvium siyahıdakı hər tələbəyə qiymət yazılmadan təsdiqlənmir; referat üçün ən azı bir qiymət kifayətdir. */
+  function exerciseGradedForConfirm(exType: "colloquium" | "referat", exerciseId: string): boolean {
+    const pts = exercisePointsByExerciseId[exerciseId] ?? {};
+    const filled = (sid: string) => exercisePointDisplay(pts[sid]).trim() !== "";
+    if (exType === "colloquium") return roster.length > 0 && roster.every((s) => filled(String(s.student_id)));
+    return Object.keys(pts).some(filled);
+  }
+
   const exerciseCanConfirm = useMemo(() => {
     if (tab !== "referat" && tab !== "colloquium") return false;
-    if (exercisePendingCount > 0) return true;
     const items = (exerciseItemsByType[tab]?.items ?? []) as any[];
-    return items.some((it) => {
-      if (it.confirmed || !it.editable) return false;
-      const pts = exercisePointsByExerciseId[String(it.course_execises_id)] ?? {};
-      return Object.values(pts).some((v) => String(v ?? "").trim() !== "");
-    });
-  }, [tab, exercisePendingCount, exerciseItemsByType, exercisePointsByExerciseId]);
+    return items.some((it) => !it.confirmed && it.editable && exerciseGradedForConfirm(tab, String(it.course_execises_id)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, exerciseItemsByType, exercisePointsByExerciseId, roster]);
 
   const incompleteStudentIds = useMemo(() => {
     const today = todayInBaku();
@@ -1664,15 +1662,9 @@ export function JournalClient({
     });
   }
 
-  function exerciseHasEntries(exType: "colloquium" | "referat", exerciseId: string): boolean {
-    if (Object.keys(exercisePendingByKey).some((k) => k.startsWith(`${exType}:${exerciseId}:`))) return true;
-    const pts = exercisePointsByExerciseId[exerciseId] ?? {};
-    return Object.values(pts).some((v) => String(v ?? "").trim() !== "");
-  }
-
   function confirmSaveExercises(exType: "colloquium" | "referat", exerciseId: string) {
     const item = ((exerciseItemsByType[exType]?.items ?? []) as any[]).find((it) => String(it.course_execises_id) === exerciseId);
-    if (!item || item.confirmed || !item.editable || !exerciseHasEntries(exType, exerciseId)) return;
+    if (!item || item.confirmed || !item.editable || !exerciseGradedForConfirm(exType, exerciseId)) return;
     const touchedExerciseIds = [exerciseId];
     const label = item.start_date ? fmtDateLabel(item.start_date) : "";
     if (
@@ -1800,7 +1792,7 @@ export function JournalClient({
 
       <div className={styles.tabsWrap}>
         <div className={styles.tabsList} role="tablist" aria-label="Jurnal bölmələri">
-          {tabs.map((t) => (
+          {TABS.map((t) => (
             <button
               key={t.id}
               type="button"
@@ -2236,7 +2228,7 @@ export function JournalClient({
                             const appeal = String(it.unlock_request ?? "").trim();
                             const canAppeal = !it.editable;
                             const canEditDate = exType === "colloquium" && !it.confirmed;
-                            const canConfirmDate = !it.confirmed && Boolean(it.editable) && exerciseHasEntries(exType, eid);
+                            const canConfirmDate = !it.confirmed && Boolean(it.editable) && exerciseGradedForConfirm(exType, eid);
                             return (
                             <th key={eid} className={`${styles.th} ${styles.thCell}`}>
                               <div className={styles.halfHead}>
@@ -2320,7 +2312,13 @@ export function JournalClient({
                                     type="button"
                                     className={`${styles.btn} ${styles.btnPrimary} ${styles.exerciseConfirmBtn}`}
                                     disabled={isPending || !canConfirmDate}
-                                    title={canConfirmDate ? "Bu tarixin qiymətlərini təsdiqlə" : "Əvvəl bu tarixə qiymət yazın"}
+                                    title={
+                                      canConfirmDate
+                                        ? "Bu tarixin qiymətlərini təsdiqlə"
+                                        : exType === "colloquium"
+                                          ? "Əvvəl bütün tələbələrə qiymət yazın"
+                                          : "Əvvəl bu tarixə qiymət yazın"
+                                    }
                                     onClick={() => confirmSaveExercises(exType, eid)}
                                   >
                                     Təsdiq et
