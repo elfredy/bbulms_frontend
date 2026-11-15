@@ -16,8 +16,10 @@ import type {
 } from "@/lib/api";
 import { fmtClockRange, fmtClockTime } from "@/lib/clock-time";
 import {
+  closeTeacherJournal,
   confirmTeacherCourseExercise,
   confirmTeacherJournalMeeting,
+  getTeacherJournalCloseStatus,
   requestTeacherExerciseUnlock,
   requestTeacherJournalUnlock,
   createTeacherCourseExercise,
@@ -34,6 +36,7 @@ import {
   upsertTeacherJournalCell,
   upsertTeacherJournalCellsBulk,
   upsertTeacherJournalPoint,
+  type JournalCloseStatus,
 } from "@/lib/api-client";
 import { LogoutButton } from "@/components/LogoutButton";
 import { TeacherCourseLessons } from "@/components/TeacherCourseLessons";
@@ -445,6 +448,7 @@ export function JournalClient({
   initialExerciseLists,
   initialExercisePoints,
   initialTab,
+  initialCloseStatus = null,
 }: {
   locale: string;
   courseTeacherId: string;
@@ -461,6 +465,7 @@ export function JournalClient({
   initialExerciseLists?: { colloquium: CourseExerciseItem[]; referat: CourseExerciseItem[] };
   initialExercisePoints?: { colloquium: CourseExercisePointCell[]; referat: CourseExercisePointCell[] };
   initialTab?: TabId;
+  initialCloseStatus?: JournalCloseStatus | null;
 }) {
   const [liveMeetings, setLiveMeetings] = useState(meetings);
   const visibleMeetings = useMemo(() => {
@@ -499,6 +504,14 @@ export function JournalClient({
   );
 
   const [tab, setTab] = useState<TabId>(initialTab ?? "attendance");
+  const [closeStatus, setCloseStatus] = useState<JournalCloseStatus | null>(initialCloseStatus);
+  const [closingJournal, setClosingJournal] = useState(false);
+  const journalClosed = Boolean(closeStatus?.closed);
+  const refreshCloseStatus = () => {
+    void getTeacherJournalCloseStatus(courseTeacherId).then((s) => {
+      if (s) setCloseStatus(s);
+    });
+  };
   const [meetingId, setMeetingId] = useState<string>(() => initialMeetingId(meetings, semesterStart ?? null));
   const [cells, setCells] = useState<Record<string, JournalCell>>({});
   const [pointCells, setPointCells] = useState<Record<string, JournalCell>>({});
@@ -1608,6 +1621,7 @@ export function JournalClient({
       setMeetingPendingByKey({});
       loadResult();
       loadQbCounts();
+      refreshCloseStatus();
     });
   }
 
@@ -1726,6 +1740,7 @@ export function JournalClient({
         };
       });
       loadResult();
+      refreshCloseStatus();
     });
   }
 
@@ -1783,12 +1798,66 @@ export function JournalClient({
           </div>
         ) : null}
         <div className={styles.headerActions}>
+          {journalClosed ? (
+            <span className={styles.closedBadge}>Jurnal bağlanıb</span>
+          ) : (
+            <button
+              type="button"
+              className={styles.closeJournalBtn}
+              disabled={closingJournal || !closeStatus?.can_close}
+              title={
+                closeStatus?.can_close
+                  ? "Bütün dərslər təsdiqlənib — jurnalı bağlaya bilərsiniz"
+                  : (closeStatus?.reasons || []).join(". ") || "Açıq dərs varsa bağlamaq olmaz"
+              }
+              onClick={() => {
+                if (!closeStatus?.can_close) return;
+                const ok = window.confirm(
+                  "Jurnal bağlansın? Yekun ballar transkriptə yazılacaq. Sonra dəyişiklik üçün adminə müraciət lazımdır.",
+                );
+                if (!ok) return;
+                setClosingJournal(true);
+                setErr(null);
+                void closeTeacherJournal(courseTeacherId).then((res) => {
+                  setClosingJournal(false);
+                  if (!res.ok) {
+                    setErr(res.error);
+                    void getTeacherJournalCloseStatus(courseTeacherId).then((s) => {
+                      if (s) setCloseStatus(s);
+                    });
+                    return;
+                  }
+                  setCloseStatus(res.data);
+                  const n = res.data.transcript_updated ?? 0;
+                  window.alert(
+                    n > 0
+                      ? `Jurnal bağlandı. ${n} tələbənin balı transkriptə yazıldı.`
+                      : "Jurnal bağlandı.",
+                  );
+                });
+              }}
+            >
+              {closingJournal ? "Bağlanır…" : "Jurnalı bağla"}
+            </button>
+          )}
           <a className={styles.backButton} href={`/${locale}/dashboard`}>
             Geri
           </a>
           <LogoutButton className={styles.logoutButton} onBeforeLogout={confirmLeavePage} />
         </div>
       </div>
+
+      {!journalClosed && closeStatus && !closeStatus.can_close && (closeStatus.open_meeting_count > 0 || closeStatus.open_exercise_count > 0) ? (
+        <p className={styles.closeHint}>
+          Bağlamaq üçün:{" "}
+          {closeStatus.open_meeting_count > 0 ? `${closeStatus.open_meeting_count} dərs təsdiqlənməyib` : null}
+          {closeStatus.open_meeting_count > 0 && closeStatus.open_exercise_count > 0 ? ", " : null}
+          {closeStatus.open_exercise_count > 0
+            ? `${closeStatus.open_exercise_count} kollokvium/referat təsdiqlənməyib`
+            : null}
+          .
+        </p>
+      ) : null}
 
       <div className={styles.tabsWrap}>
         <div className={styles.tabsList} role="tablist" aria-label="Jurnal bölmələri">
@@ -2406,7 +2475,7 @@ export function JournalClient({
                           onChange={(ev) =>
                             setBulkValueByEvaId((prev) => ({ ...prev, [e.course_eva_id]: String(ev.target.value) }))
                           }
-                          disabled={isPending || tab === "exam"}
+                          disabled={isPending || tab === "exam" || journalClosed}
                         >
                           {optionsForEval(e).map((o) => (
                             <option key={o.label} value={o.value}>
@@ -2418,7 +2487,7 @@ export function JournalClient({
                           type="button"
                           className={styles.bulkButton}
                           onClick={() => bulkApply(e)}
-                          disabled={isPending || tab === "exam" || (isMeetingEval(e.course_eva_id) && !meetingId)}
+                          disabled={isPending || tab === "exam" || journalClosed || (isMeetingEval(e.course_eva_id) && !meetingId)}
                         >
                           Hamısına
                         </button>
@@ -2445,7 +2514,7 @@ export function JournalClient({
                               const next = String(ev.target.value);
                               setLocal(s.student_id, e.course_eva_id, next);
                             }}
-                            disabled={isPending || tab === "exam" || (isMeetingEval(e.course_eva_id) && !meetingId)}
+                            disabled={isPending || tab === "exam" || journalClosed || (isMeetingEval(e.course_eva_id) && !meetingId)}
                           >
                             {optionsForEval(e).map((o) => (
                               <option key={o.label} value={o.value}>

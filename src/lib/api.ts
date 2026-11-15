@@ -1214,6 +1214,32 @@ export async function getTeacherJournalResultSimple(courseId: string): Promise<J
   return res.json();
 }
 
+export type JournalCloseStatus = {
+  closed: boolean;
+  course_closed?: boolean;
+  can_close: boolean;
+  open_meeting_count: number;
+  open_exercise_count: number;
+  meeting_count?: number;
+  reasons: string[];
+  open_meetings?: { course_meeting_id: string; meeting_date?: string | null; lesson_type_az?: string | null }[];
+  open_exercises?: { course_execises_id: string; start_date?: string | null; exercise_type?: string }[];
+};
+
+export async function getTeacherJournalCloseStatus(courseTeacherId: string): Promise<JournalCloseStatus | null> {
+  const cookieStore = await cookies();
+  const header = cookieStore.toString();
+  if (!header) return null;
+  const origin = serverApiBase();
+  const res = await fetch(`${origin}/api/teacher/courses/${encodeURIComponent(courseTeacherId)}/journal-close-status`, {
+    headers: { cookie: header },
+    cache: "no-store",
+  });
+  if (res.status === 403) return null;
+  if (!res.ok) return null;
+  return res.json();
+}
+
 export async function getTeacherCourseExercises(courseId: string, type: string): Promise<CourseExerciseListResponse | null> {
   const cookieStore = await cookies();
   const header = cookieStore.toString();

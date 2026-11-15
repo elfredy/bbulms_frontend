@@ -44,6 +44,8 @@ export default async function AdminHomePage({ params }: Props) {
         { href: `/${locale}/dashboard/admin/subject-groups`, label: t("subjectGroups") },
         { href: `/${locale}/dashboard/admin/courses`, label: t("timetable") },
         { href: `/${locale}/dashboard/admin/journal`, label: "Jurnal admin" },
+        { href: `/${locale}/dashboard/admin/exams`, label: "İmtahan" },
+        { href: `/${locale}/dashboard/admin/student-transcript`, label: "Tələbə transkripti" },
       ],
     },
   ];

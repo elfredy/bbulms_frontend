@@ -146,6 +146,42 @@ export async function confirmTeacherJournalMeeting(courseId: string, body: Journ
   return jsonOrNull(res);
 }
 
+export type JournalCloseStatus = {
+  closed: boolean;
+  course_closed?: boolean;
+  can_close: boolean;
+  open_meeting_count: number;
+  open_exercise_count: number;
+  meeting_count?: number;
+  reasons: string[];
+  open_meetings?: { course_meeting_id: string; meeting_date?: string | null; lesson_type_az?: string | null }[];
+  open_exercises?: { course_execises_id: string; start_date?: string | null; exercise_type?: string }[];
+  transcript_updated?: number;
+  detail?: string;
+};
+
+export async function getTeacherJournalCloseStatus(courseTeacherId: string): Promise<JournalCloseStatus | null> {
+  const res = await fetch(`/api/teacher/courses/${encodeURIComponent(courseTeacherId)}/journal-close-status`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  return jsonOrNull(res);
+}
+
+export async function closeTeacherJournal(
+  courseTeacherId: string,
+): Promise<{ ok: true; data: JournalCloseStatus } | { ok: false; error: string }> {
+  const res = await fetch(`/api/teacher/courses/${encodeURIComponent(courseTeacherId)}/journal/close`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!res.ok) {
+    return { ok: false, error: (await readErrorDetail(res)) || "Jurnal bağlanmadı" };
+  }
+  const data = (await res.json()) as JournalCloseStatus;
+  return { ok: true, data };
+}
+
 export async function getTeacherJournalPointsGrid(courseId: string): Promise<JournalPointsGridResponse | null> {
   const res = await fetch(`/api/teacher/courses/${courseId}/journal-points`, {
     credentials: "include",

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { SearchableSelect } from "@/components/SearchableSelect";
@@ -129,6 +130,7 @@ function windowStartForMeeting(meetings: { course_meeting_id: string }[], meetin
 }
 
 export function AdminJournalClient({
+  locale,
   initialCourseId,
   initialMeetingId,
 }: {
@@ -720,6 +722,43 @@ export function AdminJournalClient({
           title={confirmedCount < 1 ? "Təsdiqlənmiş dərs yoxdur" : `${confirmedCount} təsdiqi qaldır`}
         >
           Bütün təsdiqləri qaldır
+        </button>
+        {groupId ? (
+          <Link
+            className={styles.activate}
+            href={`/${locale}/dashboard/admin/student-transcript?education_group_id=${encodeURIComponent(groupId)}`}
+            style={{ textAlign: "center", textDecoration: "none", background: "#1d4ed8" }}
+          >
+            Tələbə transkripti
+          </Link>
+        ) : null}
+        <button
+          type="button"
+          className={styles.liftAll}
+          style={{ background: "#0f766e" }}
+          disabled={!courseId || busy}
+          onClick={() => {
+            if (!courseId) return;
+            if (!window.confirm("Bu fənn qrupunun jurnalını yenidən açmaq istəyirsiniz?")) return;
+            setBusy(true);
+            setError(null);
+            setOkMsg(null);
+            void fetch(`/api/admin/journal/courses/${encodeURIComponent(courseId)}/reopen`, {
+              method: "POST",
+              credentials: "include",
+            })
+              .then(async (res) => {
+                const data = await res.json().catch(() => null);
+                if (!res.ok) {
+                  setError(typeof data?.detail === "string" ? data.detail : "Jurnal açılmadı");
+                  return;
+                }
+                setOkMsg("Jurnal yenidən açıldı.");
+              })
+              .finally(() => setBusy(false));
+          }}
+        >
+          Jurnalı yenidən aç
         </button>
         {okMsg ? <p className={styles.ok}>{okMsg}</p> : null}
       </aside>

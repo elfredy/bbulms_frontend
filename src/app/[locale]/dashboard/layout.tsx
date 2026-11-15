@@ -29,6 +29,9 @@ export default async function DashboardLayout({ children, params }: Props) {
     : [
         { href: `/${locale}/dashboard`, label: "Şəxsi kabinet" },
         ...(isStudent ? [{ href: `/${locale}/dashboard/schedule`, label: "Dərs cədvəli", section: "Tələbə" }] : []),
+        ...(me.teacher_id
+          ? [{ href: `/${locale}/dashboard/exams`, label: "İmtahan balları", section: "Müəllim" }]
+          : []),
         ...(isTutor ? [{ href: `/${locale}/dashboard/tutor`, label: "Tyutor paneli", section: "Tyutor" }] : []),
         ...(isAdminRole
           ? [
@@ -48,6 +51,8 @@ export default async function DashboardLayout({ children, params }: Props) {
               { href: `/${locale}/dashboard/admin/subject-groups`, label: "Fənn qrupları", section: "Təhsil proqramları" },
               { href: `/${locale}/dashboard/admin/courses`, label: "Cari semestrin dərs cədvəli", section: "Təhsil proqramları" },
               { href: `/${locale}/dashboard/admin/journal`, label: "Jurnal admin", section: "Təhsil proqramları" },
+              { href: `/${locale}/dashboard/admin/exams`, label: "İmtahan", section: "Təhsil proqramları" },
+              { href: `/${locale}/dashboard/admin/student-transcript`, label: "Tələbə transkripti", section: "Təhsil proqramları" },
             ]
           : []),
         ...(isDepartment ? [{ href: `/${locale}/dashboard/department`, label: "Kafedra paneli", section: "Kafedra" }] : []),

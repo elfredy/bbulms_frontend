@@ -11,6 +11,7 @@ import {
   getTeacherCourseMeetings,
   getTeacherCourseRoster,
   getTeacherCourses,
+  getTeacherJournalCloseStatus,
   getTeacherJournalMeetings,
   type TeacherCourseItem,
 } from "@/lib/api";
@@ -97,17 +98,27 @@ export default async function JournalPage({ params, searchParams }: Props) {
   });
 
   const meetingIds = meetings.map((m) => String(m.course_meeting_id));
-  const [roster, evals, teacherCourses, gradeBundle, colloquiumList, colloquiumPoints, referatList, referatPoints] =
-    await Promise.all([
-      getTeacherCourseRoster(courseId, ctIds),
-      getTeacherCourseEvaluations(courseId),
-      getTeacherCourses(),
-      getTeacherJournalMeetings(courseId, meetingIds),
-      getTeacherCourseExercises(courseId, "colloquium"),
-      getTeacherCourseExerciseAllPoints(courseId, "colloquium"),
-      getTeacherCourseExercises(courseId, "referat"),
-      getTeacherCourseExerciseAllPoints(courseId, "referat"),
-    ]);
+  const [
+    roster,
+    evals,
+    teacherCourses,
+    gradeBundle,
+    colloquiumList,
+    colloquiumPoints,
+    referatList,
+    referatPoints,
+    closeStatus,
+  ] = await Promise.all([
+    getTeacherCourseRoster(courseId, ctIds),
+    getTeacherCourseEvaluations(courseId),
+    getTeacherCourses(),
+    getTeacherJournalMeetings(courseId, meetingIds),
+    getTeacherCourseExercises(courseId, "colloquium"),
+    getTeacherCourseExerciseAllPoints(courseId, "colloquium"),
+    getTeacherCourseExercises(courseId, "referat"),
+    getTeacherCourseExerciseAllPoints(courseId, "referat"),
+    getTeacherJournalCloseStatus(ctId),
+  ]);
   if (!roster || !evals) {
     return <p>{t("loadError")}</p>;
   }
@@ -144,6 +155,7 @@ export default async function JournalPage({ params, searchParams }: Props) {
         referat: referatPoints?.cells ?? [],
       }}
       initialTab={initialTab}
+      initialCloseStatus={closeStatus}
     />
   );
 }
