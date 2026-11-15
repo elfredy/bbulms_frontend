@@ -425,7 +425,6 @@ export function AdminExamClient({ locale }: { locale: string }) {
                 setFacultyId(id);
                 setPage(1);
               }}
-              compact
             />
           </div>
           <div className={styles.field}>
@@ -437,7 +436,6 @@ export function AdminExamClient({ locale }: { locale: string }) {
                 setYearId(id);
                 setPage(1);
               }}
-              compact
             />
           </div>
           <div className={styles.field}>
@@ -449,7 +447,6 @@ export function AdminExamClient({ locale }: { locale: string }) {
                 setSemesterId(id);
                 setPage(1);
               }}
-              compact
             />
           </div>
           <div className={styles.field}>
@@ -461,7 +458,6 @@ export function AdminExamClient({ locale }: { locale: string }) {
                 setTypeId(id);
                 setPage(1);
               }}
-              compact
             />
           </div>
           <div className={styles.field}>
@@ -494,19 +490,21 @@ export function AdminExamClient({ locale }: { locale: string }) {
               }}
             />
           </div>
-          <button
-            type="button"
-            className={styles.btn}
-            onClick={() => {
-              setQ(qDraft.trim());
-              setPage(1);
-            }}
-          >
-            Axtar
-          </button>
-          <button type="button" className={styles.btnPrimary} onClick={openCreate}>
-            İmtahan əlavə et
-          </button>
+          <div className={styles.toolbarActions}>
+            <button
+              type="button"
+              className={styles.btn}
+              onClick={() => {
+                setQ(qDraft.trim());
+                setPage(1);
+              }}
+            >
+              Axtar
+            </button>
+            <button type="button" className={styles.btnPrimary} onClick={openCreate}>
+              İmtahan əlavə et
+            </button>
+          </div>
         </div>
 
         {error ? <p className={styles.error}>{error}</p> : null}
@@ -600,7 +598,7 @@ export function AdminExamClient({ locale }: { locale: string }) {
             <h2 className={styles.sideTitle}>İmtahan əlavə et</h2>
             <div className={styles.field}>
               <span className={styles.label}>İmtahan növü *</span>
-              <SearchableSelect value={cTypeId} options={typeOpts} onChange={setCTypeId} compact />
+              <SearchableSelect value={cTypeId} options={typeOpts} onChange={setCTypeId} />
             </div>
             <div className={styles.field}>
               <span className={styles.label}>Fakültə</span>
@@ -611,7 +609,6 @@ export function AdminExamClient({ locale }: { locale: string }) {
                   setCFacultyId(id);
                   setCCourseId("");
                 }}
-                compact
               />
             </div>
             <div className={styles.field}>
@@ -623,7 +620,6 @@ export function AdminExamClient({ locale }: { locale: string }) {
                   setCYearId(id);
                   setCCourseId("");
                 }}
-                compact
               />
             </div>
             <div className={styles.field}>
@@ -635,7 +631,6 @@ export function AdminExamClient({ locale }: { locale: string }) {
                   setCSemesterId(id);
                   setCCourseId("");
                 }}
-                compact
               />
             </div>
             <div className={styles.field}>
@@ -645,16 +640,15 @@ export function AdminExamClient({ locale }: { locale: string }) {
                 options={courseOpts}
                 onChange={setCCourseId}
                 placeholder="Fənn qrupu seçin"
-                compact
               />
             </div>
             <div className={styles.field}>
               <span className={styles.label}>Otaq *</span>
-              <SearchableSelect value={cRoomId} options={roomOpts} onChange={setCRoomId} compact />
+              <SearchableSelect value={cRoomId} options={roomOpts} onChange={setCRoomId} />
             </div>
             <div className={styles.field}>
               <span className={styles.label}>İmtahanın növü *</span>
-              <SearchableSelect value={cIntType} options={intTypeOpts} onChange={setCIntType} compact />
+              <SearchableSelect value={cIntType} options={intTypeOpts} onChange={setCIntType} />
             </div>
             <div className={styles.field}>
               <span className={styles.label}>Status</span>
