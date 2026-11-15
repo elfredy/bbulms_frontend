@@ -290,16 +290,20 @@ export type AdminCourseMeetingItem = {
   lesson_type_id: string | null;
   lesson_type_az: string | null;
   meeting_date: string | null;
+  week_day?: string | null;
+  week_type?: string | null;
   clock_id: string | null;
   start_time: string | null;
   end_time: string | null;
   room_id: string | null;
   room_name: string | null;
   point_status: string | null;
+  has_journal?: boolean;
 };
 
 export type AdminCourseMeetingListResponse = {
   course_id: string;
+  counts?: Record<string, number>;
   items: AdminCourseMeetingItem[];
 };
 

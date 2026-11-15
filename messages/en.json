@@ -126,7 +126,7 @@
     "timetableCreate": "Create timetable",
     "timetableCreateHint": "Choose faculty (pick Magistratura for master's groups), year, semester and group. Leave subject type as All. Select a subject on the right and place it on the upper/lower week or the full-lesson block. To change a confirmed timetable, click Update.",
     "coursesHint": "Select a course to view meeting dates.",
-    "meetingsHint": "Meeting dates and times for this course.",
+    "meetingsHint": "Meeting dates and times for this course. After timetable changes you can select and remove excess lectures/seminars (soft-delete).",
     "timetableCourse": "Timetable (CourseId: {id})",
     "fromDate": "From",
     "toDate": "To",
