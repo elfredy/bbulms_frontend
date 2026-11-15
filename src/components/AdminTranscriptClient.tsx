@@ -334,7 +334,6 @@ export function AdminTranscriptClient({
               setSpecialtyId("");
               setGroupId("");
             }}
-            compact
           />
         </div>
         <div className={styles.field}>
@@ -346,7 +345,6 @@ export function AdminTranscriptClient({
               setSpecialtyId(id);
               setGroupId("");
             }}
-            compact
           />
         </div>
         <div className={styles.field}>
@@ -358,7 +356,6 @@ export function AdminTranscriptClient({
               setYearId(id);
               setGroupId("");
             }}
-            compact
           />
         </div>
         <div className={styles.field}>
@@ -368,7 +365,6 @@ export function AdminTranscriptClient({
             options={groupOpts}
             onChange={(id) => setGroupId(id)}
             placeholder="Qrup seçin"
-            compact
           />
         </div>
 
