@@ -27,8 +27,38 @@
 
 .studentTitle {
   margin: 0;
-  font-size: 1rem;
+  font-size: 1.15rem;
   font-weight: 800;
+}
+
+.docKicker {
+  margin: 0 0 2px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
+.docMeta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px 14px;
+  margin-top: 10px;
+}
+
+.docMeta > div {
+  display: grid;
+  gap: 2px;
+}
+
+.docMeta span {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.docMeta strong {
+  font-size: 0.86rem;
+  font-weight: 700;
 }
 
 .meta {

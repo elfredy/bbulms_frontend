@@ -71,6 +71,7 @@ export function AdminTranscriptClient({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -198,32 +199,54 @@ export function AdminTranscriptClient({
     if (studentId) void loadTranscript(studentId);
   }, [studentId, loadTranscript]);
 
+  const downloadBlob = async (urlPath: string, filename: string, failMsg: string) => {
+    const res = await fetch(urlPath, { credentials: "include", cache: "no-store" });
+    if (!res.ok) {
+      setError(await readDetail(res, failMsg));
+      return;
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
   const exportXlsx = async () => {
     if (!studentId) return;
     setExporting(true);
     setError(null);
     try {
-      const res = await fetch(`/api/admin/transcript/students/${encodeURIComponent(studentId)}/export`, {
-        credentials: "include",
-        cache: "no-store",
-      });
-      if (!res.ok) {
-        setError(await readDetail(res, "Export alınmadı"));
-        return;
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `transkript_${(header?.full_name || studentId).replace(/\s+/g, "_")}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      await downloadBlob(
+        `/api/admin/transcript/students/${encodeURIComponent(studentId)}/export`,
+        `transkript_${(header?.full_name || studentId).replace(/\s+/g, "_")}.xlsx`,
+        "Export alınmadı",
+      );
     } catch {
       setError("Export alınmadı");
     } finally {
       setExporting(false);
+    }
+  };
+
+  const exportPdf = async () => {
+    if (!studentId) return;
+    setExportingPdf(true);
+    setError(null);
+    try {
+      await downloadBlob(
+        `/api/admin/transcript/students/${encodeURIComponent(studentId)}/export.pdf`,
+        `transkript_${(header?.full_name || studentId).replace(/\s+/g, "_")}.pdf`,
+        "PDF alınmadı",
+      );
+    } catch {
+      setError("PDF alınmadı");
+    } finally {
+      setExportingPdf(false);
     }
   };
 
@@ -250,14 +273,31 @@ export function AdminTranscriptClient({
       <div className={styles.main}>
         <div className={styles.headerRow}>
           <div>
-            <h2 className={styles.studentTitle}>{header?.full_name || "Tələbə transkripti"}</h2>
+            <p className={styles.docKicker}>Bakı Biznes Universiteti</p>
+            <h2 className={styles.studentTitle}>Tələbə transkripti</h2>
             {header ? (
-              <p className={styles.meta}>
-                {[header.faculty_name, header.speciality_name, header.group_name ? `Qrup ${header.group_name}` : null]
-                  .filter(Boolean)
-                  .join(" · ")}
-                {header.student_card_no ? ` · Bilet: ${header.student_card_no}` : ""}
-              </p>
+              <div className={styles.docMeta}>
+                <div>
+                  <span>Tələbə</span>
+                  <strong>{header.full_name}</strong>
+                </div>
+                <div>
+                  <span>Fakültə</span>
+                  <strong>{header.faculty_name || "—"}</strong>
+                </div>
+                <div>
+                  <span>İxtisas</span>
+                  <strong>{header.speciality_name || "—"}</strong>
+                </div>
+                <div>
+                  <span>Qrup</span>
+                  <strong>{header.group_name || "—"}</strong>
+                </div>
+                <div>
+                  <span>Tələbə bileti</span>
+                  <strong>{header.student_card_no || "—"}</strong>
+                </div>
+              </div>
             ) : (
               <p className={styles.meta}>Sağdan fakültə / ixtisas / akademik qrup və tələbə seçin.</p>
             )}
@@ -266,6 +306,14 @@ export function AdminTranscriptClient({
             <button
               type="button"
               className={styles.btnPrimary}
+              disabled={!studentId || exportingPdf || rows.length === 0}
+              onClick={() => void exportPdf()}
+            >
+              {exportingPdf ? "PDF…" : "PDF export"}
+            </button>
+            <button
+              type="button"
+              className={styles.btn}
               disabled={!studentId || exporting || rows.length === 0}
               onClick={() => void exportXlsx()}
             >

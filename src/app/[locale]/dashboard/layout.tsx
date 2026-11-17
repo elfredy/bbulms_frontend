@@ -28,9 +28,17 @@ export default async function DashboardLayout({ children, params }: Props) {
     ? [{ href: `/${locale}/dashboard/change-password`, label: "Şifrəni dəyiş" }]
     : [
         { href: `/${locale}/dashboard`, label: "Şəxsi kabinet" },
-        ...(isStudent ? [{ href: `/${locale}/dashboard/schedule`, label: "Dərs cədvəli", section: "Tələbə" }] : []),
+        ...(isStudent
+          ? [
+              { href: `/${locale}/dashboard/schedule`, label: "Dərs cədvəli", section: "Tələbə" },
+              { href: `/${locale}/dashboard/requests`, label: "Müraciətlər", section: "Tələbə" },
+            ]
+          : []),
         ...(me.teacher_id
-          ? [{ href: `/${locale}/dashboard/exams`, label: "İmtahan balları", section: "Müəllim" }]
+          ? [
+              { href: `/${locale}/dashboard/exams`, label: "İmtahan balları", section: "Müəllim" },
+              { href: `/${locale}/dashboard/requests`, label: "Müraciətlər", section: "Müəllim" },
+            ]
           : []),
         ...(isTutor ? [{ href: `/${locale}/dashboard/tutor`, label: "Tyutor paneli", section: "Tyutor" }] : []),
         ...(isAdminRole

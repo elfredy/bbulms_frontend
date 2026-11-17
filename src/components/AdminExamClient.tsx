@@ -771,6 +771,38 @@ export function AdminExamClient({ locale }: { locale: string }) {
                   void (async () => {
                     try {
                       const res = await fetch(
+                        `/api/admin/exams/${encodeURIComponent(selectedExamId)}/sheet.pdf`,
+                        { credentials: "include", cache: "no-store" },
+                      );
+                      if (!res.ok) {
+                        setError(await readDetail(res, "PDF alınmadı"));
+                        return;
+                      }
+                      const blob = await res.blob();
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `imtahan_vereqi_${selectedExamId}.pdf`;
+                      document.body.appendChild(a);
+                      a.click();
+                      a.remove();
+                      URL.revokeObjectURL(url);
+                    } catch {
+                      setError("PDF alınmadı");
+                    }
+                  })();
+                }}
+              >
+                PDF (İmtahan vərəqi)
+              </button>
+              <button
+                type="button"
+                className={styles.btn}
+                onClick={() => {
+                  if (!selectedExamId) return;
+                  void (async () => {
+                    try {
+                      const res = await fetch(
                         `/api/admin/exams/${encodeURIComponent(selectedExamId)}/scores/export`,
                         { credentials: "include", cache: "no-store" },
                       );
