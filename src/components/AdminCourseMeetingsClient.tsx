@@ -276,6 +276,25 @@ export function AdminCourseMeetingsClient({
           <button
             type="button"
             disabled={busy}
+            onClick={() => {
+              setSelected(new Set(items.filter((m) => !m.has_journal).map((m) => m.course_meeting_id)));
+              setMsg(null);
+              setErr(null);
+            }}
+            style={{
+              padding: "10px 12px",
+              borderRadius: 10,
+              border: "1px solid var(--border)",
+              background: "var(--card)",
+              color: "var(--text)",
+              cursor: "pointer",
+            }}
+          >
+            Boş slotları seç
+          </button>
+          <button
+            type="button"
+            disabled={busy}
             onClick={() => selectLatestByType("110000112", 1)}
             style={{
               padding: "10px 12px",
@@ -343,7 +362,7 @@ export function AdminCourseMeetingsClient({
                   <th className={tableStyles.th}>Dərs növü</th>
                   <th className={tableStyles.th}>Müəllim</th>
                   <th className={tableStyles.th}>Otaq</th>
-                  <th className={tableStyles.th}>Jurnal</th>
+                  <th className={tableStyles.th}>Qiymət</th>
                 </tr>
               </thead>
               <tbody>
@@ -364,7 +383,7 @@ export function AdminCourseMeetingsClient({
                     <td className={tableStyles.td}>{m.lesson_type_az?.trim() || "—"}</td>
                     <td className={tableStyles.td}>{m.teacher_fullname?.trim() || "—"}</td>
                     <td className={tableStyles.td}>{m.room_name?.trim() || "—"}</td>
-                    <td className={tableStyles.td}>{m.has_journal ? "var" : "—"}</td>
+                    <td className={tableStyles.td}>{m.has_journal ? "var" : "boş"}</td>
                   </tr>
                 ))}
               </tbody>

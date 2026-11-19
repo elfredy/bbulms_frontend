@@ -312,7 +312,8 @@ function isLessonOpen(m: CourseMeetingItem, today: string): boolean {
 
 /**
  * Təsdiq yalnız yuxarıdan seçilmiş dərsə aiddir.
- * Bu günün dərsi və təsdiqi qaldırılmış keçmiş dərs açıq sayılır; qiyməti varsa təsdiqlənir.
+ * Bu gün / unlock edilmiş dərs, və ya keçmişdə artıq qiyməti olan dərs təsdiqlənə bilər
+ * (keçmiş boş slotlar bağlamanı bloklamır; qiymətli keçmiş isə unlock olmadan təsdiqlənir).
  */
 function confirmableMeetingIds(
   meetings: CourseMeetingItem[],
@@ -322,10 +323,13 @@ function confirmableMeetingIds(
 ): string[] {
   return meetings
     .filter((m) => {
-      if (!isLessonOpen(m, today)) return false;
       const mid = String(m.course_meeting_id);
       if (locked[mid]) return false;
-      return hasValues(mid);
+      if (isFutureLesson(m, today)) return false;
+      if (!hasValues(mid)) return false;
+      if (isLessonOpen(m, today)) return true;
+      const d = dateOnly(m.meeting_date);
+      return Boolean(d) && d < today;
     })
     .map((m) => String(m.course_meeting_id));
 }
@@ -1799,7 +1803,9 @@ export function JournalClient({
         ) : null}
         <div className={styles.headerActions}>
           {journalClosed ? (
-            <span className={styles.closedBadge}>Jurnal bağlanıb</span>
+            <span className={styles.closedBadge} title="Dəyişiklik üçün dərs sütunundakı məktub ikonu ilə adminə müraciət edin">
+              Jurnal bağlanıb — açmaq üçün ✉ müraciət
+            </span>
           ) : (
             <button
               type="button"
@@ -1946,7 +1952,8 @@ export function JournalClient({
                     const future = isFutureLesson(m, today);
                     const closed = !isLessonOpen(m, today);
                     const appeal = String(m.unlock_request ?? "").trim();
-                    const canAppeal = locked || (closed && !future);
+                    // Təsdiqlənmiş / keçmiş bağlı / jurnal bağlanıb → müraciət ikonu
+                    const canAppeal = !future && (locked || closed || journalClosed);
                     return (
                       <th key={mid} className={`${styles.th} ${styles.thCell}`}>
                         <div className={styles.pairTitle}>
@@ -1965,12 +1972,12 @@ export function JournalClient({
                             {canAppeal ? (
                               <button
                                 type="button"
-                                className={`${styles.mailBtn} ${appeal ? styles.mailBtnSent : ""}`}
+                                className={`${styles.mailBtn} ${appeal ? styles.mailBtnSent : ""} ${locked || journalClosed ? styles.mailBtnUrgent : ""}`}
                                 title={
                                   appeal
                                     ? "Müraciət göndərilib. Mətni dəyişmək üçün açın."
-                                    : locked
-                                      ? "Təsdiqin qaldırılması üçün müraciət yazın"
+                                    : locked || journalClosed
+                                      ? "Bağlı/təsdiqlənmiş dərs üçün açılma müraciəti yazın"
                                       : "Bağlı dərs üçün müraciət yazın"
                                 }
                                 aria-label="Müraciət"

@@ -571,6 +571,12 @@
   cursor: pointer;
 }
 
+.mailBtnUrgent {
+  background: #fff7ed;
+  border-color: #fdba74;
+  color: #c2410c;
+}
+
 .mailBtnSent {
   background: #dbeafe;
   border-color: #93c5fd;

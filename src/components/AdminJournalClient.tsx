@@ -25,6 +25,7 @@ type Meeting = {
   lesson_type_id: string | null;
   lesson_type_az: string | null;
   confirmed?: boolean;
+  has_marks?: boolean;
   unlock_request?: string | null;
 };
 type Student = { student_id: string; person_fullname: string; qb_count: number; half_group_az?: string | null };
@@ -382,9 +383,73 @@ export function AdminJournalClient({
         setError(typeof data?.detail === "string" ? data.detail : "Təsdiq qaldırılmadı");
         return;
       }
-      setOkMsg("Təsdiq qaldırıldı. Müəllim dəyişiklik edə bilər.");
+      setOkMsg("Təsdiq qaldırıldı; jurnal açıldı. Müəllim dəyişiklik edə bilər.");
       window.dispatchEvent(new Event("bbu-journal-unlocks-changed"));
       await loadGrid(courseId, meetingId);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deleteEmptyMeeting(meetingId: string) {
+    if (!courseId) return;
+    if (!window.confirm("Bu boş dərs slotu silinsin? (Jurnalda qiymət yoxdur)")) return;
+    setBusy(true);
+    setError(null);
+    setOkMsg(null);
+    try {
+      const res = await fetch(`/api/admin/courses/${encodeURIComponent(courseId)}/meetings/deactivate`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ meeting_ids: [meetingId], allow_with_journal: false }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError(typeof data?.detail === "string" ? data.detail : "Slot silinmədi");
+        return;
+      }
+      const n = Number(data?.deactivated_count ?? 0);
+      const skipped = Number(data?.skipped_journal_count ?? 0);
+      if (n < 1) {
+        setError(skipped > 0 ? "Bu dərsdə qiymət var — silinmədi" : "Slot silinmədi");
+        return;
+      }
+      setOkMsg("Boş dərs slotu silindi.");
+      await loadGrid(courseId, focusMeetingId || undefined);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deleteAllEmptyMeetings() {
+    if (!courseId) return;
+    const emptyIds = (grid?.meetings ?? [])
+      .filter((m) => !m.has_marks && !m.confirmed && String(m.point_status ?? "") !== STATUS_CONFIRMED)
+      .map((m) => m.course_meeting_id);
+    if (emptyIds.length < 1) {
+      setOkMsg(null);
+      setError("Silinəcək boş dərs slotu yoxdur");
+      return;
+    }
+    if (!window.confirm(`${emptyIds.length} boş dərs slotu silinsin?`)) return;
+    setBusy(true);
+    setError(null);
+    setOkMsg(null);
+    try {
+      const res = await fetch(`/api/admin/courses/${encodeURIComponent(courseId)}/meetings/deactivate`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ meeting_ids: emptyIds, allow_with_journal: false }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError(typeof data?.detail === "string" ? data.detail : "Boş slotlar silinmədi");
+        return;
+      }
+      setOkMsg(`Silindi: ${Number(data?.deactivated_count ?? 0)} boş dərs`);
+      await loadGrid(courseId, focusMeetingId || undefined);
     } finally {
       setBusy(false);
     }
@@ -416,6 +481,9 @@ export function AdminJournalClient({
 
   const confirmedCount = meetings.filter(
     (m) => Boolean(m.confirmed) || String(m.point_status ?? "") === STATUS_CONFIRMED,
+  ).length;
+  const emptyMeetingCount = meetings.filter(
+    (m) => !m.has_marks && !(Boolean(m.confirmed) || String(m.point_status ?? "") === STATUS_CONFIRMED),
   ).length;
 
   async function liftAllConfirms() {
@@ -512,15 +580,29 @@ export function AdminJournalClient({
                     const request = String(m.unlock_request ?? "").trim();
                     const day = String(m.meeting_date ?? "").slice(0, 10);
                     const closed = Boolean(day) && day < todayInBaku() && !confirmed;
+                    const empty = !m.has_marks && !confirmed;
                     const focused = focusMeetingId === m.course_meeting_id;
                     return (
-                      <th key={m.course_meeting_id} className={`${styles.th} ${focused || request ? styles.thFocus : ""}`}>
+                      <th key={m.course_meeting_id} className={`${styles.th} ${focused || request ? styles.thFocus : ""} ${empty ? styles.thEmpty : ""}`}>
                         <div className={styles.headDate}>
                           {m.meeting_date || "—"}
                           {lt ? ` (${lt})` : ""}
                         </div>
                         <span className={styles.headTime}>{fmtClockRange(m.start_time, m.end_time) || " "}</span>
-                        <span className={styles.headStatus}>{confirmed ? "Təsdiq olunub" : closed ? "Bağlı" : " "}</span>
+                        <span className={styles.headStatus}>
+                          {confirmed ? "Təsdiq olunub" : empty ? "Boş slot" : closed ? "Bağlı" : " "}
+                        </span>
+                        {empty ? (
+                          <button
+                            type="button"
+                            className={styles.deleteSlotBtn}
+                            disabled={busy}
+                            title="Boş dərs slotunu sil"
+                            onClick={() => void deleteEmptyMeeting(m.course_meeting_id)}
+                          >
+                            Slotu sil
+                          </button>
+                        ) : null}
                         {request ? (
                           <div className={styles.requestBox}>
                             <span className={styles.requestText} title={request}>
@@ -713,6 +795,15 @@ export function AdminJournalClient({
         )}
         <button type="button" className={styles.activate} onClick={() => void activateJournal()} disabled={!courseId || busy}>
           Jurnalın aktivləşdirilməsi
+        </button>
+        <button
+          type="button"
+          className={styles.deleteEmptyAll}
+          onClick={() => void deleteAllEmptyMeetings()}
+          disabled={!courseId || busy || emptyMeetingCount < 1}
+          title={emptyMeetingCount < 1 ? "Boş dərs slotu yoxdur" : `${emptyMeetingCount} boş slotu sil`}
+        >
+          Boş slotları sil{emptyMeetingCount > 0 ? ` (${emptyMeetingCount})` : ""}
         </button>
         <button
           type="button"
