@@ -1803,9 +1803,35 @@ export function JournalClient({
         ) : null}
         <div className={styles.headerActions}>
           {journalClosed ? (
-            <span className={styles.closedBadge} title="Dəyişiklik üçün dərs sütunundakı məktub ikonu ilə adminə müraciət edin">
-              Jurnal bağlanıb — açmaq üçün ✉ müraciət
-            </span>
+            <button
+              type="button"
+              className={`${styles.closedBadge} ${styles.closedBadgeBtn} ${
+                meetingId && String(selectedMeeting?.unlock_request ?? "").trim() ? styles.mailBtnSent : ""
+              }`}
+              title={
+                meetingId
+                  ? "Admin qəbul edəndə təsdiqlənməmiş bütün dərslər açılacaq"
+                  : "Əvvəl yuxarıdan dərs tarixi seçin"
+              }
+              disabled={!meetingId || isPending}
+              onClick={() => {
+                if (!meetingId) {
+                  setErr("Müraciət üçün yuxarıdan dərs tarixi seçin");
+                  return;
+                }
+                const existing = String(selectedMeeting?.unlock_request ?? "").trim();
+                setAppealOpenId((cur) => (cur === meetingId ? null : meetingId));
+                setAppealDraft(existing || "Jurnal bağlıdır; təsdiqlənməmiş dərsləri açın.");
+              }}
+            >
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                <path
+                  fill="currentColor"
+                  d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 4-8 5L4 8V6l8 5 8-5v2z"
+                />
+              </svg>
+              Jurnal bağlanıb — müraciət yaz
+            </button>
           ) : (
             <button
               type="button"
@@ -1911,6 +1937,20 @@ export function JournalClient({
             >
               Ləğv et
             </button>
+            {journalClosed && meetingId ? (
+              <button
+                type="button"
+                className={`${styles.btn} ${styles.btnAppeal}`}
+                disabled={isPending}
+                onClick={() => {
+                  const existing = String(selectedMeeting?.unlock_request ?? "").trim();
+                  setAppealOpenId((cur) => (cur === meetingId ? null : meetingId));
+                  setAppealDraft(existing);
+                }}
+              >
+                ✉ Açılma müraciəti
+              </button>
+            ) : null}
             <div className={styles.actionHint}>
               {savingHint
                 ? savingHint
@@ -1925,6 +1965,31 @@ export function JournalClient({
                 {incompleteStudentIds.size} tələbədə qiymət və ya i.e / q.b yazılmayıb (qırmızı).
                 {leaveHighlight ? " Səhifəni tərk etməzdən əvvəl yazın və ya təsdiq edin." : ""}
               </p>
+            ) : null}
+            {journalClosed && meetingId && appealOpenId === meetingId ? (
+              <form
+                className={styles.appealBoxWide}
+                onSubmit={(ev) => {
+                  ev.preventDefault();
+                  sendAppeal(meetingId);
+                }}
+              >
+                <div className={styles.actionHint}>
+                  Admin qəbul edəndə <strong>təsdiqlənməmiş bütün dərslər</strong> açılacaq (yalnız 1 tarix yox).
+                </div>
+                <textarea
+                  className={styles.appealInput}
+                  rows={3}
+                  maxLength={500}
+                  placeholder="Nəyi dəyişmək lazımdır? (adminə göndəriləcək)"
+                  value={appealDraft}
+                  onChange={(ev) => setAppealDraft(ev.target.value)}
+                  disabled={isPending}
+                />
+                <button type="submit" className={styles.appealSend} disabled={isPending}>
+                  Müraciəti göndər
+                </button>
+              </form>
             ) : null}
             <div className={styles.actionHint}>
               Üst və alt həftə tarix sırası ilə göstərilir. Təsdiq et düyməsi yuxarıdan seçilmiş dərs tarixini bağlayır. Gələcək dərslərə qiymət yazmaq olmaz.

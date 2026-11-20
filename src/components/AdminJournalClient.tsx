@@ -369,7 +369,12 @@ export function AdminJournalClient({
 
   async function liftConfirm(meetingId: string) {
     if (!courseId) return;
-    if (!window.confirm("Bu dərsin təsdiqi qaldırılsın? Müəllim davamiyyət və qiymətləndirməni yenidən dəyişə biləcək.")) return;
+    if (
+      !window.confirm(
+        "Müraciət qəbul edilsin? Jurnal açılacaq və təsdiqlənməmiş bütün dərslər müəllimə açılacaq.",
+      )
+    )
+      return;
     setBusy(true);
     setError(null);
     setOkMsg(null);
@@ -383,7 +388,12 @@ export function AdminJournalClient({
         setError(typeof data?.detail === "string" ? data.detail : "Təsdiq qaldırılmadı");
         return;
       }
-      setOkMsg("Təsdiq qaldırıldı; jurnal açıldı. Müəllim dəyişiklik edə bilər.");
+      const opened = Number(data?.opened_unconfirmed_count ?? 0);
+      setOkMsg(
+        opened > 0
+          ? `Jurnal açıldı; təsdiqlənməmiş ${opened} dərs müəllimə açıldı.`
+          : "Təsdiq qaldırıldı; jurnal açıldı. Müəllim dəyişiklik edə bilər.",
+      );
       window.dispatchEvent(new Event("bbu-journal-unlocks-changed"));
       await loadGrid(courseId, meetingId);
     } finally {

@@ -173,12 +173,52 @@
 .closedBadge {
   display: inline-flex;
   align-items: center;
+  gap: 0.4rem;
   padding: 0.4rem 0.75rem;
   border-radius: 10px;
   background: #fee2e2;
   color: #991b1b;
   font-weight: 800;
   font-size: 0.82rem;
+}
+
+.closedBadgeBtn {
+  border: 1px solid #fecaca;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  font-size: 0.82rem;
+}
+
+.closedBadgeBtn:hover:not(:disabled) {
+  background: #fecaca;
+}
+
+.closedBadgeBtn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.btnAppeal {
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  color: #c2410c;
+  font-weight: 700;
+}
+
+.btnAppeal:hover:not(:disabled) {
+  background: #ffedd5;
+}
+
+.appealBoxWide {
+  display: grid;
+  gap: 6px;
+  width: min(420px, 100%);
+  margin-top: 4px;
+  padding: 10px;
+  border: 1px solid #fdba74;
+  border-radius: 10px;
+  background: #fffbeb;
 }
 
 .closeHint {

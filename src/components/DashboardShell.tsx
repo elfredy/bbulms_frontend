@@ -117,7 +117,14 @@ export function DashboardShell({ me, items, children }: Props) {
     const title = [notice.course_code, notice.subject_name_az].filter(Boolean).join(" — ") || "Fənn qrupu";
     const when = notice.meeting_date ? ` (${notice.meeting_date})` : "";
     const what = notice.exercise_label || "dərs";
-    if (!window.confirm(`${title}${when} üçün ${what} üzrə təsdiq qaldırılsın? Müraciət siyahıdan çıxacaq.`)) return;
+    if (
+      !window.confirm(
+        notice.kind === "exercise"
+          ? `${title}${when} üçün ${what} üzrə təsdiq qaldırılsın? Müraciət siyahıdan çıxacaq.`
+          : `${title}${when} müraciəti qəbul edilsin? Jurnal açılacaq və təsdiqlənməmiş bütün dərslər müəllimə açılacaq.`,
+      )
+    )
+      return;
     setLiftingId(notice.id);
     setNoticeError(null);
     const exerciseId = String(notice.course_execises_id ?? "").trim();
