@@ -22,6 +22,8 @@ export type UserProfile = {
   faculty_name_az?: string | null;
   is_department_user?: boolean;
   is_superadmin?: boolean;
+  can_access_admin?: boolean;
+  permissions?: string[];
   must_change_password?: boolean;
 };
 

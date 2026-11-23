@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { EducationPlanCreateForm } from "@/components/EducationPlanCreateForm";
 import { AdminFormPage } from "@/components/admin/form-shared";
 import { adminEducationPlanLookups, getMe } from "@/lib/api";
+import { canAccessAdminPath } from "@/lib/permissions";
 
 type Props = { params: Promise<{ locale: string }> };
 
@@ -13,7 +14,7 @@ export default async function AdminEducationPlanCreatePage({ params }: Props) {
 
   const me = await getMe();
   if (!me) redirect(`/${locale}/login`);
-  if (!me.is_superadmin) redirect(`/${locale}/dashboard`);
+  if (!canAccessAdminPath(me, "education-plans/new")) redirect(`/${locale}/dashboard`);
 
   const lookups = await adminEducationPlanLookups();
   if (!lookups) {

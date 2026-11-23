@@ -3,6 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 
 import { getMe } from "@/lib/api";
+import { PERMS, canAccessAdmin, hasPerm } from "@/lib/permissions";
 
 import styles from "../dashboard.module.css";
 
@@ -13,42 +14,47 @@ export default async function AdminHomePage({ params }: Props) {
   const t = await getTranslations("admin");
   const me = await getMe();
   if (!me) redirect(`/${locale}/login`);
-  if (!me.is_superadmin) redirect(`/${locale}/dashboard`);
+  if (!canAccessAdmin(me)) redirect(`/${locale}/dashboard`);
 
   const groups = [
     {
       title: "Planlama",
       items: [
-        { href: `/${locale}/dashboard/admin/edu-years`, label: "Tədris illərinin qrafiki" },
-        { href: `/${locale}/dashboard/admin/academic-calendar`, label: "Akademik təqvim" },
-        { href: `/${locale}/dashboard/admin/evaluation`, label: "Qiymətləndirmə sistemi" },
+        { href: `/${locale}/dashboard/admin/edu-years`, label: "Tədris illərinin qrafiki", perm: PERMS.PLANNING },
+        { href: `/${locale}/dashboard/admin/academic-calendar`, label: "Akademik təqvim", perm: PERMS.PLANNING },
+        { href: `/${locale}/dashboard/admin/evaluation`, label: "Qiymətləndirmə sistemi", perm: PERMS.PLANNING },
       ],
     },
     {
       title: "Müəssisə idarəsi",
       items: [
-        { href: `/${locale}/dashboard/admin/orders`, label: "Tələbə əmrləri" },
-        { href: `/${locale}/dashboard/admin/students`, label: "Tələbələr" },
-        { href: `/${locale}/dashboard/admin/teachers`, label: "Pedaqoji heyət" },
-        { href: `/${locale}/dashboard/admin/teachers?staff_role=TYUTOR`, label: "Tyutorlar" },
-        { href: `/${locale}/dashboard/admin/teachers?staff_role=LABORANT`, label: "Laborantlar" },
-        { href: `/${locale}/dashboard/admin/user-roles`, label: "İstifadəçi rolları" },
-        { href: `/${locale}/dashboard/admin/groups`, label: "Tələbə qrupları" },
+        { href: `/${locale}/dashboard/admin/orders`, label: "Tələbə əmrləri", perm: PERMS.ORG_ORDERS },
+        { href: `/${locale}/dashboard/admin/students`, label: "Tələbələr", perm: PERMS.ORG_STUDENTS },
+        { href: `/${locale}/dashboard/admin/teachers`, label: "Pedaqoji heyət", perm: PERMS.ORG_STAFF },
+        { href: `/${locale}/dashboard/admin/teachers?staff_role=TYUTOR`, label: "Tyutorlar", perm: PERMS.ORG_STAFF },
+        { href: `/${locale}/dashboard/admin/teachers?staff_role=LABORANT`, label: "Laborantlar", perm: PERMS.ORG_STAFF },
+        { href: `/${locale}/dashboard/admin/user-roles`, label: "İstifadəçi rolları", perm: PERMS.ROLES_MANAGE },
+        { href: `/${locale}/dashboard/admin/groups`, label: "Tələbə qrupları", perm: PERMS.ORG_GROUPS },
       ],
     },
     {
       title: "Təhsil proqramları",
       items: [
-        { href: `/${locale}/dashboard/admin/subject-catalog`, label: "Kafedralar üzrə fənn kataloqu" },
-        { href: `/${locale}/dashboard/admin/education-plans`, label: t("educationPlans") },
-        { href: `/${locale}/dashboard/admin/subject-groups`, label: t("subjectGroups") },
-        { href: `/${locale}/dashboard/admin/courses`, label: t("timetable") },
-        { href: `/${locale}/dashboard/admin/journal`, label: "Jurnal admin" },
-        { href: `/${locale}/dashboard/admin/exams`, label: "İmtahan" },
-        { href: `/${locale}/dashboard/admin/student-transcript`, label: "Tələbə transkripti" },
+        { href: `/${locale}/dashboard/admin/subject-catalog`, label: "Kafedralar üzrə fənn kataloqu", perm: PERMS.EDU_CATALOG },
+        { href: `/${locale}/dashboard/admin/education-plans`, label: t("educationPlans"), perm: PERMS.EDU_PLANS },
+        { href: `/${locale}/dashboard/admin/subject-groups`, label: t("subjectGroups"), perm: PERMS.EDU_PLANS },
+        { href: `/${locale}/dashboard/admin/courses`, label: t("timetable"), perm: PERMS.EDU_TIMETABLE },
+        { href: `/${locale}/dashboard/admin/journal`, label: "Jurnal admin", perm: PERMS.EDU_JOURNAL },
+        { href: `/${locale}/dashboard/admin/exams`, label: "İmtahan", perm: PERMS.EDU_EXAM },
+        { href: `/${locale}/dashboard/admin/student-transcript`, label: "Tələbə transkripti", perm: PERMS.EDU_TRANSCRIPT },
       ],
     },
-  ];
+  ]
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => hasPerm(me, item.perm)),
+    }))
+    .filter((group) => group.items.length > 0);
 
   return (
     <div className={styles.page}>

@@ -3,6 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 
 import { adminGetDepartmentDetail, getMe } from "@/lib/api";
+import { canAccessAdminPath } from "@/lib/permissions";
 
 import styles from "../../../dashboard.module.css";
 
@@ -14,7 +15,7 @@ export default async function AdminDepartmentDetailPage({ params }: Props) {
 
   const me = await getMe();
   if (!me) redirect(`/${locale}/login`);
-  if (!me.is_superadmin) redirect(`/${locale}/dashboard`);
+  if (!canAccessAdminPath(me, "departments/[departmentId]")) redirect(`/${locale}/dashboard`);
 
   const data = await adminGetDepartmentDetail(departmentId);
   if (!data) {

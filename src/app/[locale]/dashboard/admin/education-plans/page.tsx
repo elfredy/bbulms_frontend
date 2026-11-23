@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { EducationPlanRowMenu } from "@/components/admin/EducationPlanRowMenu";
 import { adminEducationPlanLookups, adminListEducationPlans, getMe } from "@/lib/api";
+import { canAccessAdminPath } from "@/lib/permissions";
 
 import styles from "../../dashboard.module.css";
 
@@ -43,7 +44,7 @@ export default async function AdminEducationPlansPage({ params, searchParams }: 
 
   const me = await getMe();
   if (!me) redirect(`/${locale}/login`);
-  if (!me.is_superadmin) redirect(`/${locale}/dashboard`);
+  if (!canAccessAdminPath(me, "education-plans")) redirect(`/${locale}/dashboard`);
 
   const q = (sp.q ?? "").trim();
   const educationTypeId = (sp.education_type_id ?? "").trim();

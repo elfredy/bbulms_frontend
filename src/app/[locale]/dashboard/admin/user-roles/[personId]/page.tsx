@@ -5,6 +5,7 @@ import { UserRoleForm } from "@/components/admin/UserRoleForm";
 import { AdminFormPage } from "@/components/admin/form-shared";
 import { adminGetUserRole, adminInstitutionLookups } from "@/lib/admin-org";
 import { getMe } from "@/lib/api";
+import { canAccessAdminPath } from "@/lib/permissions";
 
 import styles from "../../../dashboard.module.css";
 
@@ -18,7 +19,7 @@ export default async function AdminUserRoleDetailPage({ params, searchParams }: 
   const saved = ((await searchParams) ?? {}).saved === "1";
   const me = await getMe();
   if (!me) redirect(`/${locale}/login`);
-  if (!me.is_superadmin) redirect(`/${locale}/dashboard`);
+  if (!canAccessAdminPath(me, "user-roles/[personId]")) redirect(`/${locale}/dashboard`);
 
   const [lookups, person] = await Promise.all([adminInstitutionLookups(), adminGetUserRole(personId)]);
   if (!lookups || !person) redirect(`/${locale}/dashboard/admin/user-roles`);

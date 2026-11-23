@@ -4,6 +4,7 @@ import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 
 import { adminListCourses, adminListTeachers, adminGetGroupDetail, getMe } from "@/lib/api";
+import { canAccessAdminPath } from "@/lib/permissions";
 import { adminListOrders } from "@/lib/admin-org";
 import { GroupStudentsPanel } from "@/components/admin/GroupStudentsPanel";
 import { serverApiBase } from "@/lib/server-api-base";
@@ -31,7 +32,7 @@ export default async function AdminGroupDetailPage({ params, searchParams }: Pro
 
   const me = await getMe();
   if (!me) redirect(`/${locale}/login`);
-  if (!me.is_superadmin) redirect(`/${locale}/dashboard`);
+  if (!canAccessAdminPath(me, "groups/[educationGroupId]")) redirect(`/${locale}/dashboard`);
 
   const data = await adminGetGroupDetail(educationGroupId);
   if (!data) {

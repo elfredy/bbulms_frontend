@@ -4,6 +4,7 @@ import { GroupForm } from "@/components/admin/GroupForm";
 import { AdminFormPage } from "@/components/admin/form-shared";
 import { adminInstitutionLookups } from "@/lib/admin-org";
 import { adminGetGroupDetail, getMe } from "@/lib/api";
+import { canAccessAdminPath } from "@/lib/permissions";
 
 type Props = { params: Promise<{ locale: string; educationGroupId: string }> };
 
@@ -11,7 +12,7 @@ export default async function EditGroupPage({ params }: Props) {
   const { locale, educationGroupId } = await params;
   const me = await getMe();
   if (!me) redirect(`/${locale}/login`);
-  if (!me.is_superadmin) redirect(`/${locale}/dashboard`);
+  if (!canAccessAdminPath(me, "groups/[educationGroupId]/edit")) redirect(`/${locale}/dashboard`);
   const [lookups, data] = await Promise.all([adminInstitutionLookups(), adminGetGroupDetail(educationGroupId)]);
   if (!lookups || !data) redirect(`/${locale}/dashboard/admin/groups`);
 

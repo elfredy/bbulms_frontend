@@ -3,6 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 
 import { adminListSubjectGroups, getMe } from "@/lib/api";
+import { canAccessAdminPath } from "@/lib/permissions";
 import { SubjectGroupRowMenu } from "@/components/SubjectGroupRowMenu";
 
 import styles from "../../dashboard.module.css";
@@ -43,7 +44,7 @@ export default async function AdminSubjectGroupsPage({ params, searchParams }: P
 
   const me = await getMe();
   if (!me) redirect(`/${locale}/login`);
-  if (!me.is_superadmin) redirect(`/${locale}/dashboard`);
+  if (!canAccessAdminPath(me, "subject-groups")) redirect(`/${locale}/dashboard`);
 
   const q = (sp.q ?? "").trim();
   const educationPlanId = (sp.education_plan_id ?? "").trim();

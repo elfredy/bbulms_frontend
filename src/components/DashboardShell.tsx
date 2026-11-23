@@ -8,6 +8,7 @@ import { usePathname, useRouter } from "next/navigation";
 
 import { LocaleSwitcher } from "@/components/LocaleSwitcher";
 import { LogoutButton } from "@/components/LogoutButton";
+import { PERMS, hasPerm } from "@/lib/permissions";
 
 import styles from "./DashboardShell.module.css";
 
@@ -24,6 +25,8 @@ export type DashboardMe = {
   user_type?: string | null;
   user_type_label?: string | null;
   is_superadmin?: boolean | null;
+  can_access_admin?: boolean | null;
+  permissions?: string[] | null;
   must_change_password?: boolean | null;
   available_roles?: { id: string; label: string }[];
 };
@@ -149,8 +152,10 @@ export function DashboardShell({ me, items, children }: Props) {
     }
   }
 
+  const canJournalUnlock = hasPerm(me, PERMS.EDU_JOURNAL);
+
   useEffect(() => {
-    if (!me.is_superadmin) return;
+    if (!canJournalUnlock) return;
     let alive = true;
     async function load() {
       try {
@@ -170,7 +175,7 @@ export function DashboardShell({ me, items, children }: Props) {
       window.clearInterval(timer);
       window.removeEventListener("bbu-journal-unlocks-changed", load);
     };
-  }, [me.is_superadmin]);
+  }, [canJournalUnlock]);
 
   useEffect(() => {
     setOpenSections((prev) => {
@@ -231,7 +236,7 @@ export function DashboardShell({ me, items, children }: Props) {
             </label>
           ) : null}
           {me.is_superadmin ? <p className={styles.userMeta}>Superadmin · aktiv</p> : null}
-          {me.is_superadmin ? (
+          {canJournalUnlock ? (
             <div className={styles.noticeBox}>
               <button
                 type="button"
@@ -269,7 +274,7 @@ export function DashboardShell({ me, items, children }: Props) {
                       >
                         <span>{item.label}</span>
                         {item.badge ? <span className={styles.pill}>{item.badge}</span> : null}
-                        {!item.badge && me.is_superadmin && item.href.endsWith("/admin/journal") && notices.length ? (
+                        {!item.badge && canJournalUnlock && item.href.endsWith("/admin/journal") && notices.length ? (
                           <span className={styles.pill}>{notices.length}</span>
                         ) : null}
                       </Link>
@@ -307,7 +312,7 @@ export function DashboardShell({ me, items, children }: Props) {
                           <span className={styles.bullet} aria-hidden />
                           <span>{item.label}</span>
                           {item.badge ? <span className={styles.pill}>{item.badge}</span> : null}
-                          {!item.badge && me.is_superadmin && item.href.endsWith("/admin/journal") && notices.length ? (
+                          {!item.badge && canJournalUnlock && item.href.endsWith("/admin/journal") && notices.length ? (
                             <span className={styles.pill}>{notices.length}</span>
                           ) : null}
                         </Link>
@@ -331,7 +336,7 @@ export function DashboardShell({ me, items, children }: Props) {
         {children}
       </div>
 
-      {me.is_superadmin && noticesOpen ? (
+      {canJournalUnlock && noticesOpen ? (
         <div className={styles.noticeOverlay} role="presentation" onClick={() => setNoticesOpen(false)}>
           <div
             className={styles.noticeModal}

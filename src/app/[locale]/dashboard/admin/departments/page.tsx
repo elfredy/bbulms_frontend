@@ -3,6 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 
 import { adminListDepartments, getMe } from "@/lib/api";
+import { canAccessAdminPath } from "@/lib/permissions";
 
 import styles from "../../dashboard.module.css";
 
@@ -18,7 +19,7 @@ export default async function AdminDepartmentsPage({ params, searchParams }: Pro
 
   const me = await getMe();
   if (!me) redirect(`/${locale}/login`);
-  if (!me.is_superadmin) redirect(`/${locale}/dashboard`);
+  if (!canAccessAdminPath(me, "departments")) redirect(`/${locale}/dashboard`);
 
   const q = (sp.q ?? "").trim() || null;
   const data = await adminListDepartments(q, 100, 0);

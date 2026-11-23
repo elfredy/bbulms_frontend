@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { StudentImportForm } from "@/components/admin/StudentImportForm";
 import { adminInstitutionLookups } from "@/lib/admin-org";
 import { getMe } from "@/lib/api";
+import { canAccessAdminPath } from "@/lib/permissions";
 
 import styles from "../../../dashboard.module.css";
 
@@ -13,7 +14,7 @@ export default async function ImportStudentsPage({ params }: Props) {
   const { locale } = await params;
   const me = await getMe();
   if (!me) redirect(`/${locale}/login`);
-  if (!me.is_superadmin) redirect(`/${locale}/dashboard`);
+  if (!canAccessAdminPath(me, "students/import")) redirect(`/${locale}/dashboard`);
   const lookups = await adminInstitutionLookups();
   if (!lookups) redirect(`/${locale}/dashboard/admin/students`);
 

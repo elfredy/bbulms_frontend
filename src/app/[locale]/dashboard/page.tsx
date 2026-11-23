@@ -21,7 +21,11 @@ export default async function DashboardPage({ params }: Props) {
   const isStudent = user.user_type === "STUDENT" && user.student_id != null;
   const isDepartmentUser = Boolean(user.is_department_user);
   const isTutor = user.user_type === "TYUTOR";
-  const isSuperadmin = user.user_type === "ADMIN" || user.user_type === "SUPERADMIN";
+  const isOffice =
+    user.can_access_admin ||
+    user.is_superadmin ||
+    ["ADMIN", "SUPERADMIN", "TEDRIS", "DEKANAT"].includes((user.user_type || "").toUpperCase());
+  const isSuperadmin = Boolean(user.is_superadmin);
 
   const teacherCourses = isTeacher ? await getTeacherCourses() : null;
   const studentCourses = isStudent ? await getStudentCourses() : null;
@@ -124,7 +128,7 @@ export default async function DashboardPage({ params }: Props) {
               Kafedra paneli
             </a>
           ) : null}
-          {isSuperadmin ? (
+          {isOffice ? (
             <a className={styles.actionLink} href={`/${locale}/dashboard/admin`}>
               Admin panel
             </a>

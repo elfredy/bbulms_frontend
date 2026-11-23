@@ -7,6 +7,7 @@ import { TeacherForm } from "@/components/admin/TeacherForm";
 import { AdminFormPage } from "@/components/admin/form-shared";
 import { adminInstitutionLookups } from "@/lib/admin-org";
 import { adminGetTeacherDetail, getMe } from "@/lib/api";
+import { canAccessAdminPath } from "@/lib/permissions";
 
 import styles from "../../../dashboard.module.css";
 
@@ -17,7 +18,7 @@ export default async function AdminTeacherDetailPage({ params }: Props) {
   const t = await getTranslations("admin");
   const me = await getMe();
   if (!me) redirect(`/${locale}/login`);
-  if (!me.is_superadmin) redirect(`/${locale}/dashboard`);
+  if (!canAccessAdminPath(me, "teachers/[teacherId]")) redirect(`/${locale}/dashboard`);
 
   const [data, lookups] = await Promise.all([adminGetTeacherDetail(teacherId), adminInstitutionLookups()]);
   if (!data || !lookups) {

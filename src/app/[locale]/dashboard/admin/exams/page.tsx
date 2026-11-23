@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { AdminExamClient } from "@/components/AdminExamClient";
 import { getMe } from "@/lib/api";
+import { canAccessAdminPath } from "@/lib/permissions";
 
 import styles from "../../dashboard.module.css";
 
@@ -13,7 +14,7 @@ export default async function AdminExamsPage({ params }: Props) {
   const { locale } = await params;
   const me = await getMe();
   if (!me) redirect(`/${locale}/login`);
-  if (!me.is_superadmin) redirect(`/${locale}/dashboard`);
+  if (!canAccessAdminPath(me, "exams")) redirect(`/${locale}/dashboard`);
 
   return (
     <div className={styles.pageWide}>

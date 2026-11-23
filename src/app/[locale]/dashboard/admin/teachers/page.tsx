@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { AdminRowMenu } from "@/components/admin/AdminRowMenu";
 import { pageList } from "@/lib/admin-org";
 import { adminListTeachers, getMe } from "@/lib/api";
+import { canAccessAdminPath } from "@/lib/permissions";
 
 import styles from "../../dashboard.module.css";
 
@@ -19,7 +20,7 @@ export default async function AdminTeachersPage({ params, searchParams }: Props)
   const t = await getTranslations("admin");
   const me = await getMe();
   if (!me) redirect(`/${locale}/login`);
-  if (!me.is_superadmin) redirect(`/${locale}/dashboard`);
+  if (!canAccessAdminPath(me, "teachers")) redirect(`/${locale}/dashboard`);
 
   const q = (sp.q ?? "").trim();
   const staffRole = (sp.staff_role ?? "").trim().toUpperCase() || null;

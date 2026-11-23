@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { AcademicCalendarFilter } from "@/components/admin/AcademicCalendarFilter";
 import { adminAcademicCalendar } from "@/lib/admin-org";
 import { getMe } from "@/lib/api";
+import { canAccessAdminPath } from "@/lib/permissions";
 
 import styles from "../../dashboard.module.css";
 
@@ -16,7 +17,7 @@ export default async function AcademicCalendarPage({ params, searchParams }: Pro
   const sp = (await searchParams) ?? {};
   const me = await getMe();
   if (!me) redirect(`/${locale}/login`);
-  if (!me.is_superadmin) redirect(`/${locale}/dashboard`);
+  if (!canAccessAdminPath(me, "academic-calendar")) redirect(`/${locale}/dashboard`);
   const data = await adminAcademicCalendar(sp.education_year_id ?? null);
 
   if (!data) {

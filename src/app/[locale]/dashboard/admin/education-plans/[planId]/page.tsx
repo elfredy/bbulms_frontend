@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { EducationPlanSubjectsBoard } from "@/components/admin/EducationPlanSubjectsBoard";
 import { adminEducationPlanLookups, adminGetEducationPlan, getMe } from "@/lib/api";
+import { canAccessAdminPath } from "@/lib/permissions";
 
 import styles from "../../../dashboard.module.css";
 
@@ -15,7 +16,7 @@ export default async function AdminEducationPlanDetailPage({ params }: Props) {
 
   const me = await getMe();
   if (!me) redirect(`/${locale}/login`);
-  if (!me.is_superadmin) redirect(`/${locale}/dashboard`);
+  if (!canAccessAdminPath(me, "education-plans/[planId]")) redirect(`/${locale}/dashboard`);
 
   const [data, lookups] = await Promise.all([adminGetEducationPlan(planId), adminEducationPlanLookups()]);
   if (!data) notFound();

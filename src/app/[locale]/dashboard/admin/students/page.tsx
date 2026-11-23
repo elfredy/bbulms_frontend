@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { StudentRowMenu } from "@/components/admin/StudentRowMenu";
 import { adminInstitutionLookups, adminListStudents, pageList } from "@/lib/admin-org";
 import { getMe } from "@/lib/api";
+import { canAccessAdminPath } from "@/lib/permissions";
 
 import styles from "../../dashboard.module.css";
 
@@ -17,7 +18,7 @@ export default async function AdminStudentsPage({ params, searchParams }: Props)
   const sp = (await searchParams) ?? {};
   const me = await getMe();
   if (!me) redirect(`/${locale}/login`);
-  if (!me.is_superadmin) redirect(`/${locale}/dashboard`);
+  if (!canAccessAdminPath(me, "students")) redirect(`/${locale}/dashboard`);
 
   const q = (sp.q ?? "").trim();
   const groupId = (sp.education_group_id ?? "").trim();

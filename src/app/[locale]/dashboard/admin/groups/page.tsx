@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { AdminRowMenu } from "@/components/admin/AdminRowMenu";
 import { pageList } from "@/lib/admin-org";
 import { adminListGroups, getMe } from "@/lib/api";
+import { canAccessAdminPath } from "@/lib/permissions";
 
 import styles from "../../dashboard.module.css";
 
@@ -19,7 +20,7 @@ export default async function AdminGroupsPage({ params, searchParams }: Props) {
   const t = await getTranslations("admin");
   const me = await getMe();
   if (!me) redirect(`/${locale}/login`);
-  if (!me.is_superadmin) redirect(`/${locale}/dashboard`);
+  if (!canAccessAdminPath(me, "groups")) redirect(`/${locale}/dashboard`);
 
   const q = (sp.q ?? "").trim();
   const pageSize = Math.min(200, Math.max(1, Number(sp.pageSize) || 25));

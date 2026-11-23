@@ -4,6 +4,7 @@ import { SubjectBlockCreateForm } from "@/components/admin/SubjectBlockCreateFor
 import { SubjectCatalogForm } from "@/components/admin/SubjectCatalogForm";
 import { adminInstitutionLookups, adminListSubjectBlocks } from "@/lib/admin-org";
 import { getMe } from "@/lib/api";
+import { canAccessAdminPath } from "@/lib/permissions";
 
 import styles from "../../dashboard.module.css";
 
@@ -13,7 +14,7 @@ export default async function SubjectBlocksPage({ params }: Props) {
   const { locale } = await params;
   const me = await getMe();
   if (!me) redirect(`/${locale}/login`);
-  if (!me.is_superadmin) redirect(`/${locale}/dashboard`);
+  if (!canAccessAdminPath(me, "subject-blocks")) redirect(`/${locale}/dashboard`);
 
   const [data, lookups] = await Promise.all([adminListSubjectBlocks(), adminInstitutionLookups()]);
 

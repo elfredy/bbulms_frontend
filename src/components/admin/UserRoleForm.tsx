@@ -13,6 +13,8 @@ const ROLE_OPTIONS = [
   { id: "TYUTOR", label: "Tyutor" },
   { id: "LABORANT", label: "Laborant" },
   { id: "ADMIN", label: "Admin" },
+  { id: "TEDRIS", label: "Tədris şöbəsi" },
+  { id: "DEKANAT", label: "Dekanat" },
   { id: "SUPERADMIN", label: "Superadmin" },
 ];
 

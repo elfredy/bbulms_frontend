@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { AdminJournalClient } from "@/components/AdminJournalClient";
 import { getMe } from "@/lib/api";
+import { canAccessAdminPath } from "@/lib/permissions";
 
 import styles from "../../dashboard.module.css";
 
@@ -15,7 +16,7 @@ export default async function AdminJournalPage({ params, searchParams }: Props) 
   const sp = (await searchParams) ?? {};
   const me = await getMe();
   if (!me) redirect(`/${locale}/login`);
-  if (!me.is_superadmin) redirect(`/${locale}/dashboard`);
+  if (!canAccessAdminPath(me, "journal")) redirect(`/${locale}/dashboard`);
 
   return (
     <div className={styles.pageWide}>

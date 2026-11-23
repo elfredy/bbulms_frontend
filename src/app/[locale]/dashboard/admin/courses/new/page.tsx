@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import formStyles from "@/components/admin/AdminForm.module.css";
 import { adminListCourses, getMe } from "@/lib/api";
+import { canAccessAdminPath } from "@/lib/permissions";
 import { serverApiBase } from "@/lib/server-api-base";
 
 type Props = {
@@ -16,7 +17,7 @@ export default async function AdminCourseCreatePage({ params, searchParams }: Pr
   const sp = (await searchParams) ?? {};
   const me = await getMe();
   if (!me) redirect(`/${locale}/login`);
-  if (!me.is_superadmin) redirect(`/${locale}/dashboard`);
+  if (!canAccessAdminPath(me, "courses/new")) redirect(`/${locale}/dashboard`);
 
   const courses = (await adminListCourses(null, null, null, 200, 0))?.items ?? [];
 

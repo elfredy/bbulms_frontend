@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { AdminRowMenu } from "@/components/admin/AdminRowMenu";
 import { adminListOrders, pageList } from "@/lib/admin-org";
 import { getMe } from "@/lib/api";
+import { canAccessAdminPath } from "@/lib/permissions";
 
 import styles from "../../dashboard.module.css";
 
@@ -17,7 +18,7 @@ export default async function AdminOrdersPage({ params, searchParams }: Props) {
   const sp = (await searchParams) ?? {};
   const me = await getMe();
   if (!me) redirect(`/${locale}/login`);
-  if (!me.is_superadmin) redirect(`/${locale}/dashboard`);
+  if (!canAccessAdminPath(me, "orders")) redirect(`/${locale}/dashboard`);
 
   const q = (sp.q ?? "").trim();
   const pageSize = Math.min(200, Math.max(1, Number(sp.pageSize) || 25));

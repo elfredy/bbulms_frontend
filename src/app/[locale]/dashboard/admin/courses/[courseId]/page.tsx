@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { AdminCourseMeetingsClient } from "@/components/AdminCourseMeetingsClient";
 import { adminListCourseMeetings, getMe } from "@/lib/api";
+import { canAccessAdminPath } from "@/lib/permissions";
 
 import styles from "../../../dashboard.module.css";
 
@@ -18,7 +19,7 @@ export default async function AdminCourseMeetingsPage({ params, searchParams }: 
 
   const me = await getMe();
   if (!me) redirect(`/${locale}/login`);
-  if (!me.is_superadmin) redirect(`/${locale}/dashboard`);
+  if (!canAccessAdminPath(me, "courses/[courseId]")) redirect(`/${locale}/dashboard`);
 
   const from = (sp.from ?? "").trim() || null;
   const to = (sp.to ?? "").trim() || null;
