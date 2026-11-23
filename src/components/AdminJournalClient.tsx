@@ -63,11 +63,32 @@ type Grid = {
 
 const WINDOW_SIZE = 7;
 const STATUS_CONFIRMED = "110000058";
-const ATTENDANCE_CODES = new Set(["i.e", "q.b", "qb", "q.iş", "ü.z"]);
+const ATTENDANCE_CODES = new Set(["i.e", "q.b", "qb", "q.iş", "ü.z", "ü/qb", "u/qb"]);
+const ADMIN_ATTENDANCE_OPTIONS: { value: string; label: string }[] = [
+  { value: "", label: "—" },
+  { value: "i.e", label: "i.e" },
+  { value: "q.b", label: "q.b" },
+  { value: "ü/qb", label: "ü/qb" },
+  { value: "q.iş", label: "q.iş" },
+  { value: "ü.z", label: "ü.z" },
+];
 
 function isQb(raw: string | null | undefined): boolean {
   const s = String(raw ?? "").trim().toLowerCase().replace(/\s+/g, "");
   return s === "q.b" || s === "qb";
+}
+
+function isUzQb(raw: string | null | undefined): boolean {
+  const s = String(raw ?? "").trim().toLowerCase().replace(/\s+/g, "");
+  return s === "ü/qb" || s === "u/qb";
+}
+
+/** Boş və ya davamiyyət kodu — admin select ilə redaktə olunur; rəqəm qiymət toxunulmur. */
+function isEditableAttendanceDisplay(raw: string | null | undefined): boolean {
+  const v = String(raw ?? "").trim();
+  if (!v) return true;
+  const s = v.toLowerCase().replace(/\s+/g, "");
+  return ATTENDANCE_CODES.has(s) || ATTENDANCE_CODES.has(v.toLowerCase());
 }
 
 function parseNum(v: string | null | undefined): number | null {
@@ -92,9 +113,10 @@ function lessonTypeShort(m: Meeting): string | null {
 function cellTone(value: string): string {
   const v = value.trim();
   if (!v) return styles.cellEmpty;
-  const s = v.toLowerCase();
-  if (ATTENDANCE_CODES.has(s) || isQb(v)) {
+  const s = v.toLowerCase().replace(/\s+/g, "");
+  if (ATTENDANCE_CODES.has(s) || ATTENDANCE_CODES.has(v.toLowerCase()) || isQb(v) || isUzQb(v)) {
     if (isQb(v)) return styles.cellNeutral;
+    if (isUzQb(v)) return styles.cellWarn;
     return styles.cellGood;
   }
   const n = parseNum(v);
@@ -367,11 +389,45 @@ export function AdminJournalClient({
   const windowMeetings = meetings.slice(windowStart, windowStart + WINDOW_SIZE);
   const maxStart = Math.max(0, meetings.length - WINDOW_SIZE);
 
+  async function saveAttendance(meetingId: string, studentId: string, nextValue: string) {
+    if (!courseId) return;
+    const evaA = evaAttendance[0];
+    setBusy(true);
+    setError(null);
+    setOkMsg(null);
+    try {
+      const res = await fetch(
+        `/api/admin/journal/courses/${encodeURIComponent(courseId)}/meetings/${encodeURIComponent(meetingId)}/attendance`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            student_id: studentId,
+            course_eva_id: evaA?.course_eva_id || undefined,
+            value: nextValue || null,
+          }),
+        },
+      );
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError(typeof data?.detail === "string" ? data.detail : "Davamiyyət saxlanmadı");
+        return;
+      }
+      setOkMsg(nextValue === "ü/qb" ? "ü/qb yazıldı (davamiyyət ortalamasına təsir etmir)." : "Davamiyyət yeniləndi.");
+      await loadGrid(courseId, focusMeetingId || undefined);
+    } catch {
+      setError("Davamiyyət saxlanmadı");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function liftConfirm(meetingId: string) {
     if (!courseId) return;
     if (
       !window.confirm(
-        "Müraciət qəbul edilsin? Jurnal açılacaq və təsdiqlənməmiş bütün dərslər müəllimə açılacaq.",
+        "Müraciət qəbul edilsin? Jurnal açılacaq və təsdiqlənməmiş bütün dərslər müəllimə açılacaq. Yazılmış q.b dəyişməz qalır.",
       )
     )
       return;
@@ -391,8 +447,8 @@ export function AdminJournalClient({
       const opened = Number(data?.opened_unconfirmed_count ?? 0);
       setOkMsg(
         opened > 0
-          ? `Jurnal açıldı; təsdiqlənməmiş ${opened} dərs müəllimə açıldı.`
-          : "Təsdiq qaldırıldı; jurnal açıldı. Müəllim dəyişiklik edə bilər.",
+          ? `Jurnal açıldı; təsdiqlənməmiş ${opened} dərs müəllimə açıldı. Yazılmış q.b dəyişməz (yalnız ü/qb admin).`
+          : "Təsdiq qaldırıldı; jurnal açıldı. Yazılmış q.b dəyişməz (yalnız ü/qb admin).",
       );
       window.dispatchEvent(new Event("bbu-journal-unlocks-changed"));
       await loadGrid(courseId, meetingId);
@@ -481,7 +537,7 @@ export function AdminJournalClient({
         setError(typeof data?.detail === "string" ? data.detail : "Təsdiq qaldırılmadı");
         return;
       }
-      setOkMsg("Təsdiq qaldırıldı. Müəllim dəyişiklik edə bilər.");
+      setOkMsg("Təsdiq qaldırıldı. Müəllim dəyişiklik edə bilər (yazılmış q.b istisna).");
       window.dispatchEvent(new Event("bbu-journal-unlocks-changed"));
       await loadGrid(courseId, focusMeetingId || undefined);
     } finally {
@@ -520,7 +576,7 @@ export function AdminJournalClient({
         return;
       }
       const count = Number(data?.count ?? confirmedCount);
-      setOkMsg(`${count} dərsin təsdiqi qaldırıldı. Müəllim dəyişiklik edə bilər.`);
+      setOkMsg(`${count} dərsin təsdiqi qaldırıldı. Yazılmış q.b dəyişməz (yalnız ü/qb admin).`);
       window.dispatchEvent(new Event("bbu-journal-unlocks-changed"));
       await loadGrid(courseId, focusMeetingId || undefined);
     } finally {
@@ -678,9 +734,30 @@ export function AdminJournalClient({
                       </td>
                       {windowMeetings.map((m) => {
                         const value = displayValue(s.student_id, m.course_meeting_id);
+                        const editable = isEditableAttendanceDisplay(value);
                         return (
                           <td key={m.course_meeting_id} className={styles.td}>
-                            <span className={`${styles.cell} ${cellTone(value)}`}>{value || "—"}</span>
+                            {editable ? (
+                              <select
+                                className={`${styles.cellSelect} ${cellTone(value)}`}
+                                value={isUzQb(value) ? "ü/qb" : value}
+                                disabled={busy || !evaAttendance[0]}
+                                title={
+                                  !evaAttendance[0]
+                                    ? "EVA_01 tapılmadı"
+                                    : "Admin davamiyyət (ü/qb ortalamaya təsir etmir)"
+                                }
+                                onChange={(e) => void saveAttendance(m.course_meeting_id, s.student_id, e.target.value)}
+                              >
+                                {ADMIN_ATTENDANCE_OPTIONS.map((o) => (
+                                  <option key={o.value || "empty"} value={o.value}>
+                                    {o.label}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <span className={`${styles.cell} ${cellTone(value)}`}>{value || "—"}</span>
+                            )}
                           </td>
                         );
                       })}

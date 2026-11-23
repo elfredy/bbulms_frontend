@@ -254,6 +254,26 @@
   font-size: 0.8rem;
 }
 
+.cellSelect {
+  min-width: 64px;
+  max-width: 88px;
+  height: 30px;
+  border: 1px solid rgba(2, 6, 23, 0.14);
+  border-radius: 6px;
+  background: #fff;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-align: center;
+  padding: 0 4px;
+  cursor: pointer;
+}
+
+.cellSelect:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
 .cellEmpty {
   color: rgba(15, 23, 42, 0.35);
 }

@@ -78,12 +78,20 @@ const LEAVE_INCOMPLETE_MSG =
   "Bəzi tələbələrdə qiymət və ya i.e / q.b yazılmayıb (qırmızı sətirlər). Dəyişikliklər yadda qalır, ümumi hesablama üçün təsdiq lazımdır. Səhifəni tərk etmək istəyirsiniz?";
 
 function isAttendanceValue(rawValue: string | null | undefined): boolean {
-  return ATTENDANCE_CODE_SET.has(String(rawValue ?? "").trim().toLowerCase());
+  const s = String(rawValue ?? "").trim().toLowerCase();
+  if (ATTENDANCE_CODE_SET.has(s)) return true;
+  const compact = s.replace(/\s+/g, "");
+  return compact === "ü/qb" || compact === "u/qb" || compact === "qb";
 }
 
 function isQbText(rawValue: string | null | undefined): boolean {
   const s = String(rawValue ?? "").trim().toLowerCase().replace(/\s+/g, "");
   return s === "q.b" || s === "qb";
+}
+
+function isUzQbText(rawValue: string | null | undefined): boolean {
+  const s = String(rawValue ?? "").trim().toLowerCase().replace(/\s+/g, "");
+  return s === "ü/qb" || s === "u/qb";
 }
 
 function meetingStartMs(m: CourseMeetingItem): number | null {
@@ -95,12 +103,13 @@ function meetingStartMs(m: CourseMeetingItem): number | null {
   return Number.isFinite(ms) ? ms : null;
 }
 
+/** Yazılmış q.b (start+20dəq) və admin ü/qb — müəllim dəyişə bilməz; unlock açmır. */
 function isQbLocked(m: CourseMeetingItem, display: string, now: number): boolean {
-  if (m.admin_unlocked) return false;
+  if (isUzQbText(display)) return true;
   if (!isQbText(display)) return false;
   const start = meetingStartMs(m);
   if (start == null) return false;
-  return now >= start + 15 * 60 * 1000;
+  return now >= start + 20 * 60 * 1000;
 }
 
 /** Davamiyyət kodları əvvəl, sonra qiymət (0–max). */
@@ -118,8 +127,9 @@ function cellToneClass(stylesObj: typeof styles, rawValue: string, isAttendanceC
   if (!v) return stylesObj.cellEmpty;
 
   if (isAttendanceCell || isAttendanceValue(v)) {
-    const s = v.toLowerCase();
-    if (s === "q.b") return stylesObj.cellNeutral;
+    const s = v.toLowerCase().replace(/\s+/g, "");
+    if (s === "q.b" || s === "qb") return stylesObj.cellNeutral;
+    if (s === "ü/qb" || s === "u/qb") return stylesObj.cellWarn;
     if (s === "i.e" || s === "q.iş" || s === "ü.z") return stylesObj.cellGood;
     return stylesObj.cellNeutral;
   }
@@ -819,6 +829,7 @@ export function JournalClient({
     if (isQbLocked(meeting, currentDisplay, nowMs)) return;
 
     const next = String(rawNext ?? "").trim();
+    if (isUzQbText(next)) return;
     const n = parseNum(next);
     const isAtt = isAttendanceValue(next);
     const cells: { student_id: string; course_eva_id: string; value: string | null }[] = [];
@@ -877,6 +888,7 @@ export function JournalClient({
   function bulkApplyMeeting(mid: string, meeting: CourseMeetingItem) {
     if (meetingLockedById[mid] || !isLessonOpen(meeting, todayInBaku())) return;
     const raw = (bulkValueByMeetingId[mid] ?? "").trim();
+    if (isUzQbText(raw)) return;
     const evaA = evalAttendance[0];
     const evaS = evalSeminar[0];
     if (!evaA && !evaS) return;
@@ -2174,12 +2186,17 @@ export function JournalClient({
                                 : closed
                                   ? "Yalnız bu günün dərsi aktivdir"
                                   : qbLocked
-                                  ? "q.b dərs başladıqdan 15 dəqiqə sonra dəyişdirilə bilməz"
+                                  ? isUzQbText(display)
+                                    ? "ü/qb yalnız admin dəyişə bilər"
+                                    : "q.b dərs başladıqdan 20 dəqiqə sonra dəyişdirilə bilməz"
                                   : cellMissing
                                     ? "Qiymət və ya i.e / q.b yazılmayıb"
                                     : undefined
                             }
                           >
+                            {isUzQbText(display) && !meetingCombinedOpts.some((o) => o.value === display) ? (
+                              <option value={display}>ü/qb</option>
+                            ) : null}
                             {meetingCombinedOpts.map((o) => (
                               <option key={`${o.value}-${o.label}`} value={o.value}>
                                 {o.label}
