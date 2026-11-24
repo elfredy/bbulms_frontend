@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 
 import { AdminJournalClient } from "@/components/AdminJournalClient";
 import { getMe } from "@/lib/api";
-import { canAccessAdminPath } from "@/lib/permissions";
+import { PERMS, canAccessAdminPath, hasPerm } from "@/lib/permissions";
 
 import styles from "../../dashboard.module.css";
 
@@ -31,6 +31,7 @@ export default async function AdminJournalPage({ params, searchParams }: Props) 
           locale={locale}
           initialCourseId={(sp.course_id ?? "").trim() || undefined}
           initialMeetingId={(sp.meeting_id ?? "").trim() || undefined}
+          canUzQb={hasPerm(me, PERMS.JOURNAL_UZQB)}
         />
       </div>
     </div>

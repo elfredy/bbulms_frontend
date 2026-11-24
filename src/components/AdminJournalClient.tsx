@@ -156,10 +156,13 @@ export function AdminJournalClient({
   locale,
   initialCourseId,
   initialMeetingId,
+  canUzQb = false,
 }: {
   locale: string;
   initialCourseId?: string;
   initialMeetingId?: string;
+  /** journal.uzqb icazəsi (ADMIN, SUPERADMIN). Yoxdursa ü/qb seçilmir və dəyişdirilmir. */
+  canUzQb?: boolean;
 }) {
   const [lookups, setLookups] = useState<{
     current_year_id: string | null;
@@ -734,7 +737,8 @@ export function AdminJournalClient({
                       </td>
                       {windowMeetings.map((m) => {
                         const value = displayValue(s.student_id, m.course_meeting_id);
-                        const editable = isEditableAttendanceDisplay(value);
+                        // ü/qb yalnız canUzQb olanlar dəyişə bilər; yazılmış ü/qb digərlərində yalnız oxunur.
+                        const editable = isEditableAttendanceDisplay(value) && (canUzQb || !isUzQb(value));
                         return (
                           <td key={m.course_meeting_id} className={styles.td}>
                             {editable ? (
@@ -749,7 +753,7 @@ export function AdminJournalClient({
                                 }
                                 onChange={(e) => void saveAttendance(m.course_meeting_id, s.student_id, e.target.value)}
                               >
-                                {ADMIN_ATTENDANCE_OPTIONS.map((o) => (
+                                {ADMIN_ATTENDANCE_OPTIONS.filter((o) => canUzQb || !isUzQb(o.value)).map((o) => (
                                   <option key={o.value || "empty"} value={o.value}>
                                     {o.label}
                                   </option>

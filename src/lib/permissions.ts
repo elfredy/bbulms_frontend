@@ -12,6 +12,7 @@ export const PERMS = {
   EDU_JOURNAL: "edu.journal",
   EDU_EXAM: "edu.exam",
   EDU_TRANSCRIPT: "edu.transcript",
+  JOURNAL_UZQB: "journal.uzqb",
 } as const;
 
 export type PermCode = (typeof PERMS)[keyof typeof PERMS];
