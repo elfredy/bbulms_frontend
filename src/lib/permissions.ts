@@ -1,5 +1,3 @@
-import type { UserProfile } from "./api";
-
 export const PERMS = {
   ROLES_MANAGE: "roles.manage",
   PLANNING: "planning.manage",
@@ -39,7 +37,13 @@ export const ADMIN_ROUTE_PERMS: { match: RegExp | string; perm: PermCode }[] = [
   { match: /^student-transcript/, perm: PERMS.EDU_TRANSCRIPT },
 ];
 
-export function hasPerm(me: Pick<UserProfile, "permissions" | "is_superadmin"> | null | undefined, ...needed: string[]): boolean {
+type PermSubject = {
+  permissions?: string[] | null;
+  is_superadmin?: boolean | null;
+  can_access_admin?: boolean | null;
+};
+
+export function hasPerm(me: PermSubject | null | undefined, ...needed: string[]): boolean {
   if (!me) return false;
   if (me.is_superadmin) return true;
   const have = new Set(me.permissions ?? []);
@@ -47,14 +51,14 @@ export function hasPerm(me: Pick<UserProfile, "permissions" | "is_superadmin"> |
   return needed.some((p) => have.has(p));
 }
 
-export function canAccessAdmin(me: Pick<UserProfile, "permissions" | "is_superadmin" | "can_access_admin"> | null | undefined): boolean {
+export function canAccessAdmin(me: PermSubject | null | undefined): boolean {
   if (!me) return false;
   if (me.can_access_admin || me.is_superadmin) return true;
   return (me.permissions?.length ?? 0) > 0;
 }
 
 export function canAccessAdminPath(
-  me: Pick<UserProfile, "permissions" | "is_superadmin" | "can_access_admin"> | null | undefined,
+  me: PermSubject | null | undefined,
   adminPath: string,
 ): boolean {
   if (!canAccessAdmin(me)) return false;
