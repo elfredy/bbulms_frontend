@@ -197,6 +197,8 @@ export function TimetableBuilder() {
   const [editing, setEditing] = useState(false);
   const [editScope, setEditScope] = useState<"semester" | "until">("semester");
   const [untilDate, setUntilDate] = useState("");
+  // Fənn qrupunda artıq təsdiqlənmiş dərs olsa belə yeni dərs növü keçmiş tarixlərə də yazılsın
+  const [includePast, setIncludePast] = useState(false);
   const locked = confirmInfo.confirmed && !editing;
 
   function chosenUntil(): { ok: true; until_date: string | null } | { ok: false } {
@@ -464,6 +466,7 @@ export function TimetableBuilder() {
       course_group_id: lesson.course_group_id || null,
       until_date: scope.until_date,
       split_full: weekType !== 3 && isSplit(lesson),
+      include_past: includePast,
     });
     setBusy(false);
     if (!res.ok) {
@@ -980,6 +983,10 @@ export function TimetableBuilder() {
                 }}
                 onClick={() => setEditScope("until")}
               />
+            </label>
+            <label className={styles.scopeOption}>
+              <input type="checkbox" checked={includePast} onChange={(e) => setIncludePast(e.target.checked)} />
+              Keçmiş tarixlərə də əlavə et (yeni əlavə olunan dərs, məs. seminar, semestr başlanğıcından bu günə qədər də yazılsın ki, müəllim əvvəlki dərslərə məlumat yaza bilsin)
             </label>
           </fieldset>
         ) : null}

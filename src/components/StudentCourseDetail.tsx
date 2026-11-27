@@ -53,8 +53,23 @@ export function StudentCourseDetailView({ data, locale }: { data: Detail; locale
     { label: "q.b sayı", value: String(data.qb_count) },
   ];
 
+  const hasLive = data.davamiyyet != null || data.aktivlik != null;
+  const breakdown = hasLive
+    ? [
+        { label: "Davamiyyət", value: data.davamiyyet },
+        { label: "Aktivlik", value: data.aktivlik },
+        { label: "Kollokvium", value: data.collokvium },
+        { label: "Sərbəst iş", value: data.serbestish },
+      ].filter((item) => String(item.value ?? "").trim())
+    : [];
+
+  // Davamiyyət/aktivlik/imtahan artıq yuxarıdakı hesabda var — təkrar göstərmə
+  const extraScores = hasLive
+    ? data.scores.filter((sc) => !["EVA_01", "EVA_02", "EVA_03"].includes((sc.code ?? "").toUpperCase()))
+    : data.scores;
+
   const official = [
-    { label: "İmtahana qədərki bal", value: data.before_point },
+    { label: "İmtahana qədərki yekun bal", value: data.before_point },
     { label: "İmtahan balı", value: data.exam_point },
     { label: "Yekun bal", value: data.end_point },
   ].filter((item) => String(item.value ?? "").trim());
@@ -88,11 +103,22 @@ export function StudentCourseDetailView({ data, locale }: { data: Detail; locale
         ))}
       </section>
 
-      {data.scores.length || official.length ? (
+      {extraScores.length || official.length || breakdown.length ? (
         <section className={styles.block}>
           <h2 className={styles.blockTitle}>Qiymətlər</h2>
+          <p className={styles.hint}>
+            {data.is_final
+              ? "Jurnal bağlanıb — rəsmi yekun ballar."
+              : "Jurnal hələ bağlanmayıb. Ballar təsdiqlənmiş dərslər üzrə cari hesabdır və dəyişə bilər."}
+          </p>
           <div className={styles.scores}>
-            {data.scores.map((score) => (
+            {breakdown.map((item) => (
+              <div key={item.label} className={styles.score}>
+                <span className={styles.scoreName}>{item.label}</span>
+                <span className={styles.scorePoint}>{item.value}</span>
+              </div>
+            ))}
+            {extraScores.map((score) => (
               <div key={`${score.code ?? ""}-${score.name_az ?? ""}`} className={styles.score}>
                 <span className={styles.scoreName}>{score.name_az || score.code || "Bal"}</span>
                 <span className={styles.scorePoint}>{score.point}</span>

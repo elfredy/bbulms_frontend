@@ -27,10 +27,13 @@ export function SubjectGroupRowMenu({
   courseId,
   organizationId,
   educationPlanSubjectId,
+  readOnly = false,
 }: {
   courseId: string;
   organizationId?: string | null;
   educationPlanSubjectId?: string | null;
+  /** Tyutor: yalnız jurnala baxış. */
+  readOnly?: boolean;
 }) {
   const locale = useLocale();
   const router = useRouter();
@@ -198,6 +201,20 @@ export function SubjectGroupRowMenu({
           role="menu"
           style={menuPos ? { top: menuPos.top, right: menuPos.right } : undefined}
         >
+            {readOnly ? (
+              <button
+                type="button"
+                className={styles.item}
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false);
+                  router.push(`/${locale}/dashboard/admin/journal?course_id=${encodeURIComponent(courseId)}`);
+                }}
+              >
+                Jurnala bax
+              </button>
+            ) : (
+              <>
             <button
               type="button"
               className={styles.item}
@@ -229,6 +246,8 @@ export function SubjectGroupRowMenu({
             <button type="button" className={styles.item} role="menuitem" disabled={busy} onClick={() => void onActivate()}>
               Jurnalın aktivləşdirilməsi
             </button>
+              </>
+            )}
             {error ? <p className={styles.error}>{error}</p> : null}
         </div>
       ) : null}

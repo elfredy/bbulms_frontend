@@ -25,7 +25,7 @@ export default async function DashboardLayout({ children, params }: Props) {
   const isDepartment = Boolean(me.is_department_user) && (role === "OWNER" || role === "TYUTOR");
   const forcePassword = Boolean(me.must_change_password);
 
-  const adminItems: { href: string; label: string; section: string; perm: string }[] = [
+  const adminItems: { href: string; label: string; section: string; perm: string | string[] }[] = [
     { href: `/${locale}/dashboard/admin/edu-years`, label: "Tədris illərinin qrafiki", section: "Planlama", perm: PERMS.PLANNING },
     { href: `/${locale}/dashboard/admin/academic-calendar`, label: "Akademik təqvim", section: "Planlama", perm: PERMS.PLANNING },
     { href: `/${locale}/dashboard/admin/evaluation`, label: "Qiymətləndirmə sistemi", section: "Planlama", perm: PERMS.PLANNING },
@@ -39,9 +39,9 @@ export default async function DashboardLayout({ children, params }: Props) {
     { href: `/${locale}/dashboard/admin/subject-catalog`, label: "Kafedralar üzrə fənn kataloqu", section: "Təhsil proqramları", perm: PERMS.EDU_CATALOG },
     { href: `/${locale}/dashboard/admin/subject-blocks`, label: "Fənn blokları", section: "Təhsil proqramları", perm: PERMS.PLANNING },
     { href: `/${locale}/dashboard/admin/education-plans`, label: "Tədris planları", section: "Təhsil proqramları", perm: PERMS.EDU_PLANS },
-    { href: `/${locale}/dashboard/admin/subject-groups`, label: "Fənn qrupları", section: "Təhsil proqramları", perm: PERMS.EDU_PLANS },
+    { href: `/${locale}/dashboard/admin/subject-groups`, label: "Fənn qrupları", section: "Təhsil proqramları", perm: [PERMS.EDU_PLANS, PERMS.EDU_SUBJECT_GROUPS_VIEW] },
     { href: `/${locale}/dashboard/admin/courses`, label: "Cari semestrin dərs cədvəli", section: "Təhsil proqramları", perm: PERMS.EDU_TIMETABLE },
-    { href: `/${locale}/dashboard/admin/journal`, label: "Jurnal admin", section: "Təhsil proqramları", perm: PERMS.EDU_JOURNAL },
+    { href: `/${locale}/dashboard/admin/journal`, label: "Jurnal admin", section: "Təhsil proqramları", perm: [PERMS.EDU_JOURNAL, PERMS.EDU_JOURNAL_VIEW] },
     { href: `/${locale}/dashboard/admin/exams`, label: "İmtahan", section: "Təhsil proqramları", perm: PERMS.EDU_EXAM },
     { href: `/${locale}/dashboard/admin/student-transcript`, label: "Tələbə transkripti", section: "Təhsil proqramları", perm: PERMS.EDU_TRANSCRIPT },
   ];
@@ -64,7 +64,7 @@ export default async function DashboardLayout({ children, params }: Props) {
           : []),
         ...(isTutor ? [{ href: `/${locale}/dashboard/tutor`, label: "Tyutor paneli", section: "Tyutor" }] : []),
         ...adminItems
-          .filter((item) => hasPerm(me, item.perm))
+          .filter((item) => hasPerm(me, ...(Array.isArray(item.perm) ? item.perm : [item.perm])))
           .map(({ href, label, section }) => ({ href, label, section })),
         ...(isDepartment ? [{ href: `/${locale}/dashboard/department`, label: "Kafedra paneli", section: "Kafedra" }] : []),
       ];

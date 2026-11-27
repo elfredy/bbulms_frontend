@@ -350,7 +350,7 @@ export function AdminTranscriptClient({
                 </thead>
                 <tbody>
                   {rows.map((r, i) => (
-                    <tr key={r.id || `${r.subject_code}-${i}`} className={styles.row}>
+                    <tr key={`${r.id || r.subject_code}-${i}`} className={styles.row}>
                       <td className={`${styles.td} ${styles.tdCenter}`}>{i + 1}</td>
                       <td className={styles.td}>{r.subject_name || "—"}</td>
                       <td className={`${styles.td} ${styles.tdCenter}`}>{r.credit ?? "—"}</td>

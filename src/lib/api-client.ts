@@ -598,6 +598,7 @@ export async function adminTimetablePlace(body: {
   course_group_id?: string | null;
   until_date?: string | null;
   split_full?: boolean;
+  include_past?: boolean;
 }): Promise<{ ok: true; created_count: number } | { ok: false; error: string }> {
   const res = await fetch("/api/admin/timetable/place", {
     method: "POST",
@@ -608,6 +609,25 @@ export async function adminTimetablePlace(body: {
   if (!res.ok) return { ok: false, error: (await readErrorDetail(res)) || "Yerləşdirilmədi" };
   const data = (await res.json()) as { created_count?: number };
   return { ok: true, created_count: Number(data.created_count ?? 0) };
+}
+
+export async function adminTimetableBackfillPast(body: {
+  course_id: string;
+  lesson_type_id?: string | null;
+}): Promise<{ ok: true; created_count: number; skipped_busy_count: number } | { ok: false; error: string }> {
+  const res = await fetch("/api/admin/timetable/backfill-past", {
+    method: "POST",
+    credentials: "include",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) return { ok: false, error: (await readErrorDetail(res)) || "Keçmiş dərslər tamamlanmadı" };
+  const data = (await res.json()) as { created_count?: number; skipped_busy_count?: number };
+  return {
+    ok: true,
+    created_count: Number(data.created_count ?? 0),
+    skipped_busy_count: Number(data.skipped_busy_count ?? 0),
+  };
 }
 
 export async function adminTimetableUnplace(body: {

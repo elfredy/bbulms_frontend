@@ -42,9 +42,9 @@ export default async function AdminHomePage({ params }: Props) {
       items: [
         { href: `/${locale}/dashboard/admin/subject-catalog`, label: "Kafedralar üzrə fənn kataloqu", perm: PERMS.EDU_CATALOG },
         { href: `/${locale}/dashboard/admin/education-plans`, label: t("educationPlans"), perm: PERMS.EDU_PLANS },
-        { href: `/${locale}/dashboard/admin/subject-groups`, label: t("subjectGroups"), perm: PERMS.EDU_PLANS },
+        { href: `/${locale}/dashboard/admin/subject-groups`, label: t("subjectGroups"), perm: [PERMS.EDU_PLANS, PERMS.EDU_SUBJECT_GROUPS_VIEW] },
         { href: `/${locale}/dashboard/admin/courses`, label: t("timetable"), perm: PERMS.EDU_TIMETABLE },
-        { href: `/${locale}/dashboard/admin/journal`, label: "Jurnal admin", perm: PERMS.EDU_JOURNAL },
+        { href: `/${locale}/dashboard/admin/journal`, label: "Jurnal admin", perm: [PERMS.EDU_JOURNAL, PERMS.EDU_JOURNAL_VIEW] },
         { href: `/${locale}/dashboard/admin/exams`, label: "İmtahan", perm: PERMS.EDU_EXAM },
         { href: `/${locale}/dashboard/admin/student-transcript`, label: "Tələbə transkripti", perm: PERMS.EDU_TRANSCRIPT },
       ],
@@ -52,7 +52,7 @@ export default async function AdminHomePage({ params }: Props) {
   ]
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => hasPerm(me, item.perm)),
+      items: group.items.filter((item) => hasPerm(me, ...(Array.isArray(item.perm) ? item.perm : [item.perm]))),
     }))
     .filter((group) => group.items.length > 0);
 

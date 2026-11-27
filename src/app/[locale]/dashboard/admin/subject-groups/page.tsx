@@ -3,7 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 
 import { adminListSubjectGroups, getMe } from "@/lib/api";
-import { canAccessAdminPath } from "@/lib/permissions";
+import { PERMS, canAccessAdminPath, hasPerm } from "@/lib/permissions";
 import { SubjectGroupRowMenu } from "@/components/SubjectGroupRowMenu";
 
 import styles from "../../dashboard.module.css";
@@ -46,6 +46,7 @@ export default async function AdminSubjectGroupsPage({ params, searchParams }: P
   if (!me) redirect(`/${locale}/login`);
   if (!canAccessAdminPath(me, "subject-groups")) redirect(`/${locale}/dashboard`);
 
+  const canManage = hasPerm(me, PERMS.EDU_PLANS);
   const q = (sp.q ?? "").trim();
   const educationPlanId = (sp.education_plan_id ?? "").trim();
   const createdId = (sp.created ?? "").trim();
@@ -111,9 +112,11 @@ export default async function AdminSubjectGroupsPage({ params, searchParams }: P
               {t("showOldYears")}
             </Link>
           )}
-          <Link href={`/${locale}/dashboard/admin/subject-groups/new`} className={styles.actionLinkPrimary}>
-            {t("subjectGroupCreate")}
-          </Link>
+          {canManage ? (
+            <Link href={`/${locale}/dashboard/admin/subject-groups/new`} className={styles.actionLinkPrimary}>
+              {t("subjectGroupCreate")}
+            </Link>
+          ) : null}
         </div>
       </header>
 
@@ -181,6 +184,7 @@ export default async function AdminSubjectGroupsPage({ params, searchParams }: P
                         courseId={g.id}
                         organizationId={g.organization_id}
                         educationPlanSubjectId={g.education_plan_subject_id}
+                        readOnly={!canManage}
                       />
                     </td>
                   </tr>

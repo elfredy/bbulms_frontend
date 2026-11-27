@@ -1893,12 +1893,15 @@ export function JournalClient({
 
       {!journalClosed && closeStatus && !closeStatus.can_close && (closeStatus.open_meeting_count > 0 || closeStatus.open_exercise_count > 0) ? (
         <p className={styles.closeHint}>
-          Bağlamaq üçün:{" "}
-          {closeStatus.open_meeting_count > 0 ? `${closeStatus.open_meeting_count} dərs təsdiqlənməyib` : null}
-          {closeStatus.open_meeting_count > 0 && closeStatus.open_exercise_count > 0 ? ", " : null}
-          {closeStatus.open_exercise_count > 0
-            ? `${closeStatus.open_exercise_count} kollokvium/referat təsdiqlənməyib`
-            : null}
+          Jurnalı bağlamaq üçün bütün tarixlər doldurulub təsdiqlənməlidir:{" "}
+          {closeStatus.reasons?.length
+            ? closeStatus.reasons.join(", ")
+            : [
+                closeStatus.open_meeting_count > 0 ? `${closeStatus.open_meeting_count} dərs təsdiqlənməyib` : "",
+                closeStatus.open_exercise_count > 0 ? `${closeStatus.open_exercise_count} kollokvium/referat təsdiqlənməyib` : "",
+              ]
+                .filter(Boolean)
+                .join(", ")}
           .
         </p>
       ) : null}

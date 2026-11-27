@@ -13,12 +13,15 @@ export const PERMS = {
   EDU_EXAM: "edu.exam",
   EDU_TRANSCRIPT: "edu.transcript",
   JOURNAL_UZQB: "journal.uzqb",
+  JOURNAL_ATTENDANCE_EDIT: "journal.attendance_edit",
+  EDU_JOURNAL_VIEW: "edu.journal.view",
+  EDU_SUBJECT_GROUPS_VIEW: "edu.subject_groups.view",
 } as const;
 
 export type PermCode = (typeof PERMS)[keyof typeof PERMS];
 
 /** Path prefix (after /dashboard/admin/) → required permission */
-export const ADMIN_ROUTE_PERMS: { match: RegExp | string; perm: PermCode }[] = [
+export const ADMIN_ROUTE_PERMS: { match: RegExp | string; perm: PermCode | PermCode[] }[] = [
   { match: /^edu-years/, perm: PERMS.PLANNING },
   { match: /^academic-calendar/, perm: PERMS.PLANNING },
   { match: /^evaluation/, perm: PERMS.PLANNING },
@@ -31,9 +34,11 @@ export const ADMIN_ROUTE_PERMS: { match: RegExp | string; perm: PermCode }[] = [
   { match: /^departments/, perm: PERMS.ORG_DEPARTMENTS },
   { match: /^subject-catalog/, perm: PERMS.EDU_CATALOG },
   { match: /^education-plans/, perm: PERMS.EDU_PLANS },
-  { match: /^subject-groups/, perm: PERMS.EDU_PLANS },
+  // Alt səhifələr (yeni/redaktə) yalnız edu.plans; siyahı tyutor üçün də açıqdır
+  { match: /^subject-groups\/.+/, perm: PERMS.EDU_PLANS },
+  { match: /^subject-groups\/?$/, perm: [PERMS.EDU_PLANS, PERMS.EDU_SUBJECT_GROUPS_VIEW] },
   { match: /^courses/, perm: PERMS.EDU_TIMETABLE },
-  { match: /^journal/, perm: PERMS.EDU_JOURNAL },
+  { match: /^journal/, perm: [PERMS.EDU_JOURNAL, PERMS.EDU_JOURNAL_VIEW] },
   { match: /^exams/, perm: PERMS.EDU_EXAM },
   { match: /^student-transcript/, perm: PERMS.EDU_TRANSCRIPT },
 ];
@@ -52,6 +57,15 @@ export function hasPerm(me: PermSubject | null | undefined, ...needed: string[])
   return needed.some((p) => have.has(p));
 }
 
+const VIEW_ONLY_PERMS = new Set<string>([PERMS.EDU_JOURNAL_VIEW, PERMS.EDU_SUBJECT_GROUPS_VIEW]);
+
+/** Yalnız-baxış icazələrindən (tyutor) başqa ən azı bir admin icazəsi var. */
+function hasFullAdminAccess(me: PermSubject | null | undefined): boolean {
+  if (!me) return false;
+  if (me.is_superadmin) return true;
+  return (me.permissions ?? []).some((p) => !VIEW_ONLY_PERMS.has(p));
+}
+
 export function canAccessAdmin(me: PermSubject | null | undefined): boolean {
   if (!me) return false;
   if (me.can_access_admin || me.is_superadmin) return true;
@@ -67,8 +81,8 @@ export function canAccessAdminPath(
   if (!rel || rel === "") return true;
   for (const rule of ADMIN_ROUTE_PERMS) {
     if (typeof rule.match === "string" ? rel.startsWith(rule.match) : rule.match.test(rel)) {
-      return hasPerm(me, rule.perm);
+      return hasPerm(me, ...(Array.isArray(rule.perm) ? rule.perm : [rule.perm]));
     }
   }
-  return canAccessAdmin(me);
+  return canAccessAdmin(me) && hasFullAdminAccess(me);
 }

@@ -32,6 +32,8 @@ export default async function AdminJournalPage({ params, searchParams }: Props) 
           initialCourseId={(sp.course_id ?? "").trim() || undefined}
           initialMeetingId={(sp.meeting_id ?? "").trim() || undefined}
           canUzQb={hasPerm(me, PERMS.JOURNAL_UZQB)}
+          canManage={hasPerm(me, PERMS.EDU_JOURNAL)}
+          canEditAttendance={hasPerm(me, PERMS.JOURNAL_ATTENDANCE_EDIT)}
         />
       </div>
     </div>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { SearchableSelect } from "@/components/SearchableSelect";
+import { adminTimetableBackfillPast } from "@/lib/api-client";
 import { fmtClockRange } from "@/lib/clock-time";
 
 import styles from "./AdminJournal.module.css";
@@ -157,12 +158,18 @@ export function AdminJournalClient({
   initialCourseId,
   initialMeetingId,
   canUzQb = false,
+  canManage = true,
+  canEditAttendance = false,
 }: {
   locale: string;
   initialCourseId?: string;
   initialMeetingId?: string;
   /** journal.uzqb icazəsi (ADMIN, SUPERADMIN). Yoxdursa ü/qb seçilmir və dəyişdirilmir. */
   canUzQb?: boolean;
+  /** edu.journal: təsdiq qaldırma, slot silmə, jurnal aktivləşdirmə/açma. Tyutor üçün false (yalnız baxış). */
+  canManage?: boolean;
+  /** journal.attendance_edit (yalnız ADMIN, SUPERADMIN): davamiyyət (qaib) hüceyrəsini dəyişmək. */
+  canEditAttendance?: boolean;
 }) {
   const [lookups, setLookups] = useState<{
     current_year_id: string | null;
@@ -610,6 +617,34 @@ export function AdminJournalClient({
     }
   }
 
+  async function backfillPastMeetings() {
+    if (!courseId) return;
+    if (
+      !window.confirm(
+        "Cədvəldə olan bütün dərs növləri (mühazirə, seminar, …) üçün semestr başlanğıcından ilk yazılmış dərsə qədər əskik keçmiş dərslər əlavə olunsun? Mövcud dərs və qiymətlər dəyişməz.",
+      )
+    )
+      return;
+    setBusy(true);
+    setError(null);
+    setOkMsg(null);
+    try {
+      const res = await adminTimetableBackfillPast({ course_id: courseId });
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      setOkMsg(
+        res.created_count > 0
+          ? `${res.created_count} keçmiş dərs əlavə olundu${res.skipped_busy_count ? ` (${res.skipped_busy_count} tarix müəllim məşğul olduğuna görə keçildi)` : ""}.`
+          : "Əskik keçmiş dərs tapılmadı.",
+      );
+      await loadGrid(courseId, focusMeetingId || undefined);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className={styles.wrap}>
       <section className={styles.gridCard}>
@@ -661,7 +696,7 @@ export function AdminJournalClient({
                         <span className={styles.headStatus}>
                           {confirmed ? "Təsdiq olunub" : empty ? "Boş slot" : closed ? "Bağlı" : " "}
                         </span>
-                        {empty ? (
+                        {empty && canManage ? (
                           <button
                             type="button"
                             className={styles.deleteSlotBtn}
@@ -672,7 +707,7 @@ export function AdminJournalClient({
                             Slotu sil
                           </button>
                         ) : null}
-                        {request ? (
+                        {request && canManage ? (
                           <div className={styles.requestBox}>
                             <span className={styles.requestText} title={request}>
                               {request}
@@ -700,7 +735,7 @@ export function AdminJournalClient({
                         <div className={styles.headDate}>{ex.label}</div>
                         <span className={styles.headTime}>{fmtDot(ex.start_date) || " "}</span>
                         <span className={styles.headStatus}>{ex.confirmed ? "Təsdiq olunub" : " "}</span>
-                        {request ? (
+                        {request && canManage ? (
                           <div className={styles.requestBox}>
                             <span className={styles.requestText} title={request}>
                               {request}
@@ -738,7 +773,7 @@ export function AdminJournalClient({
                       {windowMeetings.map((m) => {
                         const value = displayValue(s.student_id, m.course_meeting_id);
                         // ü/qb yalnız canUzQb olanlar dəyişə bilər; yazılmış ü/qb digərlərində yalnız oxunur.
-                        const editable = isEditableAttendanceDisplay(value) && (canUzQb || !isUzQb(value));
+                        const editable = canEditAttendance && isEditableAttendanceDisplay(value) && (canUzQb || !isUzQb(value));
                         return (
                           <td key={m.course_meeting_id} className={styles.td}>
                             {editable ? (
@@ -884,8 +919,20 @@ export function AdminJournalClient({
         ) : (
           <p className={styles.meta}>{courses.length} fənn qrupu</p>
         )}
+        {canManage ? (
+          <>
         <button type="button" className={styles.activate} onClick={() => void activateJournal()} disabled={!courseId || busy}>
           Jurnalın aktivləşdirilməsi
+        </button>
+        <button
+          type="button"
+          className={styles.activate}
+          style={{ background: "#7c3aed" }}
+          onClick={() => void backfillPastMeetings()}
+          disabled={!courseId || busy}
+          title="Sonradan əlavə olunmuş dərs növünün (məs. seminar) keçmiş tarixlərini tamamlayır"
+        >
+          Keçmiş dərsləri tamamla
         </button>
         <button
           type="button"
@@ -905,6 +952,8 @@ export function AdminJournalClient({
         >
           Bütün təsdiqləri qaldır
         </button>
+          </>
+        ) : null}
         {groupId ? (
           <Link
             className={styles.activate}
@@ -914,6 +963,7 @@ export function AdminJournalClient({
             Tələbə transkripti
           </Link>
         ) : null}
+        {canManage ? (
         <button
           type="button"
           className={styles.liftAll}
@@ -942,6 +992,7 @@ export function AdminJournalClient({
         >
           Jurnalı yenidən aç
         </button>
+        ) : null}
         {okMsg ? <p className={styles.ok}>{okMsg}</p> : null}
       </aside>
     </div>

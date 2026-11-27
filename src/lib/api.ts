@@ -358,6 +358,21 @@ export type StudentCourseItem = {
   course_id: string;
   subject_name_az: string | null;
   education_year_name: string | null;
+  before_point?: string | null;
+  exam_point?: string | null;
+  end_point?: string | null;
+  credit?: string | null;
+  /** true: jurnal bağlanıb (rəsmi ballar); false: cari hesab */
+  is_final?: boolean;
+};
+
+export type StudentScoreSummary = {
+  average_point: string | null;
+  weighted_average_point: string | null;
+  final_count: number;
+  total_credits: string | null;
+  current_before_average: string | null;
+  current_count: number;
 };
 
 export type StudentCoursesResponse = {
@@ -368,6 +383,7 @@ export type StudentCoursesResponse = {
   future: StudentCourseItem[];
   attestation: StudentCourseItem[];
   practice: StudentCourseItem[];
+  summary?: StudentScoreSummary | null;
 };
 
 export type StudentCourseScore = {
@@ -412,6 +428,11 @@ export type StudentCourseDetail = {
   before_point: string | null;
   exam_point: string | null;
   end_point: string | null;
+  is_final?: boolean;
+  davamiyyet?: string | null;
+  aktivlik?: string | null;
+  collokvium?: string | null;
+  serbestish?: string | null;
   scores: StudentCourseScore[];
   qb_count: number;
   lessons: StudentCourseLesson[];
